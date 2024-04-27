@@ -22,6 +22,8 @@ func (game *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
 }
 
 func main() {
+    log.SetFlags(log.Ldate | log.Lshortfile | log.Lmicroseconds)
+
     ebiten.SetWindowSize(640, 480)
     ebiten.SetWindowTitle("Hello!")
 
