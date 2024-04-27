@@ -27,6 +27,8 @@ func main() {
     ebiten.SetWindowSize(640, 480)
     ebiten.SetWindowTitle("Hello!")
 
+    log.Printf("Running")
+
     err := ebiten.RunGame(&Game{})
     if err != nil {
         log.Printf("Failed to run: %v", err)
