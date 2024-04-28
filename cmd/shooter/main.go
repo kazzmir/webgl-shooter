@@ -2,13 +2,13 @@ package main
 
 import (
     "log"
-    "os"
     "fmt"
     "math/rand"
 
-    "image"
     "image/color"
     _ "image/png"
+
+    gameImages "github.com/kazzmir/webgl-shooter/images"
 
     "github.com/hajimehoshi/ebiten/v2"
     _ "github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -56,17 +56,17 @@ func randomFloat(min float64, max float64) float64 {
 }
 
 func MakeBackground() (*Background, error) {
-    starImage, err := loadPng("images/background/star1.png")
+    starImage, err := gameImages.LoadImage(gameImages.ImageStar1)
     if err != nil {
         return nil, err
     }
 
-    starImage2, err := loadPng("images/background/star2.png")
+    starImage2, err := gameImages.LoadImage(gameImages.ImageStar2)
     if err != nil {
         return nil, err
     }
 
-    planet1, err := loadPng("images/background/planet1.png")
+    planet1, err := gameImages.LoadImage(gameImages.ImagePlanet)
     if err != nil {
         return nil, err
     }
@@ -211,6 +211,7 @@ func (player *Player) HandleKeys(game *Game) error {
     return nil
 }
 
+/*
 func loadPng(path string) (image.Image, error) {
     file, err := os.Open(path)
     if err != nil {
@@ -222,16 +223,20 @@ func loadPng(path string) (image.Image, error) {
     img, _, err := image.Decode(file)
     return img, err
 }
+*/
 
 func MakePlayer(x, y float64) (*Player, error) {
 
-    playerImage, err := loadPng("images/player/player.png")
+    playerImage, err := gameImages.LoadImage(gameImages.ImagePlayer)
 
     if err != nil {
         return nil, err
     }
 
-    bulletImage, err := loadPng("images/player/bullet.png")
+    bulletImage, err := gameImages.LoadImage(gameImages.ImageBullet)
+    if err != nil {
+        return nil, err
+    }
 
     return &Player{x: x, y: y, pic: ebiten.NewImageFromImage(playerImage), bullet: ebiten.NewImageFromImage(bulletImage)}, nil
 }
