@@ -14,6 +14,9 @@ import (
     "github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
+const ScreenWidth = 800
+const ScreenHeight = 600
+
 type Bullet struct {
     x, y float64
     velocityX, velocityY float64
@@ -67,14 +70,14 @@ func (player *Player) Move() {
 
     if player.x < 0 {
         player.x = 0
-    } else if player.x > 640 {
-        player.x = 640
+    } else if player.x > ScreenWidth {
+        player.x = ScreenWidth
     }
 
     if player.y < 0 {
         player.y = 0
-    } else if player.y > 480 {
-        player.y = 480
+    } else if player.y > ScreenHeight {
+        player.y = ScreenHeight
     }
 }
 
@@ -187,7 +190,7 @@ func (game *Game) Draw(screen *ebiten.Image) {
 }
 
 func (game *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
-    return 640, 480
+    return ScreenWidth, ScreenHeight
 }
 
 func main() {
