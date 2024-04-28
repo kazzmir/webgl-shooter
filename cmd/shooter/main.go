@@ -4,6 +4,7 @@ import (
     "log"
     "os"
     "fmt"
+    "math/rand"
 
     "image"
     "image/color"
@@ -38,11 +39,58 @@ func (bullet *Bullet) IsAlive() bool {
     return bullet.y > 0
 }
 
+type StarPosition struct {
+    x, y float64
+    dx, dy float64
+}
+
 type Background struct {
+    Star *ebiten.Image
+    Stars []*StarPosition
+}
+
+func randomFloat(min float64, max float64) float64 {
+    return min + rand.Float64() * (max - min)
+}
+
+func MakeBackground() (*Background, error) {
+    starImage, err := loadPng("images/background/star1.png")
+    if err != nil {
+        return nil, err
+    }
+
+    stars := make([]*StarPosition, 0)
+    for i := 0; i < 50; i++ {
+        x := randomFloat(0, float64(ScreenWidth))
+        y := randomFloat(0, float64(ScreenHeight))
+        dx := 0.0
+        dy := randomFloat(0.6, 1.1)
+        stars = append(stars, &StarPosition{x: x, y: y, dx: dx, dy: dy})
+    }
+
+    return &Background{
+        Star: ebiten.NewImageFromImage(starImage),
+        Stars: stars,
+    }, nil
+}
+
+func (background *Background) Update(){
+    for _, star := range background.Stars {
+        star.y += star.dy
+        if star.y > ScreenHeight + 50 {
+            star.y = -50
+        }
+    }
 }
 
 func (background *Background) Draw(screen *ebiten.Image) {
-    screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff})
+    screen.Fill(color.RGBA{0x27, 0x38, 0x3e, 0xff})
+
+    for _, star := range background.Stars {
+        options := &ebiten.DrawImageOptions{}
+        options.GeoM.Translate(star.x, star.y)
+        screen.DrawImage(background.Star, options)
+    }
 }
 
 type Player struct {
@@ -102,7 +150,7 @@ func (player *Player) MakeBullet() *Bullet {
     velocityY = -2.5
 
     return &Bullet{
-        x: player.x + 30,
+        x: player.x + 27,
         y: player.y,
         velocityX: 0,
         velocityY: velocityY,
@@ -120,7 +168,7 @@ func (player *Player) HandleKeys(game *Game) error {
     keys := make([]ebiten.Key, 0)
 
     keys = inpututil.AppendPressedKeys(keys)
-    playerAccel := 2.5
+    playerAccel := 3.8
     for _, key := range keys {
         if key == ebiten.KeyArrowUp {
             game.Player.velocityY = -playerAccel;
@@ -175,6 +223,8 @@ type Game struct {
 
 func (game *Game) Update() error {
 
+    game.Background.Update()
+
     err := game.Player.HandleKeys(game)
     if err != nil {
         return err
@@ -224,10 +274,16 @@ func main() {
         return
     }
 
+    background, err := MakeBackground()
+    if err != nil {
+        log.Printf("Failed to make background: %v", err)
+        return
+    }
+
     log.Printf("Running")
 
     err = ebiten.RunGame(&Game{
-        Background: &Background{},
+        Background: background,
         Player: player,
     })
     if err != nil {
