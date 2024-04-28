@@ -105,7 +105,7 @@ func (background *Background) Update(){
 }
 
 func (background *Background) Draw(screen *ebiten.Image) {
-    screen.Fill(color.RGBA{0x27, 0x38, 0x3e, 0xff})
+    screen.Fill(color.RGBA{0x1b, 0x22, 0x24, 0xff})
 
     for _, star := range background.Stars {
         options := &ebiten.DrawImageOptions{}
