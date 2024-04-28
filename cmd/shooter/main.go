@@ -116,6 +116,7 @@ func (background *Background) Draw(screen *ebiten.Image) {
 
 type Player struct {
     x, y float64
+    Jump int
     velocityX, velocityY float64
     bulletCounter int
     pic *ebiten.Image
@@ -190,22 +191,31 @@ func (player *Player) HandleKeys(game *Game) error {
 
     keys = inpututil.AppendPressedKeys(keys)
     playerAccel := 3.8
+    if player.Jump > 0 {
+        playerAccel = 5
+    }
     for _, key := range keys {
         if key == ebiten.KeyArrowUp {
-            game.Player.velocityY = -playerAccel;
+            player.velocityY = -playerAccel;
         } else if key == ebiten.KeyArrowDown {
-            game.Player.velocityY = playerAccel;
+            player.velocityY = playerAccel;
         } else if key == ebiten.KeyArrowLeft {
-            game.Player.velocityX = -playerAccel;
+            player.velocityX = -playerAccel;
         } else if key == ebiten.KeyArrowRight {
-            game.Player.velocityX = playerAccel;
+            player.velocityX = playerAccel;
+        } else if key == ebiten.KeyShift && player.Jump <= -50 {
+            player.Jump = 20
         // FIXME: make ebiten understand key mapping
         } else if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
             return fmt.Errorf("quit")
         } else if key == ebiten.KeySpace && game.Player.bulletCounter == 0{
             game.Bullets = append(game.Bullets, game.Player.MakeBullet())
-            game.Player.bulletCounter = 5
+            player.bulletCounter = 5
         }
+    }
+
+    if player.Jump > -50 {
+        player.Jump -= 1
     }
 
     return nil
