@@ -15,8 +15,8 @@ import (
     "github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-const ScreenWidth = 800
-const ScreenHeight = 600
+const ScreenWidth = 1024
+const ScreenHeight = 768
 
 type Bullet struct {
     x, y float64
@@ -289,8 +289,9 @@ func (game *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
 func main() {
     log.SetFlags(log.Ldate | log.Lshortfile | log.Lmicroseconds)
 
-    ebiten.SetWindowSize(1024, 768)
-    ebiten.SetWindowTitle("Hello!")
+    ebiten.SetWindowSize(ScreenWidth, ScreenHeight)
+    ebiten.SetWindowTitle("Shooter")
+    ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
     log.Printf("Loading player")
 
