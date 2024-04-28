@@ -38,6 +38,13 @@ func (bullet *Bullet) IsAlive() bool {
     return bullet.y > 0
 }
 
+type Background struct {
+}
+
+func (background *Background) Draw(screen *ebiten.Image) {
+    screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff})
+}
+
 type Player struct {
     x, y float64
     velocityX, velocityY float64
@@ -79,6 +86,10 @@ func (player *Player) Move() {
     } else if player.y > ScreenHeight {
         player.y = ScreenHeight
     }
+
+    if player.bulletCounter > 0 {
+        player.bulletCounter -= 1
+    }
 }
 
 func (player *Player) MakeBullet() *Bullet {
@@ -103,6 +114,32 @@ func (player *Player) Draw(screen *ebiten.Image) {
     options := &ebiten.DrawImageOptions{}
     options.GeoM.Translate(player.x, player.y)
     screen.DrawImage(player.pic, options)
+}
+
+func (player *Player) HandleKeys(game *Game) error {
+    keys := make([]ebiten.Key, 0)
+
+    keys = inpututil.AppendPressedKeys(keys)
+    playerAccel := 2.5
+    for _, key := range keys {
+        if key == ebiten.KeyArrowUp {
+            game.Player.velocityY = -playerAccel;
+        } else if key == ebiten.KeyArrowDown {
+            game.Player.velocityY = playerAccel;
+        } else if key == ebiten.KeyArrowLeft {
+            game.Player.velocityX = -playerAccel;
+        } else if key == ebiten.KeyArrowRight {
+            game.Player.velocityX = playerAccel;
+        // FIXME: make ebiten understand key mapping
+        } else if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
+            return fmt.Errorf("quit")
+        } else if key == ebiten.KeySpace && game.Player.bulletCounter == 0{
+            game.Bullets = append(game.Bullets, game.Player.MakeBullet())
+            game.Player.bulletCounter = 5
+        }
+    }
+
+    return nil
 }
 
 func loadPng(path string) (image.Image, error) {
@@ -132,38 +169,18 @@ func MakePlayer(x, y float64) (*Player, error) {
 
 type Game struct {
     Player *Player
+    Background *Background
     Bullets []*Bullet
 }
 
 func (game *Game) Update() error {
 
-    keys := make([]ebiten.Key, 0)
-
-    keys = inpututil.AppendPressedKeys(keys)
-    playerAccel := 2.5
-    for _, key := range keys {
-        if key == ebiten.KeyArrowUp {
-            game.Player.velocityY = -playerAccel;
-        } else if key == ebiten.KeyArrowDown {
-            game.Player.velocityY = playerAccel;
-        } else if key == ebiten.KeyArrowLeft {
-            game.Player.velocityX = -playerAccel;
-        } else if key == ebiten.KeyArrowRight {
-            game.Player.velocityX = playerAccel;
-        // FIXME: make ebiten understand key mapping
-        } else if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
-            return fmt.Errorf("quit")
-        } else if key == ebiten.KeySpace && game.Player.bulletCounter == 0{
-            game.Bullets = append(game.Bullets, game.Player.MakeBullet())
-            game.Player.bulletCounter = 5
-        }
+    err := game.Player.HandleKeys(game)
+    if err != nil {
+        return err
     }
 
     game.Player.Move()
-
-    if game.Player.bulletCounter > 0 {
-        game.Player.bulletCounter -= 1
-    }
 
     for i := 0; i < 2; i++ {
         var outBullets []*Bullet
@@ -180,7 +197,7 @@ func (game *Game) Update() error {
 }
 
 func (game *Game) Draw(screen *ebiten.Image) {
-    screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff})
+    game.Background.Draw(screen)
     // ebitenutil.DebugPrint(screen, "debugging")
     game.Player.Draw(screen)
 
@@ -210,6 +227,7 @@ func main() {
     log.Printf("Running")
 
     err = ebiten.RunGame(&Game{
+        Background: &Background{},
         Player: player,
     })
     if err != nil {
