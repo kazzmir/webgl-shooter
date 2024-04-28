@@ -42,10 +42,12 @@ func (bullet *Bullet) IsAlive() bool {
 type StarPosition struct {
     x, y float64
     dx, dy float64
+    Image *ebiten.Image
 }
 
 type Background struct {
-    Star *ebiten.Image
+    // Star *ebiten.Image
+    // Star2 *ebiten.Image
     Stars []*StarPosition
 }
 
@@ -59,17 +61,36 @@ func MakeBackground() (*Background, error) {
         return nil, err
     }
 
+    starImage2, err := loadPng("images/background/star2.png")
+    if err != nil {
+        return nil, err
+    }
+
+    planet1, err := loadPng("images/background/planet1.png")
+    if err != nil {
+        return nil, err
+    }
+
+    images := []*ebiten.Image{
+        ebiten.NewImageFromImage(starImage),
+        ebiten.NewImageFromImage(starImage2),
+        ebiten.NewImageFromImage(planet1),
+    }
+
     stars := make([]*StarPosition, 0)
     for i := 0; i < 50; i++ {
         x := randomFloat(0, float64(ScreenWidth))
         y := randomFloat(0, float64(ScreenHeight))
         dx := 0.0
         dy := randomFloat(0.6, 1.1)
-        stars = append(stars, &StarPosition{x: x, y: y, dx: dx, dy: dy})
+
+        image := images[rand.Intn(len(images))]
+
+        stars = append(stars, &StarPosition{x: x, y: y, dx: dx, dy: dy, Image: image})
     }
 
     return &Background{
-        Star: ebiten.NewImageFromImage(starImage),
+        // Star: ebiten.NewImageFromImage(starImage),
         Stars: stars,
     }, nil
 }
@@ -89,7 +110,7 @@ func (background *Background) Draw(screen *ebiten.Image) {
     for _, star := range background.Stars {
         options := &ebiten.DrawImageOptions{}
         options.GeoM.Translate(star.x, star.y)
-        screen.DrawImage(background.Star, options)
+        screen.DrawImage(star.Image, options)
     }
 }
 
