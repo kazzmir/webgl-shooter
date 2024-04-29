@@ -123,6 +123,7 @@ type Player struct {
     bulletCounter int
     pic *ebiten.Image
     bullet *ebiten.Image
+    Score int
 }
 
 func (player *Player) Move() {
@@ -182,7 +183,12 @@ func (player *Player) MakeBullet() *Bullet {
     }
 }
 
-func (player *Player) Draw(screen *ebiten.Image) {
+func (player *Player) Draw(screen *ebiten.Image, font *text.GoTextFaceSource) {
+    op := &text.DrawOptions{}
+    op.GeoM.Translate(1, 1)
+    op.ColorScale.ScaleWithColor(color.White)
+    text.Draw(screen, fmt.Sprintf("Score: %v", player.Score), &text.GoTextFace{Source: font, Size: 15}, op)
+
     options := &ebiten.DrawImageOptions{}
     options.GeoM.Translate(player.x, player.y)
     screen.DrawImage(player.pic, options)
@@ -250,7 +256,13 @@ func MakePlayer(x, y float64) (*Player, error) {
         return nil, err
     }
 
-    return &Player{x: x, y: y, pic: ebiten.NewImageFromImage(playerImage), bullet: ebiten.NewImageFromImage(bulletImage)}, nil
+    return &Player{
+        x: x,
+        y: y,
+        pic: ebiten.NewImageFromImage(playerImage),
+        bullet: ebiten.NewImageFromImage(bulletImage),
+        Score: 0,
+    }, nil
 }
 
 type Game struct {
@@ -288,16 +300,18 @@ func (game *Game) Update() error {
 func (game *Game) Draw(screen *ebiten.Image) {
     game.Background.Draw(screen)
     // ebitenutil.DebugPrint(screen, "debugging")
-    game.Player.Draw(screen)
+    game.Player.Draw(screen, game.Font)
 
     for _, bullet := range game.Bullets {
         bullet.Draw(screen)
     }
 
+    /*
     op := &text.DrawOptions{}
     op.GeoM.Translate(1, 1)
     op.ColorScale.ScaleWithColor(color.White)
     text.Draw(screen, "Hello, World!", &text.GoTextFace{Source: game.Font, Size: 15}, op)
+    */
 }
 
 func (game *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
