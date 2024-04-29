@@ -9,10 +9,12 @@ import (
     _ "image/png"
 
     gameImages "github.com/kazzmir/webgl-shooter/images"
+    fontLib "github.com/kazzmir/webgl-shooter/font"
 
     "github.com/hajimehoshi/ebiten/v2"
     _ "github.com/hajimehoshi/ebiten/v2/ebitenutil"
     "github.com/hajimehoshi/ebiten/v2/inpututil"
+    "github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 const ScreenWidth = 1024
@@ -255,6 +257,7 @@ type Game struct {
     Player *Player
     Background *Background
     Bullets []*Bullet
+    Font *text.GoTextFaceSource
 }
 
 func (game *Game) Update() error {
@@ -290,6 +293,11 @@ func (game *Game) Draw(screen *ebiten.Image) {
     for _, bullet := range game.Bullets {
         bullet.Draw(screen)
     }
+
+    op := &text.DrawOptions{}
+    op.GeoM.Translate(1, 1)
+    op.ColorScale.ScaleWithColor(color.White)
+    text.Draw(screen, "Hello, World!", &text.GoTextFace{Source: game.Font, Size: 15}, op)
 }
 
 func (game *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
@@ -317,11 +325,18 @@ func main() {
         return
     }
 
+    font, err := fontLib.LoadFont()
+    if err != nil {
+        log.Printf("Failed to load font: %v", err)
+        return
+    }
+
     log.Printf("Running")
 
     err = ebiten.RunGame(&Game{
         Background: background,
         Player: player,
+        Font: font,
     })
     if err != nil {
         log.Printf("Failed to run: %v", err)
