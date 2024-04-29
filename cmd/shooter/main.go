@@ -124,6 +124,7 @@ type Player struct {
     pic *ebiten.Image
     bullet *ebiten.Image
     Score int
+    RedShader *ebiten.Shader
 }
 
 func (player *Player) Move() {
@@ -189,9 +190,31 @@ func (player *Player) Draw(screen *ebiten.Image, font *text.GoTextFaceSource) {
     op.ColorScale.ScaleWithColor(color.White)
     text.Draw(screen, fmt.Sprintf("Score: %v", player.Score), &text.GoTextFace{Source: font, Size: 15}, op)
 
+    /*
     options := &ebiten.DrawImageOptions{}
     options.GeoM.Translate(player.x, player.y)
     screen.DrawImage(player.pic, options)
+    */
+
+    if player.Jump > 0 {
+        options := &ebiten.DrawRectShaderOptions{}
+        options.GeoM.Translate(player.x, player.y)
+        options.Blend = ebiten.Blend{
+            BlendFactorSourceRGB:        ebiten.BlendFactorSourceAlpha,
+            BlendFactorSourceAlpha:      ebiten.BlendFactorZero,
+            BlendFactorDestinationRGB:   ebiten.BlendFactorOneMinusSourceAlpha,
+            BlendFactorDestinationAlpha: ebiten.BlendFactorOne,
+            BlendOperationRGB:           ebiten.BlendOperationAdd,
+            BlendOperationAlpha:         ebiten.BlendOperationAdd,
+        }
+        options.Images[0] = player.pic
+        bounds := player.pic.Bounds()
+        screen.DrawRectShader(bounds.Dx(), bounds.Dy(), player.RedShader, options)
+    } else {
+        options := &ebiten.DrawImageOptions{}
+        options.GeoM.Translate(player.x, player.y)
+        screen.DrawImage(player.pic, options)
+    }
 }
 
 func (player *Player) HandleKeys(game *Game) error {
@@ -212,7 +235,7 @@ func (player *Player) HandleKeys(game *Game) error {
         } else if key == ebiten.KeyArrowRight {
             player.velocityX = playerAccel;
         } else if key == ebiten.KeyShift && player.Jump <= -50 {
-            player.Jump = 20
+            player.Jump = 200
         // FIXME: make ebiten understand key mapping
         } else if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
             return fmt.Errorf("quit")
@@ -256,12 +279,18 @@ func MakePlayer(x, y float64) (*Player, error) {
         return nil, err
     }
 
+    redShader, err := LoadRedShader()
+    if err != nil {
+        return nil, fmt.Errorf("Error loading red shader: %v", err)
+    }
+
     return &Player{
         x: x,
         y: y,
         pic: ebiten.NewImageFromImage(playerImage),
         bullet: ebiten.NewImageFromImage(bulletImage),
         Score: 0,
+        RedShader: redShader,
     }, nil
 }
 
