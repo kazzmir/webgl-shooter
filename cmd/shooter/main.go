@@ -126,6 +126,7 @@ type Player struct {
     bullet *ebiten.Image
     Score int
     RedShader *ebiten.Shader
+    ShadowShader *ebiten.Shader
 }
 
 func (player *Player) Move() {
@@ -190,6 +191,20 @@ func (player *Player) Draw(screen *ebiten.Image, font *text.GoTextFaceSource) {
     op.GeoM.Translate(1, 1)
     op.ColorScale.ScaleWithColor(color.White)
     text.Draw(screen, fmt.Sprintf("Score: %v", player.Score), &text.GoTextFace{Source: font, Size: 15}, op)
+
+    options := &ebiten.DrawRectShaderOptions{}
+    options.GeoM.Translate(player.x + 10, player.y + 10)
+    options.Blend = ebiten.Blend{
+        BlendFactorSourceRGB:        ebiten.BlendFactorSourceAlpha,
+        BlendFactorSourceAlpha:      ebiten.BlendFactorZero,
+        BlendFactorDestinationRGB:   ebiten.BlendFactorOneMinusSourceAlpha,
+        BlendFactorDestinationAlpha: ebiten.BlendFactorOne,
+        BlendOperationRGB:           ebiten.BlendOperationAdd,
+        BlendOperationAlpha:         ebiten.BlendOperationAdd,
+    }
+    options.Images[0] = player.pic
+    bounds := player.pic.Bounds()
+    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), player.ShadowShader, options)
 
     /*
     options := &ebiten.DrawImageOptions{}
@@ -292,6 +307,11 @@ func MakePlayer(x, y float64) (*Player, error) {
         return nil, fmt.Errorf("Error loading red shader: %v", err)
     }
 
+    shadowShader, err := LoadShadowShader()
+    if err != nil {
+        return nil, fmt.Errorf("Error loading shadow shader: %v", err)
+    }
+
     return &Player{
         x: x,
         y: y,
@@ -300,6 +320,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         Jump: -50,
         Score: 0,
         RedShader: redShader,
+        ShadowShader: shadowShader,
     }, nil
 }
 

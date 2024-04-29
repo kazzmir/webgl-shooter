@@ -1,0 +1,9 @@
+//kage:unit pixels
+
+package main
+
+func Fragment(destPosition vec4, srcPosition vec2, color vec4) vec4 {
+    dark := vec4(0, 0, 0, 0.7)
+    dark.a *= imageSrc0UnsafeAt(srcPosition).a
+    return dark
+}
