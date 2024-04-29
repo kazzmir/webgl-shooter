@@ -4,6 +4,7 @@ import (
     "log"
     "fmt"
     "math/rand"
+    "math"
 
     "image/color"
     _ "image/png"
@@ -208,6 +209,11 @@ func (player *Player) Draw(screen *ebiten.Image, font *text.GoTextFaceSource) {
             BlendOperationAlpha:         ebiten.BlendOperationAdd,
         }
         options.Images[0] = player.pic
+        options.Uniforms = make(map[string]interface{})
+        var radians float32 = math.Pi * float32(player.Jump) * 360 / JumpDuration / 180.0
+        // radians = math.Pi * 90 / 180
+        // log.Printf("Red: %v", radians)
+        options.Uniforms["Red"] = radians
         bounds := player.pic.Bounds()
         screen.DrawRectShader(bounds.Dx(), bounds.Dy(), player.RedShader, options)
     } else {
@@ -235,7 +241,7 @@ func (player *Player) HandleKeys(game *Game) error {
         } else if key == ebiten.KeyArrowRight {
             player.velocityX = playerAccel;
         } else if key == ebiten.KeyShift && player.Jump <= -50 {
-            player.Jump = 200
+            player.Jump = JumpDuration
         // FIXME: make ebiten understand key mapping
         } else if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
             return fmt.Errorf("quit")
@@ -266,6 +272,8 @@ func loadPng(path string) (image.Image, error) {
 }
 */
 
+const JumpDuration = 50
+
 func MakePlayer(x, y float64) (*Player, error) {
 
     playerImage, err := gameImages.LoadImage(gameImages.ImagePlayer)
@@ -289,6 +297,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         y: y,
         pic: ebiten.NewImageFromImage(playerImage),
         bullet: ebiten.NewImageFromImage(bulletImage),
+        Jump: -50,
         Score: 0,
         RedShader: redShader,
     }, nil
