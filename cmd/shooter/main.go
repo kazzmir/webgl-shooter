@@ -25,6 +25,7 @@ type Bullet struct {
     x, y float64
     velocityX, velocityY float64
     pic *ebiten.Image
+    alive bool
 }
 
 func (bullet *Bullet) Draw(screen *ebiten.Image) {
@@ -38,8 +39,12 @@ func (bullet *Bullet) Move(){
     bullet.y += bullet.velocityY
 }
 
+func (bullet *Bullet) SetDead() {
+    bullet.alive = false
+}
+
 func (bullet *Bullet) IsAlive() bool {
-    return bullet.y > 0
+    return bullet.alive && bullet.y > 0
 }
 
 type StarPosition struct {
@@ -141,7 +146,10 @@ func MakeShaderManager() (*ShaderManager, error) {
 
 type Enemy interface {
     Move()
+    Hit()
     Draw(screen *ebiten.Image, shaders *ShaderManager)
+    // returns true if this enemy is colliding with the point
+    Collision(x, y float64) bool
 }
 
 type NormalEnemy struct {
@@ -152,6 +160,15 @@ type NormalEnemy struct {
     Flip bool
 }
 
+func (enemy *NormalEnemy) Hit() {
+    enemy.Life -= 1
+    if enemy.Life <= 0 {
+        enemy.x = randomFloat(50, ScreenWidth - 50)
+        enemy.y = randomFloat(-500, -50)
+        enemy.Life = 10
+    }
+}
+
 func (enemy *NormalEnemy) Move() {
     enemy.x += enemy.velocityX
     enemy.y += enemy.velocityY
@@ -159,6 +176,11 @@ func (enemy *NormalEnemy) Move() {
     if enemy.y > ScreenHeight + 50 {
         enemy.y = -100
     }
+}
+
+func (enemy* NormalEnemy) Collision(x float64, y float64) bool {
+    bounds := enemy.pic.Bounds()
+    return x >= enemy.x && x <= enemy.x + float64(bounds.Dx()) && y >= enemy.y && y <= enemy.y + float64(bounds.Dy())
 }
 
 func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
@@ -280,6 +302,7 @@ func (player *Player) MakeBullet() *Bullet {
     return &Bullet{
         x: player.x + 27,
         y: player.y,
+        alive: true,
         velocityX: 0,
         velocityY: velocityY,
         pic: player.bullet,
@@ -455,6 +478,16 @@ func (game *Game) Update() error {
         var outBullets []*Bullet
         for _, bullet := range game.Bullets {
             bullet.Move()
+
+            for _, enemy := range game.Enemies {
+                if enemy.Collision(bullet.x, bullet.y) {
+                    game.Player.Score += 1
+                    enemy.Hit()
+                    bullet.SetDead()
+                    break
+                }
+            }
+
             if bullet.IsAlive() {
                 outBullets = append(outBullets, bullet)
             }
