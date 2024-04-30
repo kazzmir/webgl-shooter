@@ -117,9 +117,31 @@ func (background *Background) Draw(screen *ebiten.Image) {
     }
 }
 
+type ShaderManager struct {
+    RedShader *ebiten.Shader
+    ShadowShader *ebiten.Shader
+}
+
+func MakeShaderManager() (*ShaderManager, error) {
+    redShader, err := LoadRedShader()
+    if err != nil {
+        return nil, err
+    }
+
+    shadowShader, err := LoadShadowShader()
+    if err != nil {
+        return nil, err
+    }
+
+    return &ShaderManager{
+        RedShader: redShader,
+        ShadowShader: shadowShader,
+    }, nil
+}
+
 type Enemy interface {
     Move()
-    Draw(screen *ebiten.Image)
+    Draw(screen *ebiten.Image, shaders *ShaderManager)
 }
 
 type NormalEnemy struct {
@@ -127,6 +149,7 @@ type NormalEnemy struct {
     velocityX, velocityY float64
     Life float64
     pic *ebiten.Image
+    Flip bool
 }
 
 func (enemy *NormalEnemy) Move() {
@@ -138,9 +161,24 @@ func (enemy *NormalEnemy) Move() {
     }
 }
 
-func (enemy *NormalEnemy) Draw(screen *ebiten.Image) {
+func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
+
+    // draw shadow
+    shaderOptions := &ebiten.DrawRectShaderOptions{}
+    if enemy.Flip {
+        shaderOptions.GeoM.Rotate(math.Pi)
+    }
+    shaderOptions.GeoM.Translate(enemy.x, enemy.y + 10)
+    shaderOptions.Blend = AlphaBlender
+    shaderOptions.Images[0] = enemy.pic
+    bounds := enemy.pic.Bounds()
+    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.ShadowShader, shaderOptions)
+
     options := &ebiten.DrawImageOptions{}
-    options.GeoM.Rotate(math.Pi)
+    // flip 180 degrees
+    if enemy.Flip {
+        options.GeoM.Rotate(math.Pi)
+    }
     options.GeoM.Translate(enemy.x, enemy.y)
     screen.DrawImage(enemy.pic, options)
 }
@@ -158,6 +196,24 @@ func MakeEnemy1(x, y float64) (Enemy, error) {
         velocityY: 2,
         Life: 10,
         pic: ebiten.NewImageFromImage(enemyImage),
+        Flip: true,
+    }, nil
+}
+
+func MakeEnemy2(x, y float64) (Enemy, error) {
+    enemyImage, err := gameImages.LoadImage(gameImages.ImageEnemy2)
+    if err != nil {
+        return nil, err
+    }
+
+    return &NormalEnemy{
+        x: x,
+        y: y,
+        velocityX: 0,
+        velocityY: 2,
+        Life: 10,
+        pic: ebiten.NewImageFromImage(enemyImage),
+        Flip: false,
     }, nil
 }
 
@@ -239,7 +295,7 @@ var AlphaBlender ebiten.Blend = ebiten.Blend{
     BlendOperationAlpha:         ebiten.BlendOperationAdd,
 }
 
-func (player *Player) Draw(screen *ebiten.Image, font *text.GoTextFaceSource) {
+func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *text.GoTextFaceSource) {
     op := &text.DrawOptions{}
     op.GeoM.Translate(1, 1)
     op.ColorScale.ScaleWithColor(color.White)
@@ -250,7 +306,7 @@ func (player *Player) Draw(screen *ebiten.Image, font *text.GoTextFaceSource) {
     options.Blend = AlphaBlender
     options.Images[0] = player.pic
     bounds := player.pic.Bounds()
-    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), player.ShadowShader, options)
+    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.ShadowShader, options)
 
     /*
     options := &ebiten.DrawImageOptions{}
@@ -269,7 +325,7 @@ func (player *Player) Draw(screen *ebiten.Image, font *text.GoTextFaceSource) {
         // log.Printf("Red: %v", radians)
         options.Uniforms["Red"] = radians
         bounds := player.pic.Bounds()
-        screen.DrawRectShader(bounds.Dx(), bounds.Dy(), player.RedShader, options)
+        screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.RedShader, options)
     } else {
         options := &ebiten.DrawImageOptions{}
         options.GeoM.Translate(player.x, player.y)
@@ -341,16 +397,6 @@ func MakePlayer(x, y float64) (*Player, error) {
         return nil, err
     }
 
-    redShader, err := LoadRedShader()
-    if err != nil {
-        return nil, fmt.Errorf("Error loading red shader: %v", err)
-    }
-
-    shadowShader, err := LoadShadowShader()
-    if err != nil {
-        return nil, fmt.Errorf("Error loading shadow shader: %v", err)
-    }
-
     return &Player{
         x: x,
         y: y,
@@ -358,8 +404,6 @@ func MakePlayer(x, y float64) (*Player, error) {
         bullet: ebiten.NewImageFromImage(bulletImage),
         Jump: -50,
         Score: 0,
-        RedShader: redShader,
-        ShadowShader: shadowShader,
     }, nil
 }
 
@@ -369,10 +413,20 @@ type Game struct {
     Bullets []*Bullet
     Font *text.GoTextFaceSource
     Enemies []Enemy
+    ShaderManager *ShaderManager
 }
 
 func (game *Game) MakeEnemy() error {
-    enemy, err := MakeEnemy1(randomFloat(50, ScreenWidth - 50), randomFloat(-500, -50))
+    var enemy Enemy
+    var err error
+
+    switch rand.Intn(2) {
+        case 0:
+            enemy, err = MakeEnemy1(randomFloat(50, ScreenWidth - 50), randomFloat(-500, -50))
+        case 1:
+            enemy, err = MakeEnemy2(randomFloat(50, ScreenWidth - 50), randomFloat(-500, -50))
+    }
+
     if err != nil {
         return err
     }
@@ -415,11 +469,11 @@ func (game *Game) Draw(screen *ebiten.Image) {
     game.Background.Draw(screen)
 
     for _, enemy := range game.Enemies {
-        enemy.Draw(screen)
+        enemy.Draw(screen, game.ShaderManager)
     }
 
     // ebitenutil.DebugPrint(screen, "debugging")
-    game.Player.Draw(screen, game.Font)
+    game.Player.Draw(screen, game.ShaderManager, game.Font)
 
     for _, bullet := range game.Bullets {
         bullet.Draw(screen)
@@ -464,12 +518,13 @@ func main() {
         return
     }
 
-    log.Printf("Running")
+    shaderManager, err := MakeShaderManager()
 
     game := Game{
         Background: background,
         Player: player,
         Font: font,
+        ShaderManager: shaderManager,
     }
 
     for i := 0; i < 5; i++ {
@@ -480,6 +535,7 @@ func main() {
         }
     }
 
+    log.Printf("Running")
     err = ebiten.RunGame(&game)
     if err != nil {
         log.Printf("Failed to run: %v", err)

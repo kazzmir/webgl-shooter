@@ -16,6 +16,7 @@ const ImageStar2 = Image("star2")
 const ImagePlanet = Image("planet")
 const ImageBullet = Image("bullet")
 const ImageEnemy1 = Image("enemy1")
+const ImageEnemy2 = Image("enemy2")
 
 //go:embed player/player.png
 var playerImage []byte
@@ -35,6 +36,9 @@ var planetImage []byte
 //go:embed enemy/enemy1.png
 var enemy1Image []byte
 
+//go:embed enemy/enemy2.png
+var enemy2Image []byte
+
 func loadPng(data []byte) (image.Image, error) {
     img, _, err := image.Decode(bytes.NewReader(data))
     if err != nil {
@@ -51,6 +55,7 @@ func LoadImage(name Image) (image.Image, error) {
         case ImagePlanet: return loadPng(planetImage)
         case ImageBullet: return loadPng(bulletImage)
         case ImageEnemy1: return loadPng(enemy1Image)
+        case ImageEnemy2: return loadPng(enemy2Image)
     }
 
     return nil, fmt.Errorf("no such image: %s", name)
