@@ -202,7 +202,7 @@ func (player *Player) Draw(screen *ebiten.Image, font *text.GoTextFaceSource) {
     text.Draw(screen, fmt.Sprintf("Score: %v", player.Score), &text.GoTextFace{Source: font, Size: 15}, op)
 
     options := &ebiten.DrawRectShaderOptions{}
-    options.GeoM.Translate(player.x + 10, player.y + 10)
+    options.GeoM.Translate(player.x + player.velocityX * 3, player.y + 10)
     options.Blend = AlphaBlender
     options.Images[0] = player.pic
     bounds := player.pic.Bounds()
