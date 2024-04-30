@@ -117,6 +117,50 @@ func (background *Background) Draw(screen *ebiten.Image) {
     }
 }
 
+type Enemy interface {
+    Move()
+    Draw(screen *ebiten.Image)
+}
+
+type NormalEnemy struct {
+    x, y float64
+    velocityX, velocityY float64
+    Life float64
+    pic *ebiten.Image
+}
+
+func (enemy *NormalEnemy) Move() {
+    enemy.x += enemy.velocityX
+    enemy.y += enemy.velocityY
+
+    if enemy.y > ScreenHeight + 50 {
+        enemy.y = -100
+    }
+}
+
+func (enemy *NormalEnemy) Draw(screen *ebiten.Image) {
+    options := &ebiten.DrawImageOptions{}
+    options.GeoM.Rotate(math.Pi)
+    options.GeoM.Translate(enemy.x, enemy.y)
+    screen.DrawImage(enemy.pic, options)
+}
+
+func MakeEnemy1(x, y float64) (Enemy, error) {
+    enemyImage, err := gameImages.LoadImage(gameImages.ImageEnemy1)
+    if err != nil {
+        return nil, err
+    }
+
+    return &NormalEnemy{
+        x: x,
+        y: y,
+        velocityX: 0,
+        velocityY: 2,
+        Life: 10,
+        pic: ebiten.NewImageFromImage(enemyImage),
+    }, nil
+}
+
 type Player struct {
     x, y float64
     Jump int
@@ -324,6 +368,18 @@ type Game struct {
     Background *Background
     Bullets []*Bullet
     Font *text.GoTextFaceSource
+    Enemies []Enemy
+}
+
+func (game *Game) MakeEnemy() error {
+    enemy, err := MakeEnemy1(randomFloat(50, ScreenWidth - 50), randomFloat(-500, -50))
+    if err != nil {
+        return err
+    }
+
+    game.Enemies = append(game.Enemies, enemy)
+
+    return nil
 }
 
 func (game *Game) Update() error {
@@ -336,6 +392,10 @@ func (game *Game) Update() error {
     }
 
     game.Player.Move()
+
+    for _, enemy := range game.Enemies {
+        enemy.Move()
+    }
 
     for i := 0; i < 3; i++ {
         var outBullets []*Bullet
@@ -353,6 +413,11 @@ func (game *Game) Update() error {
 
 func (game *Game) Draw(screen *ebiten.Image) {
     game.Background.Draw(screen)
+
+    for _, enemy := range game.Enemies {
+        enemy.Draw(screen)
+    }
+
     // ebitenutil.DebugPrint(screen, "debugging")
     game.Player.Draw(screen, game.Font)
 
@@ -401,11 +466,21 @@ func main() {
 
     log.Printf("Running")
 
-    err = ebiten.RunGame(&Game{
+    game := Game{
         Background: background,
         Player: player,
         Font: font,
-    })
+    }
+
+    for i := 0; i < 5; i++ {
+        err = game.MakeEnemy()
+        if err != nil {
+            log.Printf("Failed to make enemy: %v", err)
+            return
+        }
+    }
+
+    err = ebiten.RunGame(&game)
     if err != nil {
         log.Printf("Failed to run: %v", err)
     }
