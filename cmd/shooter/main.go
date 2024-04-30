@@ -254,7 +254,7 @@ func (player *Player) HandleKeys(game *Game) error {
             player.Jump = JumpDuration
         // FIXME: make ebiten understand key mapping
         } else if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
-            return fmt.Errorf("quit")
+            return ebiten.Termination
         } else if key == ebiten.KeySpace && game.Player.bulletCounter == 0{
             game.Bullets = append(game.Bullets, game.Player.MakeBullet())
             player.bulletCounter = 5
