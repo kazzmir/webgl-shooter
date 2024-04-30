@@ -186,6 +186,15 @@ func (player *Player) MakeBullet() *Bullet {
     }
 }
 
+var AlphaBlender ebiten.Blend = ebiten.Blend{
+    BlendFactorSourceRGB:        ebiten.BlendFactorSourceAlpha,
+    BlendFactorSourceAlpha:      ebiten.BlendFactorZero,
+    BlendFactorDestinationRGB:   ebiten.BlendFactorOneMinusSourceAlpha,
+    BlendFactorDestinationAlpha: ebiten.BlendFactorOne,
+    BlendOperationRGB:           ebiten.BlendOperationAdd,
+    BlendOperationAlpha:         ebiten.BlendOperationAdd,
+}
+
 func (player *Player) Draw(screen *ebiten.Image, font *text.GoTextFaceSource) {
     op := &text.DrawOptions{}
     op.GeoM.Translate(1, 1)
@@ -194,14 +203,7 @@ func (player *Player) Draw(screen *ebiten.Image, font *text.GoTextFaceSource) {
 
     options := &ebiten.DrawRectShaderOptions{}
     options.GeoM.Translate(player.x + 10, player.y + 10)
-    options.Blend = ebiten.Blend{
-        BlendFactorSourceRGB:        ebiten.BlendFactorSourceAlpha,
-        BlendFactorSourceAlpha:      ebiten.BlendFactorZero,
-        BlendFactorDestinationRGB:   ebiten.BlendFactorOneMinusSourceAlpha,
-        BlendFactorDestinationAlpha: ebiten.BlendFactorOne,
-        BlendOperationRGB:           ebiten.BlendOperationAdd,
-        BlendOperationAlpha:         ebiten.BlendOperationAdd,
-    }
+    options.Blend = AlphaBlender
     options.Images[0] = player.pic
     bounds := player.pic.Bounds()
     screen.DrawRectShader(bounds.Dx(), bounds.Dy(), player.ShadowShader, options)
@@ -215,14 +217,7 @@ func (player *Player) Draw(screen *ebiten.Image, font *text.GoTextFaceSource) {
     if player.Jump > 0 {
         options := &ebiten.DrawRectShaderOptions{}
         options.GeoM.Translate(player.x, player.y)
-        options.Blend = ebiten.Blend{
-            BlendFactorSourceRGB:        ebiten.BlendFactorSourceAlpha,
-            BlendFactorSourceAlpha:      ebiten.BlendFactorZero,
-            BlendFactorDestinationRGB:   ebiten.BlendFactorOneMinusSourceAlpha,
-            BlendFactorDestinationAlpha: ebiten.BlendFactorOne,
-            BlendOperationRGB:           ebiten.BlendOperationAdd,
-            BlendOperationAlpha:         ebiten.BlendOperationAdd,
-        }
+        options.Blend = AlphaBlender
         options.Images[0] = player.pic
         options.Uniforms = make(map[string]interface{})
         var radians float32 = math.Pi * float32(player.Jump) * 360 / JumpDuration / 180.0
@@ -342,7 +337,7 @@ func (game *Game) Update() error {
 
     game.Player.Move()
 
-    for i := 0; i < 2; i++ {
+    for i := 0; i < 3; i++ {
         var outBullets []*Bullet
         for _, bullet := range game.Bullets {
             bullet.Move()
@@ -414,4 +409,6 @@ func main() {
     if err != nil {
         log.Printf("Failed to run: %v", err)
     }
+
+    log.Printf("Bye!")
 }
