@@ -16,6 +16,7 @@ import (
     _ "github.com/hajimehoshi/ebiten/v2/ebitenutil"
     "github.com/hajimehoshi/ebiten/v2/inpututil"
     "github.com/hajimehoshi/ebiten/v2/text/v2"
+    // "github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 const ScreenWidth = 1024
@@ -30,7 +31,7 @@ type Bullet struct {
 
 func (bullet *Bullet) Draw(screen *ebiten.Image) {
     options := &ebiten.DrawImageOptions{}
-    options.GeoM.Translate(bullet.x, bullet.y)
+    options.GeoM.Translate(bullet.x - float64(bullet.pic.Bounds().Dx()) / 2, bullet.y - float64(bullet.pic.Bounds().Dy()) / 2)
     screen.DrawImage(bullet.pic, options)
 }
 
@@ -180,17 +181,26 @@ func (enemy *NormalEnemy) Move() {
 
 func (enemy* NormalEnemy) Collision(x float64, y float64) bool {
     bounds := enemy.pic.Bounds()
-    return x >= enemy.x && x <= enemy.x + float64(bounds.Dx()) && y >= enemy.y && y <= enemy.y + float64(bounds.Dy())
+
+    enemyX := enemy.x - float64(bounds.Dx()) / 2
+    enemyY := enemy.y - float64(bounds.Dy()) / 2
+
+    return x >= enemyX && x <= enemyX + float64(bounds.Dx()) && y >= enemyY && y <= enemyY + float64(bounds.Dy())
 }
 
 func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
 
+    enemyX := enemy.x - float64(enemy.pic.Bounds().Dx()) / 2
+    enemyY := enemy.y - float64(enemy.pic.Bounds().Dy()) / 2
+
     // draw shadow
     shaderOptions := &ebiten.DrawRectShaderOptions{}
     if enemy.Flip {
+        shaderOptions.GeoM.Translate(-float64(enemy.pic.Bounds().Dx()) / 2, -float64(enemy.pic.Bounds().Dy()) / 2)
         shaderOptions.GeoM.Rotate(math.Pi)
+        shaderOptions.GeoM.Translate(float64(enemy.pic.Bounds().Dx()) / 2, float64(enemy.pic.Bounds().Dy()) / 2)
     }
-    shaderOptions.GeoM.Translate(enemy.x, enemy.y + 10)
+    shaderOptions.GeoM.Translate(enemyX, enemyY + 10)
     shaderOptions.Blend = AlphaBlender
     shaderOptions.Images[0] = enemy.pic
     bounds := enemy.pic.Bounds()
@@ -199,10 +209,25 @@ func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
     options := &ebiten.DrawImageOptions{}
     // flip 180 degrees
     if enemy.Flip {
+        options.GeoM.Translate(-float64(enemy.pic.Bounds().Dx()) / 2, -float64(enemy.pic.Bounds().Dy()) / 2)
         options.GeoM.Rotate(math.Pi)
+        options.GeoM.Translate(float64(enemy.pic.Bounds().Dx()) / 2, float64(enemy.pic.Bounds().Dy()) / 2)
+        // options.GeoM.Rotate(1, -1)
     }
-    options.GeoM.Translate(enemy.x, enemy.y)
+    options.GeoM.Translate(enemyX, enemyY)
     screen.DrawImage(enemy.pic, options)
+
+    /*
+    vector.StrokeRect(
+        screen,
+        float32(enemyX),
+        float32(enemyY),
+        float32(enemy.pic.Bounds().Dx()),
+        float32(enemy.pic.Bounds().Dy()),
+        1,
+        &color.RGBA{R: 255, G: 0, B: 0, A: 128},
+        true)
+        */
 }
 
 func MakeEnemy1(x, y float64) (Enemy, error) {
@@ -300,8 +325,8 @@ func (player *Player) MakeBullet() *Bullet {
     velocityY = -2.5
 
     return &Bullet{
-        x: player.x + 27,
-        y: player.y,
+        x: player.x,
+        y: player.y - float64(player.pic.Bounds().Dy()) / 2,
         alive: true,
         velocityX: 0,
         velocityY: velocityY,
@@ -324,8 +349,11 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *t
     op.ColorScale.ScaleWithColor(color.White)
     text.Draw(screen, fmt.Sprintf("Score: %v", player.Score), &text.GoTextFace{Source: font, Size: 15}, op)
 
+    playerX := player.x - float64(player.pic.Bounds().Dx()) / 2
+    playerY := player.y - float64(player.pic.Bounds().Dy()) / 2
+
     options := &ebiten.DrawRectShaderOptions{}
-    options.GeoM.Translate(player.x + player.velocityX * 3, player.y + 10)
+    options.GeoM.Translate(playerX + player.velocityX * 3, playerY + 10)
     options.Blend = AlphaBlender
     options.Images[0] = player.pic
     bounds := player.pic.Bounds()
@@ -339,7 +367,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *t
 
     if player.Jump > 0 {
         options := &ebiten.DrawRectShaderOptions{}
-        options.GeoM.Translate(player.x, player.y)
+        options.GeoM.Translate(playerX, playerY)
         options.Blend = AlphaBlender
         options.Images[0] = player.pic
         options.Uniforms = make(map[string]interface{})
@@ -351,7 +379,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *t
         screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.RedShader, options)
     } else {
         options := &ebiten.DrawImageOptions{}
-        options.GeoM.Translate(player.x, player.y)
+        options.GeoM.Translate(playerX, playerY)
         screen.DrawImage(player.pic, options)
     }
 }
@@ -501,6 +529,7 @@ func (game *Game) Update() error {
 func (game *Game) Draw(screen *ebiten.Image) {
     game.Background.Draw(screen)
 
+
     for _, enemy := range game.Enemies {
         enemy.Draw(screen, game.ShaderManager)
     }
@@ -511,6 +540,9 @@ func (game *Game) Draw(screen *ebiten.Image) {
     for _, bullet := range game.Bullets {
         bullet.Draw(screen)
     }
+    
+    // vector.StrokeRect(screen, 0, 0, 100, 100, 3, &color.RGBA{R: 255, G: 0, B: 0, A: 128}, true)
+    // vector.DrawFilledRect(screen, 0, 0, 100, 100, &color.RGBA{R: 255, G: 0, B: 0, A: 64}, true)
 
     /*
     op := &text.DrawOptions{}
