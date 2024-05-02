@@ -126,6 +126,7 @@ func (background *Background) Draw(screen *ebiten.Image) {
 type ShaderManager struct {
     RedShader *ebiten.Shader
     ShadowShader *ebiten.Shader
+    EdgeShader *ebiten.Shader
 }
 
 func MakeShaderManager() (*ShaderManager, error) {
@@ -139,9 +140,12 @@ func MakeShaderManager() (*ShaderManager, error) {
         return nil, err
     }
 
+    edgeShader, err := LoadEdgeShader()
+
     return &ShaderManager{
         RedShader: redShader,
         ShadowShader: shadowShader,
+        EdgeShader: edgeShader,
     }, nil
 }
 
@@ -358,6 +362,14 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *t
     options.Images[0] = player.pic
     bounds := player.pic.Bounds()
     screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.ShadowShader, options)
+
+    options = &ebiten.DrawRectShaderOptions{}
+    options.GeoM.Translate(playerX, playerY)
+    options.Blend = AlphaBlender
+    options.Images[0] = player.pic
+    options.Uniforms = make(map[string]interface{})
+    options.Uniforms["Color"] = []float32{0, 0, 1, 1}
+    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.EdgeShader, options)
 
     /*
     options := &ebiten.DrawImageOptions{}

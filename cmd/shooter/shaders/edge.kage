@@ -1,0 +1,33 @@
+//kage:unit pixels
+
+package main
+
+func imageColorAtPixel(pixelCoords vec2) vec4 {
+    sizeInPixels := imageSrcTextureSize()
+    offsetInTexels, _ := imageSrcRegionOnTexture()
+    adjustedTexelCoords := pixelCoords/sizeInPixels + offsetInTexels
+    return imageSrc0At(adjustedTexelCoords)
+}
+
+// Helper function to access an image's color at the given coordinates
+// from the unit interval (e.g. top-left is (0, 0), center is (0.5, 0.5),
+// bottom-right is (1.0, 1.0)).
+func imageColorAtUnit(unitCoords vec2) vec4 {
+    offsetInTexels, sizeInTexels := imageSrcRegionOnTexture()
+    adjustedTexelCoords := unitCoords*sizeInTexels + offsetInTexels
+    return imageSrc0At(adjustedTexelCoords)
+}
+
+var Color vec4
+
+func Fragment(destPosition vec4, srcPosition vec2, color vec4) vec4 {
+
+    left := srcPosition - vec2(-1, 0)
+    value := imageSrc0At(left)
+    blue := Color * vec4(value.a)
+    return blue
+
+    // red := vec4(abs(sin(Red) / 3), 0, 0, 0)
+    // return imageSrc0UnsafeAt(srcPosition) + red
+    // return red.rgba
+}
