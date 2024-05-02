@@ -141,6 +141,9 @@ func MakeShaderManager() (*ShaderManager, error) {
     }
 
     edgeShader, err := LoadEdgeShader()
+    if err != nil {
+        return nil, err
+    }
 
     return &ShaderManager{
         RedShader: redShader,
@@ -278,9 +281,12 @@ type Player struct {
     Score int
     RedShader *ebiten.Shader
     ShadowShader *ebiten.Shader
+    Counter int
 }
 
 func (player *Player) Move() {
+    player.Counter += 1
+
     player.x += player.velocityX
     player.y += player.velocityY
 
@@ -363,14 +369,6 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *t
     bounds := player.pic.Bounds()
     screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.ShadowShader, options)
 
-    options = &ebiten.DrawRectShaderOptions{}
-    options.GeoM.Translate(playerX, playerY)
-    options.Blend = AlphaBlender
-    options.Images[0] = player.pic
-    options.Uniforms = make(map[string]interface{})
-    options.Uniforms["Color"] = []float32{0, 0, 1, 1}
-    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.EdgeShader, options)
-
     /*
     options := &ebiten.DrawImageOptions{}
     options.GeoM.Translate(player.x, player.y)
@@ -394,6 +392,15 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *t
         options.GeoM.Translate(playerX, playerY)
         screen.DrawImage(player.pic, options)
     }
+
+    options = &ebiten.DrawRectShaderOptions{}
+    options.GeoM.Translate(playerX, playerY)
+    options.Blend = AlphaBlender
+    options.Images[0] = player.pic
+    options.Uniforms = make(map[string]interface{})
+    options.Uniforms["Color"] = []float32{0, 0, float32(math.Abs(math.Sin(float64(player.Counter) * 2 * math.Pi / 180.0))), 1}
+    // options.Uniforms["Color"] = []float32{0, 0, 1, 1}
+    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.EdgeShader, options)
 }
 
 func (player *Player) HandleKeys(game *Game) error {
@@ -596,6 +603,10 @@ func main() {
     }
 
     shaderManager, err := MakeShaderManager()
+    if err != nil {
+        log.Printf("Failed to make shaders: %v", err)
+        return
+    }
 
     game := Game{
         Background: background,
