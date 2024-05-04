@@ -14,6 +14,9 @@ var ShadowShaderData []byte
 //go:embed shaders/edge.kage
 var EdgeShaderData []byte
 
+//go:embed shaders/explosion.kage
+var ExplosionShaderData []byte
+
 func LoadRedShader() (*ebiten.Shader, error) {
     return ebiten.NewShader(RedShaderData)
 }
@@ -24,4 +27,8 @@ func LoadEdgeShader() (*ebiten.Shader, error) {
 
 func LoadShadowShader() (*ebiten.Shader, error) {
     return ebiten.NewShader(ShadowShaderData)
+}
+
+func LoadExplosionShader() (*ebiten.Shader, error) {
+    return ebiten.NewShader(ExplosionShaderData)
 }

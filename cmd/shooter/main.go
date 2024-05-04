@@ -50,12 +50,33 @@ func (explosion *Explosion) IsAlive() bool {
     return explosion.life > 0
 }
 
-func (explosion *Explosion) Draw(screen *ebiten.Image) {
+func (explosion *Explosion) Draw(shaderManager *ShaderManager, screen *ebiten.Image) {
+    bounds := explosion.pic.Bounds()
+    posX := explosion.x - float64(bounds.Dx()) / 2
+    posY := explosion.y - float64(bounds.Dy()) / 2
+
+    /*
     options := &ebiten.DrawImageOptions{}
-    posX := explosion.x - float64(explosion.pic.Bounds().Dx()) / 2
-    posY := explosion.y - float64(explosion.pic.Bounds().Dy()) / 2
     options.GeoM.Translate(posX, posY)
     screen.DrawImage(explosion.pic, options)
+    */
+
+    options := &ebiten.DrawRectShaderOptions{}
+    options.GeoM.Translate(posX, posY)
+    options.Blend = AlphaBlender
+    options.Images[0] = explosion.pic
+    options.Uniforms = make(map[string]interface{})
+    // radians = math.Pi * 90 / 180
+    // log.Printf("Red: %v", radians)
+    options.Uniforms["Center"] = []float32{float32(explosion.x), float32(explosion.y)}
+    // options.Uniforms["Center"] = []float32{float32(bounds.Dx()) / 2, float32(bounds.Dy()) / 2}
+    options.Uniforms["InnerRadius"] = float32(math.Max(0, float64(5-explosion.life)))
+    options.Uniforms["OuterRadius"] = float32(math.Max(0, float64(10-explosion.life)))
+
+    // log.Printf("Uniforms: %v", options.Uniforms)
+    // options.Uniforms["InnerRadius"] = float32(10)
+    // options.Uniforms["OuterRadius"] = float32(100)
+    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaderManager.ExplosionShader, options)
 }
 
 type Bullet struct {
@@ -163,6 +184,7 @@ type ShaderManager struct {
     RedShader *ebiten.Shader
     ShadowShader *ebiten.Shader
     EdgeShader *ebiten.Shader
+    ExplosionShader *ebiten.Shader
 }
 
 func MakeShaderManager() (*ShaderManager, error) {
@@ -181,10 +203,16 @@ func MakeShaderManager() (*ShaderManager, error) {
         return nil, err
     }
 
+    explosionShader, err := LoadExplosionShader()
+    if err != nil {
+        return nil, err
+    }
+
     return &ShaderManager{
         RedShader: redShader,
         ShadowShader: shadowShader,
         EdgeShader: edgeShader,
+        ExplosionShader: explosionShader,
     }, nil
 }
 
@@ -634,7 +662,7 @@ func (game *Game) Draw(screen *ebiten.Image) {
     }
 
     for _, explosion := range game.Explosions {
-        explosion.Draw(screen)
+        explosion.Draw(game.ShaderManager, screen)
     }
 
     // ebitenutil.DebugPrint(screen, "debugging")
@@ -643,6 +671,17 @@ func (game *Game) Draw(screen *ebiten.Image) {
     for _, bullet := range game.Bullets {
         bullet.Draw(screen)
     }
+
+    /*
+    ePic, err := game.ImageManager.LoadImage(gameImages.ImageExplosion1)
+    if err == nil {
+        e := MakeExplosion(600, 400, ePic)
+        e.life = -40
+        e.Draw(game.ShaderManager, screen)
+    } else {
+        log.Printf("Failed to make explosion: %v", err)
+    }
+    */
     
     // vector.StrokeRect(screen, 0, 0, 100, 100, 3, &color.RGBA{R: 255, G: 0, B: 0, A: 128}, true)
     // vector.DrawFilledRect(screen, 0, 0, 100, 100, &color.RGBA{R: 255, G: 0, B: 0, A: 64}, true)
@@ -666,7 +705,7 @@ func main() {
     ebiten.SetWindowTitle("Shooter")
     ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
-    log.Printf("Loading player")
+    log.Printf("Loading objects")
 
     player, err := MakePlayer(320, 400)
     if err != nil {
