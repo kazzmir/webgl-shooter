@@ -398,7 +398,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *t
     options.Blend = AlphaBlender
     options.Images[0] = player.pic
     options.Uniforms = make(map[string]interface{})
-    options.Uniforms["Color"] = []float32{0, 0, float32(math.Abs(math.Sin(float64(player.Counter) * 2 * math.Pi / 180.0))), 1}
+    options.Uniforms["Color"] = []float32{0, 0, float32((math.Sin(float64(player.Counter) * 7 * math.Pi / 180.0) + 1) / 2), 1}
     // options.Uniforms["Color"] = []float32{0, 0, 1, 1}
     screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.EdgeShader, options)
 }
