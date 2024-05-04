@@ -22,6 +22,42 @@ import (
 const ScreenWidth = 1024
 const ScreenHeight = 768
 
+type Explosion struct {
+    x, y float64
+    velocityX, velocityY float64
+    pic *ebiten.Image
+    life int
+}
+
+func MakeExplosion(x float64, y float64, pic *ebiten.Image) *Explosion {
+    return &Explosion{
+        x: x,
+        y: y,
+        velocityX: 0,
+        velocityY: 0,
+        pic: pic,
+        life: 10,
+    }
+}
+
+func (explosion *Explosion) Move() {
+    explosion.x += explosion.velocityX
+    explosion.y += explosion.velocityY
+    explosion.life -= 1
+}
+
+func (explosion *Explosion) IsAlive() bool {
+    return explosion.life > 0
+}
+
+func (explosion *Explosion) Draw(screen *ebiten.Image) {
+    options := &ebiten.DrawImageOptions{}
+    posX := explosion.x - float64(explosion.pic.Bounds().Dx()) / 2
+    posY := explosion.y - float64(explosion.pic.Bounds().Dy()) / 2
+    options.GeoM.Translate(posX, posY)
+    screen.DrawImage(explosion.pic, options)
+}
+
 type Bullet struct {
     x, y float64
     velocityX, velocityY float64
@@ -237,36 +273,26 @@ func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
         */
 }
 
-func MakeEnemy1(x, y float64) (Enemy, error) {
-    enemyImage, err := gameImages.LoadImage(gameImages.ImageEnemy1)
-    if err != nil {
-        return nil, err
-    }
-
+func MakeEnemy1(x float64, y float64, image *ebiten.Image) (Enemy, error) {
     return &NormalEnemy{
         x: x,
         y: y,
         velocityX: 0,
         velocityY: 2,
         Life: 10,
-        pic: ebiten.NewImageFromImage(enemyImage),
+        pic: image,
         Flip: true,
     }, nil
 }
 
-func MakeEnemy2(x, y float64) (Enemy, error) {
-    enemyImage, err := gameImages.LoadImage(gameImages.ImageEnemy2)
-    if err != nil {
-        return nil, err
-    }
-
+func MakeEnemy2(x float64, y float64, pic *ebiten.Image) (Enemy, error) {
     return &NormalEnemy{
         x: x,
         y: y,
         velocityX: 0,
         velocityY: 2,
         Life: 10,
-        pic: ebiten.NewImageFromImage(enemyImage),
+        pic: pic,
         Flip: false,
     }, nil
 }
@@ -477,13 +503,42 @@ func MakePlayer(x, y float64) (*Player, error) {
     }, nil
 }
 
+type ImageManager struct {
+    Images map[gameImages.Image]*ebiten.Image
+}
+
+func MakeImageManager() *ImageManager {
+    return &ImageManager{
+        Images: make(map[gameImages.Image]*ebiten.Image),
+    }
+}
+
+func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, error) {
+    if image, ok := manager.Images[name]; ok {
+        return image, nil
+    }
+
+    loaded, err := gameImages.LoadImage(name)
+    if err != nil {
+        return nil, err
+    }
+
+    converted := ebiten.NewImageFromImage(loaded)
+
+    manager.Images[name] = converted
+    return converted, nil
+}
+
 type Game struct {
     Player *Player
     Background *Background
     Bullets []*Bullet
     Font *text.GoTextFaceSource
     Enemies []Enemy
+    Explosions []*Explosion
     ShaderManager *ShaderManager
+
+    ImageManager *ImageManager
 }
 
 func (game *Game) MakeEnemy() error {
@@ -492,9 +547,17 @@ func (game *Game) MakeEnemy() error {
 
     switch rand.Intn(2) {
         case 0:
-            enemy, err = MakeEnemy1(randomFloat(50, ScreenWidth - 50), randomFloat(-500, -50))
+            pic, err := game.ImageManager.LoadImage(gameImages.ImageEnemy1)
+            if err != nil {
+                return err
+            }
+            enemy, err = MakeEnemy1(randomFloat(50, ScreenWidth - 50), randomFloat(-500, -50), pic)
         case 1:
-            enemy, err = MakeEnemy2(randomFloat(50, ScreenWidth - 50), randomFloat(-500, -50))
+            pic, err := game.ImageManager.LoadImage(gameImages.ImageEnemy2)
+            if err != nil {
+                return err
+            }
+            enemy, err = MakeEnemy2(randomFloat(50, ScreenWidth - 50), randomFloat(-500, -50), pic)
     }
 
     if err != nil {
@@ -521,6 +584,15 @@ func (game *Game) Update() error {
         enemy.Move()
     }
 
+    explosionOut := make([]*Explosion, 0)
+    for _, explosion := range game.Explosions {
+        explosion.Move()
+        if explosion.IsAlive() {
+            explosionOut = append(explosionOut, explosion)
+        }
+    }
+    game.Explosions = explosionOut
+
     for i := 0; i < 3; i++ {
         var outBullets []*Bullet
         for _, bullet := range game.Bullets {
@@ -531,6 +603,14 @@ func (game *Game) Update() error {
                     game.Player.Score += 1
                     enemy.Hit()
                     bullet.SetDead()
+
+                    explosionPic, err := game.ImageManager.LoadImage(gameImages.ImageExplosion1)
+                    if err != nil {
+                        log.Printf("Could not load explosion: %v", err)
+                    } else {
+                        explosion := MakeExplosion(bullet.x, bullet.y, explosionPic)
+                        game.Explosions = append(game.Explosions, explosion)
+                    }
                     break
                 }
             }
@@ -551,6 +631,10 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
     for _, enemy := range game.Enemies {
         enemy.Draw(screen, game.ShaderManager)
+    }
+
+    for _, explosion := range game.Explosions {
+        explosion.Draw(screen)
     }
 
     // ebitenutil.DebugPrint(screen, "debugging")
@@ -613,6 +697,7 @@ func main() {
         Player: player,
         Font: font,
         ShaderManager: shaderManager,
+        ImageManager: MakeImageManager(),
     }
 
     for i := 0; i < 5; i++ {
