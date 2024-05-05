@@ -3,6 +3,8 @@ package main
 import (
     "log"
     "fmt"
+    "io"
+    _ "time"
     "math/rand"
     "math"
 
@@ -11,11 +13,14 @@ import (
 
     gameImages "github.com/kazzmir/webgl-shooter/images"
     fontLib "github.com/kazzmir/webgl-shooter/font"
+    audioFiles "github.com/kazzmir/webgl-shooter/audio"
 
     "github.com/hajimehoshi/ebiten/v2"
     _ "github.com/hajimehoshi/ebiten/v2/ebitenutil"
     "github.com/hajimehoshi/ebiten/v2/inpututil"
     "github.com/hajimehoshi/ebiten/v2/text/v2"
+    "github.com/hajimehoshi/ebiten/v2/audio"
+    // "github.com/hajimehoshi/ebiten/v2/audio/mp3"
     // "github.com/hajimehoshi/ebiten/v2/vector"
 )
 
@@ -557,6 +562,62 @@ func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, er
     return converted, nil
 }
 
+type SoundHandler struct {
+    Make func() *audio.Player
+    // Players chan *audio.Player
+}
+
+type SoundManager struct {
+    Sounds map[audioFiles.AudioName]*SoundHandler
+    Context *audio.Context
+    SampleRate int
+}
+
+func MakeSoundManager() (*SoundManager, error) {
+    manager := SoundManager{
+        Sounds: make(map[audioFiles.AudioName]*SoundHandler),
+        SampleRate: 44100,
+        Context: audio.NewContext(44100),
+    }
+
+    return &manager, manager.LoadAll()
+}
+
+func MakeSoundHandler(name audioFiles.AudioName, context *audio.Context, sampleRate int) (*SoundHandler, error) {
+    stream, err := audioFiles.LoadSound(name, sampleRate)
+    if err != nil {
+        return nil, err
+    }
+
+    data, err := io.ReadAll(stream)
+    if err != nil {
+        return nil, err
+    }
+
+    return &SoundHandler{
+        Make: func() *audio.Player {
+            return context.NewPlayerFromBytes(data)
+        },
+    }, nil
+}
+
+func (manager *SoundManager) LoadAll() error {
+
+    handler, err := MakeSoundHandler(audioFiles.AudioHit1, manager.Context, manager.SampleRate)
+    if err != nil {
+        return fmt.Errorf("Error loading %v: %v", audioFiles.AudioHit1, err)
+    }
+    manager.Sounds[audioFiles.AudioHit1] = handler
+
+    return nil
+}
+
+func (manager *SoundManager) Play(name audioFiles.AudioName) {
+    if handler, ok := manager.Sounds[name]; ok {
+        handler.Make().Play()
+    }
+}
+
 type Game struct {
     Player *Player
     Background *Background
@@ -565,8 +626,8 @@ type Game struct {
     Enemies []Enemy
     Explosions []*Explosion
     ShaderManager *ShaderManager
-
     ImageManager *ImageManager
+    SoundManager *SoundManager
 }
 
 func (game *Game) MakeEnemy() error {
@@ -632,6 +693,8 @@ func (game *Game) Update() error {
                     enemy.Hit()
                     bullet.SetDead()
 
+                    game.SoundManager.Play(audioFiles.AudioHit1)
+
                     explosionPic, err := game.ImageManager.LoadImage(gameImages.ImageExplosion1)
                     if err != nil {
                         log.Printf("Could not load explosion: %v", err)
@@ -655,7 +718,6 @@ func (game *Game) Update() error {
 
 func (game *Game) Draw(screen *ebiten.Image) {
     game.Background.Draw(screen)
-
 
     for _, enemy := range game.Enemies {
         enemy.Draw(screen, game.ShaderManager)
@@ -731,12 +793,19 @@ func main() {
         return
     }
 
+    soundManager, err := MakeSoundManager()
+    if err != nil {
+        log.Printf("Failed to make sound manager: %v", err)
+        return
+    }
+
     game := Game{
         Background: background,
         Player: player,
         Font: font,
         ShaderManager: shaderManager,
         ImageManager: MakeImageManager(),
+        SoundManager: soundManager,
     }
 
     for i := 0; i < 5; i++ {
