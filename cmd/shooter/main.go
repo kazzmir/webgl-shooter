@@ -4,7 +4,7 @@ import (
     "log"
     "fmt"
     "io"
-    _ "time"
+    "time"
     "math/rand"
     "math"
 
@@ -341,6 +341,7 @@ type Player struct {
     RedShader *ebiten.Shader
     ShadowShader *ebiten.Shader
     Counter int
+    SoundShoot chan bool
 }
 
 func (player *Player) Move() {
@@ -484,9 +485,19 @@ func (player *Player) HandleKeys(game *Game) error {
         // FIXME: make ebiten understand key mapping
         } else if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
             return ebiten.Termination
-        } else if key == ebiten.KeySpace && game.Player.bulletCounter == 0{
+        } else if key == ebiten.KeySpace && game.Player.bulletCounter == 0 {
             game.Bullets = append(game.Bullets, game.Player.MakeBullet())
             player.bulletCounter = 5
+
+            select {
+                case <-player.SoundShoot:
+                    game.SoundManager.Play(audioFiles.AudioShoot1)
+                    go func(){
+                        time.Sleep(10 * time.Millisecond)
+                        player.SoundShoot <- true
+                    }()
+                default:
+            }
         }
     }
 
@@ -526,6 +537,9 @@ func MakePlayer(x, y float64) (*Player, error) {
         return nil, err
     }
 
+    soundChan := make(chan bool, 2)
+    soundChan <- true
+
     return &Player{
         x: x,
         y: y,
@@ -533,6 +547,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         bullet: ebiten.NewImageFromImage(bulletImage),
         Jump: -50,
         Score: 0,
+        SoundShoot: soundChan,
     }, nil
 }
 
@@ -603,11 +618,14 @@ func MakeSoundHandler(name audioFiles.AudioName, context *audio.Context, sampleR
 
 func (manager *SoundManager) LoadAll() error {
 
-    handler, err := MakeSoundHandler(audioFiles.AudioHit1, manager.Context, manager.SampleRate)
-    if err != nil {
-        return fmt.Errorf("Error loading %v: %v", audioFiles.AudioHit1, err)
+    sounds := audioFiles.AllSounds
+    for _, sound := range sounds {
+        handler, err := MakeSoundHandler(sound, manager.Context, manager.SampleRate)
+        if err != nil {
+            return fmt.Errorf("Error loading %v: %v", sound, err)
+        }
+        manager.Sounds[sound] = handler
     }
-    manager.Sounds[audioFiles.AudioHit1] = handler
 
     return nil
 }
@@ -769,7 +787,7 @@ func main() {
 
     log.Printf("Loading objects")
 
-    player, err := MakePlayer(320, 400)
+    player, err := MakePlayer(ScreenWidth / 2, ScreenHeight - 100)
     if err != nil {
         log.Printf("Failed to make player: %v", err)
         return
