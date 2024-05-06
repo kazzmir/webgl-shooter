@@ -683,23 +683,42 @@ type Game struct {
     MusicPlayer sync.Once
 }
 
-func (game *Game) MakeEnemy() error {
+type Coordinate struct {
+    x, y float64
+}
+
+func MakeGroupGeneratorX() chan Coordinate {
+    out := make(chan Coordinate)
+
+    go func(){
+        out <- Coordinate{x: 0, y: 0}
+        out <- Coordinate{x: -50, y: -50}
+        out <- Coordinate{x: 50, y: -50}
+        out <- Coordinate{x: -50, y: 50}
+        out <- Coordinate{x: 50, y: 50}
+        close(out)
+    }()
+
+    return out
+}
+
+func (game *Game) MakeEnemy(x float64, y float64, kind int) error {
     var enemy Enemy
     var err error
 
-    switch rand.Intn(2) {
+    switch kind {
         case 0:
             pic, err := game.ImageManager.LoadImage(gameImages.ImageEnemy1)
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy1(randomFloat(50, ScreenWidth - 50), randomFloat(-500, -50), pic)
+            enemy, err = MakeEnemy1(x, y, pic)
         case 1:
             pic, err := game.ImageManager.LoadImage(gameImages.ImageEnemy2)
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy2(randomFloat(50, ScreenWidth - 50), randomFloat(-500, -50), pic)
+            enemy, err = MakeEnemy2(x, y, pic)
     }
 
     if err != nil {
@@ -707,6 +726,26 @@ func (game *Game) MakeEnemy() error {
     }
 
     game.Enemies = append(game.Enemies, enemy)
+
+    return nil
+}
+
+func (game *Game) MakeEnemies() error {
+
+    for i := 0; i < 5; i++ {
+        generator := MakeGroupGeneratorX()
+
+        x := randomFloat(50, ScreenWidth - 50)
+        y := randomFloat(-500, -50)
+        kind := rand.Intn(2)
+
+        for coord := range generator {
+            err := game.MakeEnemy(x + coord.x, y + coord.y, kind)
+            if err != nil {
+                return err
+            }
+        }
+    }
 
     return nil
 }
@@ -865,6 +904,13 @@ func main() {
         SoundManager: soundManager,
     }
 
+    err = game.MakeEnemies()
+    if err != nil {
+        log.Printf("Failed to make enemies: %v", err)
+        return
+    }
+
+    /*
     for i := 0; i < 5; i++ {
         err = game.MakeEnemy()
         if err != nil {
@@ -872,6 +918,7 @@ func main() {
             return
         }
     }
+    */
 
     log.Printf("Running")
     err = ebiten.RunGame(&game)
