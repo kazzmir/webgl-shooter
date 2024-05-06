@@ -5,8 +5,10 @@ import (
     "fmt"
     "io"
     "time"
+    "bytes"
     "math/rand"
     "math"
+    "sync"
 
     "image/color"
     _ "image/png"
@@ -579,6 +581,7 @@ func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, er
 
 type SoundHandler struct {
     Make func() *audio.Player
+    MakeLoop func() (*audio.Player, error)
     // Players chan *audio.Player
 }
 
@@ -591,27 +594,43 @@ type SoundManager struct {
 func MakeSoundManager() (*SoundManager, error) {
     manager := SoundManager{
         Sounds: make(map[audioFiles.AudioName]*SoundHandler),
-        SampleRate: 44100,
-        Context: audio.NewContext(44100),
+        SampleRate: 48000,
+        Context: audio.NewContext(48000),
     }
 
     return &manager, manager.LoadAll()
 }
 
 func MakeSoundHandler(name audioFiles.AudioName, context *audio.Context, sampleRate int) (*SoundHandler, error) {
-    stream, err := audioFiles.LoadSound(name, sampleRate)
-    if err != nil {
-        return nil, err
-    }
+    var data []byte
 
-    data, err := io.ReadAll(stream)
-    if err != nil {
-        return nil, err
+    var create sync.Once
+
+    load := func(){
+        log.Printf("Creating sound %v", name)
+        stream, err := audioFiles.LoadSound(name, sampleRate)
+        if err != nil {
+            log.Printf("Error loading sound %v: %v", name, err)
+            return
+        }
+
+        data, err = io.ReadAll(stream)
+        if err != nil {
+            log.Printf("Error loading sound %v: %v", name, err)
+            return
+        }
+
+        log.Printf("  loaded %v", name)
     }
 
     return &SoundHandler{
         Make: func() *audio.Player {
+            create.Do(load)
             return context.NewPlayerFromBytes(data)
+        },
+        MakeLoop: func() (*audio.Player, error) {
+            create.Do(load)
+            return context.NewPlayer(audio.NewInfiniteLoop(bytes.NewReader(data), int64(len(data)) + 1000))
         },
     }, nil
 }
@@ -636,6 +655,20 @@ func (manager *SoundManager) Play(name audioFiles.AudioName) {
     }
 }
 
+func (manager *SoundManager) PlayLoop(name audioFiles.AudioName) {
+    if handler, ok := manager.Sounds[name]; ok {
+        go func(){
+            player, err := handler.MakeLoop()
+            if err != nil {
+                log.Printf("Failed to play audio loop %v: %v", name, err)
+            } else {
+                player.Play()
+            }
+        }()
+    }
+}
+
+
 type Game struct {
     Player *Player
     Background *Background
@@ -646,6 +679,8 @@ type Game struct {
     ShaderManager *ShaderManager
     ImageManager *ImageManager
     SoundManager *SoundManager
+
+    MusicPlayer sync.Once
 }
 
 func (game *Game) MakeEnemy() error {
@@ -677,6 +712,10 @@ func (game *Game) MakeEnemy() error {
 }
 
 func (game *Game) Update() error {
+
+    game.MusicPlayer.Do(func(){
+        game.SoundManager.PlayLoop(audioFiles.AudioStellarPulseSong)
+    })
 
     game.Background.Update()
 
