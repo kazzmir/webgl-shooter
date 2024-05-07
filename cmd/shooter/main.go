@@ -238,6 +238,7 @@ type NormalEnemy struct {
     Life float64
     pic *ebiten.Image
     Flip bool
+    hurt int
 }
 
 func (enemy *NormalEnemy) IsAlive() bool {
@@ -245,6 +246,7 @@ func (enemy *NormalEnemy) IsAlive() bool {
 }
 
 func (enemy *NormalEnemy) Hit() {
+    enemy.hurt = 10
     enemy.Life -= 1
     if enemy.Life <= 0 {
         /*
@@ -261,6 +263,10 @@ func (enemy *NormalEnemy) Move() {
 
     if enemy.y > ScreenHeight + 50 {
         enemy.y = -100
+    }
+
+    if enemy.hurt > 0 {
+        enemy.hurt -= 1
     }
 }
 
@@ -291,16 +297,34 @@ func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
     bounds := enemy.pic.Bounds()
     screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.ShadowShader, shaderOptions)
 
-    options := &ebiten.DrawImageOptions{}
-    // flip 180 degrees
-    if enemy.Flip {
-        options.GeoM.Translate(-float64(enemy.pic.Bounds().Dx()) / 2, -float64(enemy.pic.Bounds().Dy()) / 2)
-        options.GeoM.Rotate(math.Pi)
-        options.GeoM.Translate(float64(enemy.pic.Bounds().Dx()) / 2, float64(enemy.pic.Bounds().Dy()) / 2)
-        // options.GeoM.Rotate(1, -1)
+    if enemy.hurt > 0 {
+        hurtOptions := &ebiten.DrawRectShaderOptions{}
+        if enemy.Flip {
+            hurtOptions.GeoM.Translate(-float64(enemy.pic.Bounds().Dx()) / 2, -float64(enemy.pic.Bounds().Dy()) / 2)
+            hurtOptions.GeoM.Rotate(math.Pi)
+            hurtOptions.GeoM.Translate(float64(enemy.pic.Bounds().Dx()) / 2, float64(enemy.pic.Bounds().Dy()) / 2)
+        }
+        hurtOptions.GeoM.Translate(enemyX, enemyY)
+        hurtOptions.Uniforms = make(map[string]interface{})
+        hurtOptions.Uniforms["Red"] = float32(math.Min(1.0, float64(enemy.hurt) / 8.0))
+        hurtOptions.Blend = AlphaBlender
+        hurtOptions.Images[0] = enemy.pic
+        bounds := enemy.pic.Bounds()
+        screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.RedShader, hurtOptions)
+
+    } else {
+
+        options := &ebiten.DrawImageOptions{}
+        // flip 180 degrees
+        if enemy.Flip {
+            options.GeoM.Translate(-float64(enemy.pic.Bounds().Dx()) / 2, -float64(enemy.pic.Bounds().Dy()) / 2)
+            options.GeoM.Rotate(math.Pi)
+            options.GeoM.Translate(float64(enemy.pic.Bounds().Dx()) / 2, float64(enemy.pic.Bounds().Dy()) / 2)
+            // options.GeoM.Rotate(1, -1)
+        }
+        options.GeoM.Translate(enemyX, enemyY)
+        screen.DrawImage(enemy.pic, options)
     }
-    options.GeoM.Translate(enemyX, enemyY)
-    screen.DrawImage(enemy.pic, options)
 
     /*
     vector.StrokeRect(
@@ -324,6 +348,7 @@ func MakeEnemy1(x float64, y float64, image *ebiten.Image) (Enemy, error) {
         Life: 10,
         pic: image,
         Flip: true,
+        hurt: 0,
     }, nil
 }
 
@@ -336,6 +361,7 @@ func MakeEnemy2(x float64, y float64, pic *ebiten.Image) (Enemy, error) {
         Life: 10,
         pic: pic,
         Flip: false,
+        hurt: 0,
     }, nil
 }
 
