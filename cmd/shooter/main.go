@@ -226,6 +226,7 @@ func MakeShaderManager() (*ShaderManager, error) {
 type Enemy interface {
     Move()
     Hit()
+    IsAlive() bool
     Draw(screen *ebiten.Image, shaders *ShaderManager)
     // returns true if this enemy is colliding with the point
     Collision(x, y float64) bool
@@ -239,12 +240,18 @@ type NormalEnemy struct {
     Flip bool
 }
 
+func (enemy *NormalEnemy) IsAlive() bool {
+    return enemy.Life > 0
+}
+
 func (enemy *NormalEnemy) Hit() {
     enemy.Life -= 1
     if enemy.Life <= 0 {
+        /*
         enemy.x = randomFloat(50, ScreenWidth - 50)
         enemy.y = randomFloat(-500, -50)
         enemy.Life = 10
+        */
     }
 }
 
@@ -691,12 +698,70 @@ func MakeGroupGeneratorX() chan Coordinate {
     out := make(chan Coordinate)
 
     go func(){
+        defer close(out)
         out <- Coordinate{x: 0, y: 0}
         out <- Coordinate{x: -50, y: -50}
         out <- Coordinate{x: 50, y: -50}
         out <- Coordinate{x: -50, y: 50}
         out <- Coordinate{x: 50, y: 50}
-        close(out)
+    }()
+
+    return out
+}
+
+func MakeGroupGeneratorVertical(many int) chan Coordinate {
+    out := make(chan Coordinate)
+
+    go func(){
+        defer close(out)
+        y := float64(0)
+        for i := 0; i < many; i++ {
+            out <- Coordinate{x: 0, y: y}
+            y -= 50
+        }
+    }()
+
+    return out
+}
+
+func MakeGroupGenerator1x2() chan Coordinate {
+    out := make(chan Coordinate)
+
+    go func(){
+        defer close(out)
+        out <- Coordinate{x: -50, y: 0}
+        out <- Coordinate{x: 50, y: 0}
+    }()
+
+    return out
+}
+
+func MakeGroupGenerator2x2() chan Coordinate {
+    out := make(chan Coordinate)
+
+    go func(){
+        defer close(out)
+        out <- Coordinate{x: -50, y: 0}
+        out <- Coordinate{x: 50, y: 0}
+        out <- Coordinate{x: -50, y: -50}
+        out <- Coordinate{x: 50, y: -50}
+    }()
+
+    return out
+}
+
+
+func MakeGroupGeneratorCircle(radius int, many int) chan Coordinate {
+    out := make(chan Coordinate)
+
+    go func(){
+        defer close(out)
+        for i := 0; i < many; i++ {
+            radians := float64(i) * 2 * math.Pi / float64(many)
+            x := float64(radius) * math.Cos(radians)
+            y := float64(radius) * math.Sin(radians)
+            out <- Coordinate{x: x, y: y}
+        }
     }()
 
     return out
@@ -730,13 +795,20 @@ func (game *Game) MakeEnemy(x float64, y float64, kind int) error {
     return nil
 }
 
-func (game *Game) MakeEnemies() error {
+func (game *Game) MakeEnemies(count int) error {
 
-    for i := 0; i < 5; i++ {
-        generator := MakeGroupGeneratorX()
+    for i := 0; i < count; i++ {
+        var generator chan Coordinate
+        switch rand.Intn(5) {
+            case 0: generator = MakeGroupGeneratorX()
+            case 1: generator = MakeGroupGeneratorVertical(rand.Intn(3) + 3)
+            case 2: generator = MakeGroupGeneratorCircle(100, 6)
+            case 3: generator = MakeGroupGenerator1x2()
+            case 4: generator = MakeGroupGenerator2x2()
+        }
 
         x := randomFloat(50, ScreenWidth - 50)
-        y := randomFloat(-500, -50)
+        y := float64(-500)
         kind := rand.Intn(2)
 
         for coord := range generator {
@@ -784,7 +856,7 @@ func (game *Game) Update() error {
             bullet.Move()
 
             for _, enemy := range game.Enemies {
-                if enemy.Collision(bullet.x, bullet.y) {
+                if enemy.IsAlive() && enemy.Collision(bullet.x, bullet.y) {
                     game.Player.Score += 1
                     enemy.Hit()
                     bullet.SetDead()
@@ -807,6 +879,18 @@ func (game *Game) Update() error {
             }
         }
         game.Bullets = outBullets
+    }
+
+    enemyOut := make([]Enemy, 0)
+    for _, enemy := range game.Enemies {
+        if enemy.IsAlive() {
+            enemyOut = append(enemyOut, enemy)
+        }
+    }
+    game.Enemies = enemyOut
+
+    if len(game.Enemies) == 0 || (len(game.Enemies) < 50 && rand.Intn(100) == 0) {
+        game.MakeEnemies(1)
     }
 
     return nil
@@ -904,7 +988,7 @@ func main() {
         SoundManager: soundManager,
     }
 
-    err = game.MakeEnemies()
+    err = game.MakeEnemies(5)
     if err != nil {
         log.Printf("Failed to make enemies: %v", err)
         return
