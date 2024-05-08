@@ -885,6 +885,9 @@ func (game *Game) Update() error {
                 if enemy.IsAlive() && enemy.Collision(bullet.x, bullet.y) {
                     game.Player.Score += 1
                     enemy.Hit()
+                    if ! enemy.IsAlive() {
+                        game.SoundManager.Play(audioFiles.AudioExplosion3)
+                    }
                     bullet.SetDead()
 
                     game.SoundManager.Play(audioFiles.AudioHit1)
