@@ -29,15 +29,21 @@ import (
 const ScreenWidth = 1024
 const ScreenHeight = 768
 
-type Explosion struct {
+type Explosion interface {
+    Move()
+    IsAlive() bool
+    Draw(shaderManager *ShaderManager, screen *ebiten.Image)
+}
+
+type SimpleExplosion struct {
     x, y float64
     velocityX, velocityY float64
     pic *ebiten.Image
     life int
 }
 
-func MakeExplosion(x float64, y float64, pic *ebiten.Image) *Explosion {
-    return &Explosion{
+func MakeSimpleExplosion(x float64, y float64, pic *ebiten.Image) Explosion {
+    return &SimpleExplosion{
         x: x,
         y: y,
         velocityX: 0,
@@ -47,17 +53,17 @@ func MakeExplosion(x float64, y float64, pic *ebiten.Image) *Explosion {
     }
 }
 
-func (explosion *Explosion) Move() {
+func (explosion *SimpleExplosion) Move() {
     explosion.x += explosion.velocityX
     explosion.y += explosion.velocityY
     explosion.life -= 1
 }
 
-func (explosion *Explosion) IsAlive() bool {
+func (explosion *SimpleExplosion) IsAlive() bool {
     return explosion.life > 0
 }
 
-func (explosion *Explosion) Draw(shaderManager *ShaderManager, screen *ebiten.Image) {
+func (explosion *SimpleExplosion) Draw(shaderManager *ShaderManager, screen *ebiten.Image) {
     bounds := explosion.pic.Bounds()
     posX := explosion.x - float64(bounds.Dx()) / 2
     posY := explosion.y - float64(bounds.Dy()) / 2
@@ -84,6 +90,37 @@ func (explosion *Explosion) Draw(shaderManager *ShaderManager, screen *ebiten.Im
     // options.Uniforms["InnerRadius"] = float32(10)
     // options.Uniforms["OuterRadius"] = float32(100)
     screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaderManager.ExplosionShader, options)
+}
+
+type AnimatedExplosion struct {
+    x, y float64
+    velocityX, velocityY float64
+    animation *Animation
+}
+
+func (explosion *AnimatedExplosion) Move() {
+    explosion.x += explosion.velocityX
+    explosion.y += explosion.velocityY
+    explosion.animation.Update()
+}
+
+func (explosion *AnimatedExplosion) IsAlive() bool {
+    return explosion.animation.IsAlive()
+}
+
+func (explosion *AnimatedExplosion) Draw(shaderManager *ShaderManager, screen *ebiten.Image) {
+    explosion.animation.Draw(screen, explosion.x, explosion.y)
+}
+
+
+func MakeAnimatedExplosion(x float64, y float64, animation *Animation) Explosion {
+    return &AnimatedExplosion{
+        x: x,
+        y: y,
+        velocityX: 0,
+        velocityY: 0,
+        animation: animation,
+    }
 }
 
 type Bullet struct {
@@ -226,6 +263,7 @@ func MakeShaderManager() (*ShaderManager, error) {
 type Enemy interface {
     Move()
     Hit()
+    Coords() (float64, float64)
     IsAlive() bool
     Draw(screen *ebiten.Image, shaders *ShaderManager)
     // returns true if this enemy is colliding with the point
@@ -239,6 +277,10 @@ type NormalEnemy struct {
     pic *ebiten.Image
     Flip bool
     hurt int
+}
+
+func (enemy *NormalEnemy) Coords() (float64, float64) {
+    return enemy.x, enemy.y
 }
 
 func (enemy *NormalEnemy) IsAlive() bool {
@@ -612,6 +654,19 @@ func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, er
     return converted, nil
 }
 
+func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, error) {
+    loaded, err := manager.LoadImage(name)
+    if err != nil {
+        return nil, err
+    }
+
+    switch name {
+        case gameImages.ImageExplosion2: return NewAnimation(loaded, 5, 6), nil
+    }
+
+    return nil, fmt.Errorf("No such animation %v", name)
+}
+
 type SoundHandler struct {
     Make func() *audio.Player
     MakeLoop func() (*audio.Player, error)
@@ -708,7 +763,7 @@ type Game struct {
     Bullets []*Bullet
     Font *text.GoTextFaceSource
     Enemies []Enemy
-    Explosions []*Explosion
+    Explosions []Explosion
     ShaderManager *ShaderManager
     ImageManager *ImageManager
     SoundManager *SoundManager
@@ -867,7 +922,7 @@ func (game *Game) Update() error {
         enemy.Move()
     }
 
-    explosionOut := make([]*Explosion, 0)
+    explosionOut := make([]Explosion, 0)
     for _, explosion := range game.Explosions {
         explosion.Move()
         if explosion.IsAlive() {
@@ -887,6 +942,14 @@ func (game *Game) Update() error {
                     enemy.Hit()
                     if ! enemy.IsAlive() {
                         game.SoundManager.Play(audioFiles.AudioExplosion3)
+
+                        animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
+                        if err == nil {
+                            x, y := enemy.Coords()
+                            game.Explosions = append(game.Explosions, MakeAnimatedExplosion(x, y, animation))
+                        } else {
+                            log.Printf("Could not load explosion sheet: %v", err)
+                        }
                     }
                     bullet.SetDead()
 
@@ -896,7 +959,7 @@ func (game *Game) Update() error {
                     if err != nil {
                         log.Printf("Could not load explosion: %v", err)
                     } else {
-                        explosion := MakeExplosion(bullet.x, bullet.y, explosionPic)
+                        explosion := MakeSimpleExplosion(bullet.x, bullet.y, explosionPic)
                         game.Explosions = append(game.Explosions, explosion)
                     }
                     break
