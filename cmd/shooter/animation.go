@@ -9,9 +9,11 @@ type Animation struct {
     Frames []*ebiten.Image
     CurrentFrame int
     Loop bool
+    FPS float64
+    fpsCounter float64
 }
 
-func NewAnimation(sheet *ebiten.Image, frameRows int, frameColumns int) *Animation {
+func NewAnimation(sheet *ebiten.Image, frameRows int, frameColumns int, fps float64) *Animation {
     var frames []*ebiten.Image
 
     yMax := float64(sheet.Bounds().Dy())
@@ -29,6 +31,8 @@ func NewAnimation(sheet *ebiten.Image, frameRows int, frameColumns int) *Animati
         Frames: frames,
         CurrentFrame: 0,
         Loop: false,
+        FPS: fps,
+        fpsCounter: 0,
     }
 }
 
@@ -37,6 +41,13 @@ func (animation *Animation) IsAlive() bool {
 }
 
 func (animation *Animation) Update() {
+    animation.fpsCounter += 1.0
+    if animation.fpsCounter < animation.FPS {
+        return
+    }
+
+    animation.fpsCounter -= animation.FPS
+
     if animation.CurrentFrame < len(animation.Frames) {
         animation.CurrentFrame += 1
     }

@@ -561,7 +561,7 @@ func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, e
     }
 
     switch name {
-        case gameImages.ImageExplosion2: return NewAnimation(loaded, 5, 6), nil
+        case gameImages.ImageExplosion2: return NewAnimation(loaded, 5, 6, 1.5), nil
     }
 
     return nil, fmt.Errorf("No such animation %v", name)
