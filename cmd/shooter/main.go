@@ -732,6 +732,8 @@ func (manager *SoundManager) LoadAll() error {
             return fmt.Errorf("Error loading %v: %v", sound, err)
         }
         manager.Sounds[sound] = handler
+
+        go handler.Make()
     }
 
     return nil
