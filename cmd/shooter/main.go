@@ -562,6 +562,7 @@ func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, e
 
     switch name {
         case gameImages.ImageExplosion2: return NewAnimation(loaded, 5, 6, 1.5), nil
+        case gameImages.ImageHit: return NewAnimation(loaded, 5, 6, 1.5), nil
     }
 
     return nil, fmt.Errorf("No such animation %v", name)
@@ -856,12 +857,11 @@ func (game *Game) Update() error {
 
                     game.SoundManager.Play(audioFiles.AudioHit1)
 
-                    explosionPic, err := game.ImageManager.LoadImage(gameImages.ImageExplosion1)
+                    animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit)
                     if err != nil {
-                        log.Printf("Could not load explosion: %v", err)
+                        log.Printf("Could not load hit animation: %v", err)
                     } else {
-                        explosion := MakeSimpleExplosion(bullet.x, bullet.y, explosionPic)
-                        game.Explosions = append(game.Explosions, explosion)
+                        game.Explosions = append(game.Explosions, MakeAnimatedExplosion(bullet.x, bullet.y, animation))
                     }
                     break
                 }
