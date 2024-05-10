@@ -22,8 +22,7 @@ import (
     "github.com/hajimehoshi/ebiten/v2/inpututil"
     "github.com/hajimehoshi/ebiten/v2/text/v2"
     "github.com/hajimehoshi/ebiten/v2/audio"
-    // "github.com/hajimehoshi/ebiten/v2/audio/mp3"
-    // "github.com/hajimehoshi/ebiten/v2/vector"
+    "github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 const ScreenWidth = 1024
@@ -659,6 +658,8 @@ func (manager *SoundManager) PlayLoop(name audioFiles.AudioName) {
     }
 }
 
+const GameFadeIn = 20
+
 type Game struct {
     Player *Player
     Background *Background
@@ -669,6 +670,7 @@ type Game struct {
     ShaderManager *ShaderManager
     ImageManager *ImageManager
     SoundManager *SoundManager
+    FadeIn int
 
     MusicPlayer sync.Once
 }
@@ -807,6 +809,10 @@ func (game *Game) MakeEnemies(count int) error {
 
 func (game *Game) Update() error {
 
+    if game.FadeIn < GameFadeIn {
+        game.FadeIn += 1
+    }
+
     game.MusicPlayer.Do(func(){
         game.SoundManager.PlayLoop(audioFiles.AudioStellarPulseSong)
     })
@@ -907,17 +913,10 @@ func (game *Game) Draw(screen *ebiten.Image) {
         bullet.Draw(screen)
     }
 
-    /*
-    ePic, err := game.ImageManager.LoadImage(gameImages.ImageExplosion1)
-    if err == nil {
-        e := MakeExplosion(600, 400, ePic)
-        e.life = -40
-        e.Draw(game.ShaderManager, screen)
-    } else {
-        log.Printf("Failed to make explosion: %v", err)
+    if game.FadeIn < GameFadeIn {
+        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: uint8(255 - game.FadeIn * 255 / GameFadeIn)}, true)
     }
-    */
-    
+
     // vector.StrokeRect(screen, 0, 0, 100, 100, 3, &color.RGBA{R: 255, G: 0, B: 0, A: 128}, true)
     // vector.DrawFilledRect(screen, 0, 0, 100, 100, &color.RGBA{R: 255, G: 0, B: 0, A: 64}, true)
 
@@ -989,6 +988,7 @@ func main() {
         ShaderManager: shaderManager,
         ImageManager: MakeImageManager(),
         SoundManager: soundManager,
+        FadeIn: 0,
     }
 
     err = game.MakeEnemies(5)
