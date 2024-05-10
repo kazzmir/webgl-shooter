@@ -1028,6 +1028,16 @@ func (game *Game) Draw(screen *ebiten.Image) {
     */
 }
 
+func (game *Game) PreloadAssets() error {
+    // preload assets
+    _, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
 func (game *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
     return ScreenWidth, ScreenHeight
 }
@@ -1086,15 +1096,11 @@ func main() {
         return
     }
 
-    /*
-    for i := 0; i < 5; i++ {
-        err = game.MakeEnemy()
-        if err != nil {
-            log.Printf("Failed to make enemy: %v", err)
-            return
-        }
+    err = game.PreloadAssets()
+    if err != nil {
+        log.Printf("Failed to preload assets: %v", err)
+        return
     }
-    */
 
     log.Printf("Running")
     err = ebiten.RunGame(&game)
