@@ -319,7 +319,7 @@ type Player struct {
     velocityX, velocityY float64
     bulletCounter int
     pic *ebiten.Image
-    bullet *ebiten.Image
+    Gun Gun
     Score int
     RedShader *ebiten.Shader
     ShadowShader *ebiten.Shader
@@ -368,14 +368,25 @@ func (player *Player) Move() {
     }
 }
 
-func (player *Player) MakeBullet() *Bullet {
+func (player *Player) Shoot(imageManager *ImageManager) []*Bullet {
 
+    bullets, err := player.Gun.Shoot(imageManager, player.x, player.y - float64(player.pic.Bounds().Dy()) / 2)
+    if err != nil {
+        log.Printf("Could not create bullets: %v", err)
+        return nil
+    }
+
+    return bullets
+
+    /*
     velocityY := player.velocityY-2
     if velocityY > -1 {
         velocityY = -1
     }
+    */
 
-    velocityY = -2.5
+    /*
+    velocityY := -2.5
 
     return &Bullet{
         x: player.x,
@@ -385,6 +396,7 @@ func (player *Player) MakeBullet() *Bullet {
         velocityY: velocityY,
         pic: player.bullet,
     }
+    */
 }
 
 var AlphaBlender ebiten.Blend = ebiten.Blend{
@@ -469,7 +481,7 @@ func (player *Player) HandleKeys(game *Game) error {
         } else if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
             return ebiten.Termination
         } else if key == ebiten.KeySpace && game.Player.bulletCounter == 0 {
-            game.Bullets = append(game.Bullets, game.Player.MakeBullet())
+            game.Bullets = append(game.Bullets, game.Player.Shoot(game.ImageManager)...)
             player.bulletCounter = 5
 
             select {
@@ -491,31 +503,12 @@ func (player *Player) HandleKeys(game *Game) error {
     return nil
 }
 
-/*
-func loadPng(path string) (image.Image, error) {
-    file, err := os.Open(path)
-    if err != nil {
-        return nil, err
-    }
-
-    defer file.Close()
-
-    img, _, err := image.Decode(file)
-    return img, err
-}
-*/
-
 const JumpDuration = 50
 
 func MakePlayer(x, y float64) (*Player, error) {
 
     playerImage, err := gameImages.LoadImage(gameImages.ImagePlayer)
 
-    if err != nil {
-        return nil, err
-    }
-
-    bulletImage, err := gameImages.LoadImage(gameImages.ImageBullet)
     if err != nil {
         return nil, err
     }
@@ -527,7 +520,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         x: x,
         y: y,
         pic: ebiten.NewImageFromImage(playerImage),
-        bullet: ebiten.NewImageFromImage(bulletImage),
+        Gun: &BasicGun{},
         Jump: -50,
         Score: 0,
         SoundShoot: soundChan,
@@ -663,7 +656,6 @@ func (manager *SoundManager) PlayLoop(name audioFiles.AudioName) {
         }()
     }
 }
-
 
 type Game struct {
     Player *Player
