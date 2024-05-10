@@ -52,7 +52,7 @@ func (bullet *Bullet) SetDead() {
 }
 
 func (bullet *Bullet) IsAlive() bool {
-    return bullet.alive && bullet.y > 0
+    return bullet.alive && bullet.y > -10
 }
 
 type StarPosition struct {
@@ -520,7 +520,8 @@ func MakePlayer(x, y float64) (*Player, error) {
         x: x,
         y: y,
         pic: ebiten.NewImageFromImage(playerImage),
-        Gun: &BasicGun{},
+        // Gun: &BasicGun{},
+        Gun: &DualBasicGun{},
         Jump: -50,
         Score: 0,
         SoundShoot: soundChan,
