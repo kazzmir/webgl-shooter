@@ -30,6 +30,7 @@ const ScreenHeight = 768
 
 type Bullet struct {
     x, y float64
+    Strength float64
     velocityX, velocityY float64
     pic *ebiten.Image
     animation *Animation
@@ -179,7 +180,7 @@ func MakeShaderManager() (*ShaderManager, error) {
 
 type Enemy interface {
     Move()
-    Hit()
+    Hit(bullet *Bullet)
     Coords() (float64, float64)
     IsAlive() bool
     Draw(screen *ebiten.Image, shaders *ShaderManager)
@@ -204,9 +205,9 @@ func (enemy *NormalEnemy) IsAlive() bool {
     return enemy.Life > 0
 }
 
-func (enemy *NormalEnemy) Hit() {
+func (enemy *NormalEnemy) Hit(bullet *Bullet) {
     enemy.hurt = 10
-    enemy.Life -= 1
+    enemy.Life -= bullet.Strength
     if enemy.Life <= 0 {
         /*
         enemy.x = randomFloat(50, ScreenWidth - 50)
@@ -379,13 +380,25 @@ func (player *Player) Move() {
     }
 }
 
-func (player *Player) Shoot(imageManager *ImageManager) []*Bullet {
+func (player *Player) Shoot(imageManager *ImageManager, soundManager *SoundManager) []*Bullet {
 
     bullets, err := player.Gun.Shoot(imageManager, player.x, player.y - float64(player.pic.Bounds().Dy()) / 2)
     if err != nil {
         log.Printf("Could not create bullets: %v", err)
         return nil
     }
+
+    select {
+    case <-player.SoundShoot:
+        // soundManager.Play(audioFiles.AudioShoot1)
+        player.Gun.DoSound(soundManager)
+        go func(){
+            time.Sleep(10 * time.Millisecond)
+            player.SoundShoot <- true
+        }()
+    default:
+    }
+
 
     return bullets
 
@@ -492,18 +505,8 @@ func (player *Player) HandleKeys(game *Game) error {
         } else if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
             return ebiten.Termination
         } else if key == ebiten.KeySpace && game.Player.bulletCounter <= 0 {
-            game.Bullets = append(game.Bullets, game.Player.Shoot(game.ImageManager)...)
+            game.Bullets = append(game.Bullets, game.Player.Shoot(game.ImageManager, game.SoundManager)...)
             player.bulletCounter = 60.0 / game.Player.Gun.Rate()
-
-            select {
-                case <-player.SoundShoot:
-                    game.SoundManager.Play(audioFiles.AudioShoot1)
-                    go func(){
-                        time.Sleep(10 * time.Millisecond)
-                        player.SoundShoot <- true
-                    }()
-                default:
-            }
         }
     }
 
@@ -532,8 +535,8 @@ func MakePlayer(x, y float64) (*Player, error) {
         y: y,
         pic: ebiten.NewImageFromImage(playerImage),
         // Gun: &BasicGun{},
-        Gun: &DualBasicGun{},
-        // Gun: &BeamGun{},
+        // Gun: &DualBasicGun{},
+        Gun: &BeamGun{},
         Jump: -50,
         Score: 0,
         SoundShoot: soundChan,
@@ -861,7 +864,7 @@ func (game *Game) Update() error {
             for _, enemy := range game.Enemies {
                 if enemy.IsAlive() && enemy.Collision(bullet.x, bullet.y) {
                     game.Player.Score += 1
-                    enemy.Hit()
+                    enemy.Hit(bullet)
                     if ! enemy.IsAlive() {
                         game.SoundManager.Play(audioFiles.AudioExplosion3)
 

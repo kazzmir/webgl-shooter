@@ -2,11 +2,13 @@ package main
 
 import (
     gameImages "github.com/kazzmir/webgl-shooter/images"
+    audioFiles "github.com/kazzmir/webgl-shooter/audio"
 )
 
 type Gun interface {
     Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error)
     Rate() float64
+    DoSound(soundManager *SoundManager)
 }
 
 type BasicGun struct {
@@ -14,6 +16,10 @@ type BasicGun struct {
 
 func (basic *BasicGun) Rate() float64 {
     return 10
+}
+
+func (basic *BasicGun) DoSound(soundManager *SoundManager) {
+    soundManager.Play(audioFiles.AudioShoot1)
 }
 
 func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
@@ -27,6 +33,7 @@ func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) (
     bullet := Bullet{
         x: x,
         y: y,
+        Strength: 1,
         alive: true,
         velocityX: 0,
         velocityY: velocityY,
@@ -43,6 +50,10 @@ func (dual *DualBasicGun) Rate() float64 {
     return 10
 }
 
+func (dual *DualBasicGun) DoSound(soundManager *SoundManager) {
+    soundManager.Play(audioFiles.AudioShoot1)
+}
+
 func (dual *DualBasicGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
     velocityY := -2.5
 
@@ -54,6 +65,7 @@ func (dual *DualBasicGun) Shoot(imageManager *ImageManager, x float64, y float64
     bullet1 := Bullet{
         x: x - 10,
         y: y,
+        Strength: 1,
         alive: true,
         velocityX: 0,
         velocityY: velocityY,
@@ -73,6 +85,10 @@ func (beam *BeamGun) Rate() float64 {
     return 4
 }
 
+func (beam *BeamGun) DoSound(soundManager *SoundManager) {
+    soundManager.Play(audioFiles.AudioShoot1)
+}
+
 func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
     velocityY := -2.3
 
@@ -84,6 +100,7 @@ func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]
     bullet := Bullet{
         x: x,
         y: y,
+        Strength: 2,
         alive: true,
         velocityX: 0,
         velocityY: velocityY,
