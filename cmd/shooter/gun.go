@@ -93,6 +93,7 @@ func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]
     velocityY := -2.3
 
     animation, err := imageManager.LoadAnimation(gameImages.ImageBeam1)
+    // animation, err := imageManager.LoadAnimation(gameImages.ImageWave1)
     if err != nil {
         return nil, err
     }
