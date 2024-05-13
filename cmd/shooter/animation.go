@@ -13,6 +13,38 @@ type Animation struct {
     fpsCounter float64
 }
 
+type SheetCoordinate struct {
+    X int
+    Y int
+}
+
+func NewAnimationCoordinates(sheet *ebiten.Image, frameRows int, frameColumns int, fps float64, coordinates []SheetCoordinate, loop bool) *Animation {
+    var frames []*ebiten.Image
+
+    yMax := float64(sheet.Bounds().Dy())
+    xMax := float64(sheet.Bounds().Dx())
+
+    frameHeight := yMax / float64(frameRows)
+    frameWidth := xMax / float64(frameColumns)
+
+    for _, coordinate := range coordinates {
+        x1 := coordinate.X * int(frameWidth)
+        y1 := coordinate.Y * int(frameHeight)
+        x2 := (coordinate.X + 1) * int(frameWidth)
+        y2 := (coordinate.Y + 1) * int(frameHeight)
+        subImage := sheet.SubImage(image.Rect(x1, y1, x2, y2)).(*ebiten.Image)
+        frames = append(frames, subImage)
+    }
+
+    return &Animation{
+        Frames: frames,
+        CurrentFrame: 0,
+        Loop: loop,
+        FPS: 1.0 / fps,
+        fpsCounter: 0,
+    }
+}
+
 func NewAnimation(sheet *ebiten.Image, frameRows int, frameColumns int, fps float64) *Animation {
     var frames []*ebiten.Image
 
@@ -31,7 +63,7 @@ func NewAnimation(sheet *ebiten.Image, frameRows int, frameColumns int, fps floa
         Frames: frames,
         CurrentFrame: 0,
         Loop: false,
-        FPS: fps,
+        FPS: 1.0 / fps,
         fpsCounter: 0,
     }
 }

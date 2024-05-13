@@ -6,9 +6,14 @@ import (
 
 type Gun interface {
     Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error)
+    Rate() float64
 }
 
 type BasicGun struct {
+}
+
+func (basic *BasicGun) Rate() float64 {
+    return 10
 }
 
 func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
@@ -34,6 +39,10 @@ func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) (
 type DualBasicGun struct {
 }
 
+func (dual *DualBasicGun) Rate() float64 {
+    return 10
+}
+
 func (dual *DualBasicGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
     velocityY := -2.5
 
@@ -55,4 +64,32 @@ func (dual *DualBasicGun) Shoot(imageManager *ImageManager, x float64, y float64
     bullet2.x += 20
 
     return []*Bullet{&bullet1, &bullet2}, nil
+}
+
+type BeamGun struct {
+}
+
+func (beam *BeamGun) Rate() float64 {
+    return 4
+}
+
+func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
+    velocityY := -2.3
+
+    animation, err := imageManager.LoadAnimation(gameImages.ImageBeam1)
+    if err != nil {
+        return nil, err
+    }
+
+    bullet := Bullet{
+        x: x,
+        y: y,
+        alive: true,
+        velocityX: 0,
+        velocityY: velocityY,
+        animation: animation,
+        // pic: pic,
+    }
+
+    return []*Bullet{&bullet}, nil
 }

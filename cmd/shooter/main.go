@@ -32,18 +32,30 @@ type Bullet struct {
     x, y float64
     velocityX, velocityY float64
     pic *ebiten.Image
+    animation *Animation
     alive bool
 }
 
 func (bullet *Bullet) Draw(screen *ebiten.Image) {
-    options := &ebiten.DrawImageOptions{}
-    options.GeoM.Translate(bullet.x - float64(bullet.pic.Bounds().Dx()) / 2, bullet.y - float64(bullet.pic.Bounds().Dy()) / 2)
-    screen.DrawImage(bullet.pic, options)
+
+    if bullet.animation != nil {
+        bullet.animation.Draw(screen, bullet.x, bullet.y)
+    } else if bullet.pic != nil {
+        x1 := bullet.x - float64(bullet.pic.Bounds().Dx()) / 2
+        y1 := bullet.y - float64(bullet.pic.Bounds().Dy()) / 2
+        options := &ebiten.DrawImageOptions{}
+        options.GeoM.Translate(x1, y1)
+        screen.DrawImage(bullet.pic, options)
+    }
 }
 
 func (bullet *Bullet) Move(){
     bullet.x += bullet.velocityX
     bullet.y += bullet.velocityY
+
+    if bullet.animation != nil {
+        bullet.animation.Update()
+    }
 }
 
 func (bullet *Bullet) SetDead() {
@@ -316,7 +328,7 @@ type Player struct {
     x, y float64
     Jump int
     velocityX, velocityY float64
-    bulletCounter int
+    bulletCounter float64
     pic *ebiten.Image
     Gun Gun
     Score int
@@ -479,9 +491,9 @@ func (player *Player) HandleKeys(game *Game) error {
         // FIXME: make ebiten understand key mapping
         } else if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
             return ebiten.Termination
-        } else if key == ebiten.KeySpace && game.Player.bulletCounter == 0 {
+        } else if key == ebiten.KeySpace && game.Player.bulletCounter <= 0 {
             game.Bullets = append(game.Bullets, game.Player.Shoot(game.ImageManager)...)
-            player.bulletCounter = 5
+            player.bulletCounter = 60.0 / game.Player.Gun.Rate()
 
             select {
                 case <-player.SoundShoot:
@@ -521,6 +533,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         pic: ebiten.NewImageFromImage(playerImage),
         // Gun: &BasicGun{},
         Gun: &DualBasicGun{},
+        // Gun: &BeamGun{},
         Jump: -50,
         Score: 0,
         SoundShoot: soundChan,
@@ -562,6 +575,7 @@ func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, e
     switch name {
         case gameImages.ImageExplosion2: return NewAnimation(loaded, 5, 6, 1.5), nil
         case gameImages.ImageHit: return NewAnimation(loaded, 5, 6, 1.5), nil
+        case gameImages.ImageBeam1: return NewAnimationCoordinates(loaded, 2, 3, 0.13, []SheetCoordinate{{0, 0}, {1, 0}, {2, 0}, {0, 1}, {1, 1}, {0, 1}, {2, 0}, {1, 0}}, true), nil
     }
 
     return nil, fmt.Errorf("No such animation %v", name)
