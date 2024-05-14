@@ -28,6 +28,10 @@ import (
 const ScreenWidth = 1024
 const ScreenHeight = 768
 
+func onScreen(x float64, y float64, margin float64) bool {
+    return x > -margin && x < ScreenWidth + margin && y > -margin && y < ScreenHeight + margin
+}
+
 type Bullet struct {
     x, y float64
     Strength float64
@@ -64,7 +68,7 @@ func (bullet *Bullet) SetDead() {
 }
 
 func (bullet *Bullet) IsAlive() bool {
-    return bullet.alive && bullet.y > -10
+    return bullet.alive && onScreen(bullet.x, bullet.y, 10)
 }
 
 type StarPosition struct {
@@ -179,7 +183,7 @@ func MakeShaderManager() (*ShaderManager, error) {
 }
 
 type Enemy interface {
-    Move()
+    Move(imageManager *ImageManager) []*Bullet
     Hit(bullet *Bullet)
     Coords() (float64, float64)
     IsAlive() bool
@@ -217,7 +221,7 @@ func (enemy *NormalEnemy) Hit(bullet *Bullet) {
     }
 }
 
-func (enemy *NormalEnemy) Move() {
+func (enemy *NormalEnemy) Move(imageManager *ImageManager) []*Bullet {
     enemy.x += enemy.velocityX
     enemy.y += enemy.velocityY
 
@@ -228,6 +232,28 @@ func (enemy *NormalEnemy) Move() {
     if enemy.hurt > 0 {
         enemy.hurt -= 1
     }
+
+    if rand.Intn(100) == 0 {
+        bulletPic, err := imageManager.LoadAnimation(gameImages.ImageRotate1)
+        if err != nil {
+            log.Printf("Unable to load bullet: %v", err)
+        } else {
+            bullet := Bullet{
+                x: enemy.x,
+                y: enemy.y + float64(enemy.pic.Bounds().Dy()) / 2,
+                Strength: 1,
+                velocityX: 0,
+                velocityY: 1.5,
+                pic: nil,
+                animation: bulletPic,
+                alive: true,
+            }
+
+            return []*Bullet{&bullet}
+        }
+    }
+
+    return nil
 }
 
 func (enemy* NormalEnemy) Collision(x float64, y float64) bool {
@@ -685,6 +711,7 @@ type Game struct {
     Player *Player
     Background *Background
     Bullets []*Bullet
+    EnemyBullets []*Bullet
     Font *text.GoTextFaceSource
     Enemies []Enemy
     Explosions []Explosion
@@ -848,7 +875,8 @@ func (game *Game) Update() error {
     game.Player.Move()
 
     for _, enemy := range game.Enemies {
-        enemy.Move()
+        bullets := enemy.Move(game.ImageManager)
+        game.EnemyBullets = append(game.EnemyBullets, bullets...)
     }
 
     explosionOut := make([]Explosion, 0)
@@ -899,6 +927,15 @@ func (game *Game) Update() error {
             }
         }
         game.Bullets = outBullets
+
+        var outEnemyBullets []*Bullet
+        for _, bullet := range game.EnemyBullets {
+            bullet.Move()
+            if bullet.IsAlive() {
+                outEnemyBullets = append(outEnemyBullets, bullet)
+            }
+        }
+        game.EnemyBullets = outEnemyBullets
     }
 
     enemyOut := make([]Enemy, 0)
@@ -931,6 +968,10 @@ func (game *Game) Draw(screen *ebiten.Image) {
     game.Player.Draw(screen, game.ShaderManager, game.Font)
 
     for _, bullet := range game.Bullets {
+        bullet.Draw(screen)
+    }
+
+    for _, bullet := range game.EnemyBullets {
         bullet.Draw(screen)
     }
 
