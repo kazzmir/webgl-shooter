@@ -45,7 +45,7 @@ func NewAnimationCoordinates(sheet *ebiten.Image, frameRows int, frameColumns in
     }
 }
 
-func NewAnimation(sheet *ebiten.Image, frameRows int, frameColumns int, fps float64) *Animation {
+func NewAnimation(sheet *ebiten.Image, frameRows int, frameColumns int, fps float64, loop bool) *Animation {
     var frames []*ebiten.Image
 
     yMax := float64(sheet.Bounds().Dy())
@@ -62,7 +62,7 @@ func NewAnimation(sheet *ebiten.Image, frameRows int, frameColumns int, fps floa
     return &Animation{
         Frames: frames,
         CurrentFrame: 0,
-        Loop: false,
+        Loop: loop,
         FPS: 1.0 / fps,
         fpsCounter: 0,
     }

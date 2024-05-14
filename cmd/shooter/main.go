@@ -576,12 +576,13 @@ func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, e
     }
 
     switch name {
-        case gameImages.ImageExplosion2: return NewAnimation(loaded, 5, 6, 1.5), nil
-        case gameImages.ImageHit: return NewAnimation(loaded, 5, 6, 1.5), nil
+        case gameImages.ImageExplosion2: return NewAnimation(loaded, 5, 6, 1.5, false), nil
+        case gameImages.ImageHit: return NewAnimation(loaded, 5, 6, 1.5, false), nil
         case gameImages.ImageBeam1:
             return NewAnimationCoordinates(loaded, 2, 3, 0.13, []SheetCoordinate{{0, 0}, {1, 0}, {2, 0}, {0, 1}, {1, 1}, {0, 1}, {2, 0}, {1, 0}}, true), nil
         case gameImages.ImageWave1:
             return NewAnimationCoordinates(loaded, 1, 3, 0.10, []SheetCoordinate{{0, 0}, {1, 0}, {2, 0}, {1, 0}}, true), nil
+        case gameImages.ImageRotate1: return NewAnimation(loaded, 2, 2, 0.14, true), nil
     }
 
     return nil, fmt.Errorf("No such animation %v", name)

@@ -22,6 +22,7 @@ const ImageExplosion2 = Image("explosion2")
 const ImageHit = Image("hit")
 const ImageBeam1 = Image("beam1")
 const ImageWave1 = Image("wave1")
+const ImageRotate1 = Image("rotate1")
 
 //go:embed player/player.png
 var playerImage []byte
@@ -59,6 +60,9 @@ var wave1Image []byte
 //go:embed misc/hit.png
 var hitImage []byte
 
+//go:embed bullet/rotate1.png
+var rotate1Image []byte
+
 func loadPng(data []byte) (image.Image, error) {
     img, _, err := image.Decode(bytes.NewReader(data))
     if err != nil {
@@ -81,6 +85,7 @@ func LoadImage(name Image) (image.Image, error) {
         case ImageHit: return loadPng(hitImage)
         case ImageBeam1: return loadPng(beam1Image)
         case ImageWave1: return loadPng(wave1Image)
+        case ImageRotate1: return loadPng(rotate1Image)
     }
 
     return nil, fmt.Errorf("no such image: %s", name)
