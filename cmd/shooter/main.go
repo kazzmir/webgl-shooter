@@ -10,6 +10,7 @@ import (
     "math"
     "sync"
 
+    "image"
     "image/color"
     _ "image/png"
 
@@ -356,6 +357,7 @@ type Player struct {
     Jump int
     velocityX, velocityY float64
     bulletCounter float64
+    rawImage image.Image
     pic *ebiten.Image
     Gun Gun
     Score int
@@ -363,6 +365,29 @@ type Player struct {
     ShadowShader *ebiten.Shader
     Counter int
     SoundShoot chan bool
+}
+
+func (player *Player) Collide(x float64, y float64) bool {
+    bounds := player.rawImage.Bounds()
+
+    x1 := player.x - float64(bounds.Dx()) / 2
+    y1 := player.y - float64(bounds.Dy()) / 2
+    x2 := x1 + float64(bounds.Dx())
+    y2 := y1 + float64(bounds.Dy())
+
+    // within the bounding box, now do pixel-perfect detection
+    if x >= x1 && x <= x2 && y >= y1 && y <= y2 {
+        // get the pixel color
+        cx := int(x - x1)
+        cy := int(y - y1)
+        c := player.rawImage.At(cx, cy)
+        _, _, _, a := c.RGBA()
+        if a > 200 {
+            return true
+        }
+    }
+
+    return false
 }
 
 func (player *Player) Move() {
@@ -559,6 +584,7 @@ func MakePlayer(x, y float64) (*Player, error) {
     return &Player{
         x: x,
         y: y,
+        rawImage: playerImage,
         pic: ebiten.NewImageFromImage(playerImage),
         // Gun: &BasicGun{},
         // Gun: &DualBasicGun{},
@@ -931,6 +957,20 @@ func (game *Game) Update() error {
         var outEnemyBullets []*Bullet
         for _, bullet := range game.EnemyBullets {
             bullet.Move()
+
+            if game.Player.Collide(bullet.x, bullet.y) {
+                game.SoundManager.Play(audioFiles.AudioHit1)
+
+                animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit)
+                if err == nil {
+                    game.Explosions = append(game.Explosions, MakeAnimatedExplosion(bullet.x, bullet.y, animation))
+                } else {
+                    log.Printf("Could not load explosion sheet: %v", err)
+                }
+
+                bullet.SetDead()
+            }
+
             if bullet.IsAlive() {
                 outEnemyBullets = append(outEnemyBullets, bullet)
             }
