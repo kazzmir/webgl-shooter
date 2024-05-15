@@ -207,7 +207,7 @@ func (enemy *NormalEnemy) Coords() (float64, float64) {
 }
 
 func (enemy *NormalEnemy) IsAlive() bool {
-    return enemy.Life > 0
+    return enemy.Life > 0 && (enemy.y < 0 || onScreen(enemy.x, enemy.y, 100))
 }
 
 func (enemy *NormalEnemy) Hit(bullet *Bullet) {
@@ -226,9 +226,11 @@ func (enemy *NormalEnemy) Move(imageManager *ImageManager) []*Bullet {
     enemy.x += enemy.velocityX
     enemy.y += enemy.velocityY
 
+    /*
     if enemy.y > ScreenHeight + 50 {
         enemy.y = -100
     }
+    */
 
     if enemy.hurt > 0 {
         enemy.hurt -= 1
@@ -987,7 +989,7 @@ func (game *Game) Update() error {
     }
     game.Enemies = enemyOut
 
-    if len(game.Enemies) == 0 || (len(game.Enemies) < 50 && rand.Intn(100) == 0) {
+    if len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.Intn(100) == 0) {
         game.MakeEnemies(1)
     }
 
