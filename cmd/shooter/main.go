@@ -630,6 +630,7 @@ func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, e
     switch name {
         case gameImages.ImageExplosion2: return NewAnimation(loaded, 5, 6, 1.5, false), nil
         case gameImages.ImageHit: return NewAnimation(loaded, 5, 6, 1.5, false), nil
+        case gameImages.ImageHit2: return NewAnimation(loaded, 5, 6, 1.5, false), nil
         case gameImages.ImageBeam1:
             return NewAnimationCoordinates(loaded, 2, 3, 0.13, []SheetCoordinate{{0, 0}, {1, 0}, {2, 0}, {0, 1}, {1, 1}, {0, 1}, {2, 0}, {1, 0}}, true), nil
         case gameImages.ImageWave1:
@@ -961,7 +962,7 @@ func (game *Game) Update() error {
             if game.Player.Collide(bullet.x, bullet.y) {
                 game.SoundManager.Play(audioFiles.AudioHit1)
 
-                animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit)
+                animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit2)
                 if err == nil {
                     game.Explosions = append(game.Explosions, MakeAnimatedExplosion(bullet.x, bullet.y, animation))
                 } else {
