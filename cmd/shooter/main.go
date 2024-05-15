@@ -1047,6 +1047,26 @@ func (game *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
     return ScreenWidth, ScreenHeight
 }
 
+type Menu struct {
+}
+
+type Run struct {
+    Game *Game
+    Menu *Menu
+}
+
+func (run *Run) Update() error {
+    return run.Game.Update()
+}
+
+func (run *Run) Layout(outsideWidth int, outsideHeight int) (int, int) {
+    return ScreenWidth, ScreenHeight
+}
+
+func (run *Run) Draw(screen *ebiten.Image) {
+    run.Game.Draw(screen)
+}
+
 func main() {
     log.SetFlags(log.Ldate | log.Lshortfile | log.Lmicroseconds)
 
@@ -1108,8 +1128,13 @@ func main() {
         return
     }
 
+    run := Run{
+        Game: &game,
+        Menu: nil,
+    }
+
     log.Printf("Running")
-    err = ebiten.RunGame(&game)
+    err = ebiten.RunGame(&run)
     if err != nil {
         log.Printf("Failed to run: %v", err)
     }
