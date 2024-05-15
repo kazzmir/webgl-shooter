@@ -14,6 +14,9 @@ import (
 //go:embed effects/hit1.ogg
 var Hit1Data []byte
 
+//go:embed effects/hit2.ogg
+var Hit2Data []byte
+
 //go:embed effects/shoot1.ogg
 var Shoot1Data []byte
 
@@ -32,17 +35,19 @@ var Explosion3Data []byte
 type AudioName string
 
 const AudioHit1 = AudioName("hit1")
+const AudioHit2 = AudioName("hit2")
 const AudioShoot1 = AudioName("shoot1")
 const AudioStellarPulseSong = AudioName("stellar-pulse")
 const AudioExplosion1 = AudioName("explosion1")
 const AudioExplosion2 = AudioName("explosion2")
 const AudioExplosion3 = AudioName("explosion3")
 
-var AllSounds []AudioName = []AudioName{AudioHit1, AudioShoot1, AudioStellarPulseSong, AudioExplosion1, AudioExplosion2, AudioExplosion3}
+var AllSounds []AudioName = []AudioName{AudioHit1, AudioHit2, AudioShoot1, AudioStellarPulseSong, AudioExplosion1, AudioExplosion2, AudioExplosion3}
 
 func LoadSound(name AudioName, sampleRate int) (io.Reader, error) {
     switch name {
         case AudioHit1: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Hit1Data))
+        case AudioHit2: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Hit2Data))
         case AudioShoot1: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Shoot1Data))
         case AudioStellarPulseSong: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(SongStellarPulseData))
         case AudioExplosion1: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Explosion1Data))

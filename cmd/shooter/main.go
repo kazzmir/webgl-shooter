@@ -960,7 +960,7 @@ func (game *Game) Update() error {
             bullet.Move()
 
             if game.Player.Collide(bullet.x, bullet.y) {
-                game.SoundManager.Play(audioFiles.AudioHit1)
+                game.SoundManager.Play(audioFiles.AudioHit2)
 
                 animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit2)
                 if err == nil {
