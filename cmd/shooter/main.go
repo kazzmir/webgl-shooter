@@ -539,19 +539,23 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
     keys := make([]ebiten.Key, 0)
 
     keys = inpututil.AppendPressedKeys(keys)
-    playerAccel := 3.8
+
+    maxVelocity := 3.8
+
+    playerAccel := 0.9
     if player.Jump > 0 {
-        playerAccel = 5
+        playerAccel = 3
+        maxVelocity = 5.5
     }
     for _, key := range keys {
         if key == ebiten.KeyArrowUp {
-            player.velocityY = -playerAccel;
+            player.velocityY -= playerAccel;
         } else if key == ebiten.KeyArrowDown {
-            player.velocityY = playerAccel;
+            player.velocityY += playerAccel;
         } else if key == ebiten.KeyArrowLeft {
-            player.velocityX = -playerAccel;
+            player.velocityX -= playerAccel;
         } else if key == ebiten.KeyArrowRight {
-            player.velocityX = playerAccel;
+            player.velocityX += playerAccel;
         } else if key == ebiten.KeyShift && player.Jump <= -50 {
             player.Jump = JumpDuration
         // FIXME: make ebiten understand key mapping
@@ -560,6 +564,9 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
             player.bulletCounter = 60.0 / game.Player.Gun.Rate()
         }
     }
+
+    player.velocityX = math.Min(maxVelocity, math.Max(-maxVelocity, player.velocityX))
+    player.velocityY = math.Min(maxVelocity, math.Max(-maxVelocity, player.velocityY))
 
     moreKeys := make([]ebiten.Key, 0)
     moreKeys = inpututil.AppendJustPressedKeys(moreKeys)
@@ -1054,9 +1061,17 @@ func (game *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
     return ScreenWidth, ScreenHeight
 }
 
+type MenuAction func(run *Run) error
+
+type MenuOption struct {
+    Text string
+    Action MenuAction
+}
+
 type Menu struct {
     Font *text.GoTextFaceSource
     Counter uint64
+    Options []*MenuOption
     Selected int
 }
 
@@ -1075,14 +1090,21 @@ func (menu *Menu) Update(run *Run) error {
                     menu.Selected = 1
                 }
             case ebiten.KeyArrowDown:
-                menu.Selected = (menu.Selected + 1) % 2
+                menu.Selected = (menu.Selected + 1) % len(menu.Options)
             case ebiten.KeyEnter:
+                err := menu.Options[menu.Selected].Action(run)
+                if err != nil {
+                    return err
+                }
+
+                /*
                 if menu.Selected == 0 {
                     run.Mode = RunGame
                 }
                 if menu.Selected == 1 {
                     return ebiten.Termination
                 }
+                */
         }
     }
 
@@ -1119,10 +1141,9 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 
     face := text.GoTextFace{Source: menu.Font, Size: 20}
 
-    options := []string{"Play", "Quit"}
-    _, height := text.Measure("Play", &face, 0)
+    _, height := text.Measure("X", &face, 0)
 
-    for i, option := range options {
+    for i, option := range menu.Options {
         drawColor := color.RGBA{R: 255, G: 255, B: 255, A: 32}
         if menu.Selected == i {
             drawColor = color.RGBA{R: 255, G: 255, B: 255, A: uint8(a)}
@@ -1133,9 +1154,34 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
         op.GeoM.Translate(x, y)
         red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
         op.ColorScale.ScaleWithColor(red)
-        text.Draw(screen, fmt.Sprintf(option), &face, op)
+        text.Draw(screen, option.Text, &face, op)
 
         y += float64(height + 40)
+    }
+}
+
+func createMenu(font *text.GoTextFaceSource) *Menu {
+
+    var options []*MenuOption
+
+    options = append(options, &MenuOption{
+        Text: "Play",
+        Action: func(run *Run) error {
+            run.Mode = RunGame
+            return nil
+        },
+    })
+
+    options = append(options, &MenuOption{
+        Text: "Quit",
+        Action: func(run *Run) error {
+            return ebiten.Termination
+        },
+    })
+
+    return &Menu{
+        Font: font,
+        Options: options,
     }
 }
 
@@ -1229,9 +1275,7 @@ func main() {
         FadeIn: 0,
     }
 
-    menu := Menu{
-        Font: font,
-    }
+    menu := createMenu(font)
 
     err = game.MakeEnemies(5)
     if err != nil {
@@ -1248,7 +1292,7 @@ func main() {
     run := Run{
         Mode: RunMenu,
         Game: &game,
-        Menu: &menu,
+        Menu: menu,
     }
 
     log.Printf("Running")
