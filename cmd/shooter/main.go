@@ -535,7 +535,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *t
     screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.EdgeShader, options)
 }
 
-func (player *Player) HandleKeys(game *Game) error {
+func (player *Player) HandleKeys(game *Game, run *Run) error {
     keys := make([]ebiten.Key, 0)
 
     keys = inpututil.AppendPressedKeys(keys)
@@ -555,11 +555,18 @@ func (player *Player) HandleKeys(game *Game) error {
         } else if key == ebiten.KeyShift && player.Jump <= -50 {
             player.Jump = JumpDuration
         // FIXME: make ebiten understand key mapping
-        } else if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
-            return ebiten.Termination
         } else if key == ebiten.KeySpace && game.Player.bulletCounter <= 0 {
             game.Bullets = append(game.Bullets, game.Player.Shoot(game.ImageManager, game.SoundManager)...)
             player.bulletCounter = 60.0 / game.Player.Gun.Rate()
+        }
+    }
+
+    moreKeys := make([]ebiten.Key, 0)
+    moreKeys = inpututil.AppendJustPressedKeys(moreKeys)
+    for _, key := range moreKeys {
+        if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
+            // return ebiten.Termination
+            run.Mode = RunMenu
         }
     }
 
@@ -884,7 +891,7 @@ func (game *Game) MakeEnemies(count int) error {
     return nil
 }
 
-func (game *Game) Update() error {
+func (game *Game) Update(run *Run) error {
 
     if game.FadeIn < GameFadeIn {
         game.FadeIn += 1
@@ -896,7 +903,7 @@ func (game *Game) Update() error {
 
     game.Background.Update()
 
-    err := game.Player.HandleKeys(game)
+    err := game.Player.HandleKeys(game, run)
     if err != nil {
         return err
     }
@@ -1051,49 +1058,32 @@ type Menu struct {
     Font *text.GoTextFaceSource
     Counter uint64
     Selected int
-
-    HoldUp bool
-    HoldDown bool
 }
 
-func (menu *Menu) Update() error {
+func (menu *Menu) Update(run *Run) error {
     menu.Counter = (menu.Counter + 1)
 
     keys := make([]ebiten.Key, 0)
-    keys = inpututil.AppendPressedKeys(keys)
-
-    pressedUp := false
-    pressedDown := false
+    keys = inpututil.AppendJustPressedKeys(keys)
 
     for _, key := range keys {
         switch key {
             case ebiten.KeyEscape, ebiten.KeyCapsLock: return ebiten.Termination
             case ebiten.KeyArrowUp:
-                pressedUp = true
+                menu.Selected -= 1
+                if menu.Selected < 0 {
+                    menu.Selected = 1
+                }
             case ebiten.KeyArrowDown:
-                pressedDown = true
+                menu.Selected = (menu.Selected + 1) % 2
             case ebiten.KeyEnter:
+                if menu.Selected == 0 {
+                    run.Mode = RunGame
+                }
                 if menu.Selected == 1 {
                     return ebiten.Termination
                 }
         }
-    }
-
-    if pressedUp && !menu.HoldUp {
-        menu.HoldUp = true
-        menu.Selected -= 1
-        if menu.Selected < 0 {
-            menu.Selected = 1
-        }
-    } else if !pressedUp {
-        menu.HoldUp = false
-    }
-
-    if pressedDown && !menu.HoldDown {
-        menu.HoldDown = true
-        menu.Selected = (menu.Selected + 1) % 2
-    } else if !pressedDown {
-        menu.HoldDown = false
     }
 
     return nil
@@ -1149,17 +1139,25 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
     }
 }
 
+type RunMode int
+const (
+    RunGame RunMode = iota
+    RunMenu RunMode = iota
+)
+
 type Run struct {
     Game *Game
     Menu *Menu
+    Mode RunMode
 }
 
 func (run *Run) Update() error {
-    if run.Menu != nil {
-        return run.Menu.Update()
-    } else {
-        return run.Game.Update()
+    switch run.Mode {
+        case RunGame: return run.Game.Update(run)
+        case RunMenu: return run.Menu.Update(run)
     }
+
+    return fmt.Errorf("Unknown mode %v", run.Mode)
 }
 
 func (run *Run) Layout(outsideWidth int, outsideHeight int) (int, int) {
@@ -1167,11 +1165,19 @@ func (run *Run) Layout(outsideWidth int, outsideHeight int) (int, int) {
 }
 
 func (run *Run) Draw(screen *ebiten.Image) {
-    if run.Menu != nil {
+    run.Game.Draw(screen)
+
+    if run.Mode == RunMenu {
+        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: 92}, true)
         run.Menu.Draw(screen)
-    } else {
-        run.Game.Draw(screen)
     }
+
+    /*
+    switch run.Mode {
+        case RunGame: run.Game.Draw(screen)
+        case RunMenu: run.Menu.Draw(screen)
+    }
+    */
 }
 
 func main() {
@@ -1240,6 +1246,7 @@ func main() {
     }
 
     run := Run{
+        Mode: RunMenu,
         Game: &game,
         Menu: &menu,
     }
