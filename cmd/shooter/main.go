@@ -5,10 +5,13 @@ import (
     "fmt"
     "io"
     "time"
+    "os"
     "bytes"
     "math/rand"
     "math"
     "sync"
+    "context"
+    "runtime/pprof"
 
     "image"
     "image/color"
@@ -667,13 +670,15 @@ type SoundManager struct {
     Sounds map[audioFiles.AudioName]*SoundHandler
     Context *audio.Context
     SampleRate int
+    Quit context.Context
 }
 
-func MakeSoundManager() (*SoundManager, error) {
+func MakeSoundManager(quit context.Context, audioContext *audio.Context) (*SoundManager, error) {
     manager := SoundManager{
         Sounds: make(map[audioFiles.AudioName]*SoundHandler),
         SampleRate: 48000,
-        Context: audio.NewContext(48000),
+        Context: audioContext,
+        Quit: quit,
     }
 
     return &manager, manager.LoadAll()
@@ -742,6 +747,20 @@ func (manager *SoundManager) PlayLoop(name audioFiles.AudioName) {
             if err != nil {
                 log.Printf("Failed to play audio loop %v: %v", name, err)
             } else {
+                go func(){
+                    for {
+                        select {
+                            case <-manager.Quit.Done():
+                                player.Close()
+                                return
+                            case <-time.After(1 * time.Second):
+                                if !player.IsPlaying() {
+                                    return
+                                }
+                        }
+                    }
+                }()
+
                 player.Play()
             }
         }()
@@ -764,6 +783,9 @@ type Game struct {
     FadeIn int
 
     MusicPlayer sync.Once
+
+    Quit context.Context
+    Cancel context.CancelFunc
 }
 
 type Coordinate struct {
@@ -1057,10 +1079,6 @@ func (game *Game) PreloadAssets() error {
     return nil
 }
 
-func (game *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
-    return ScreenWidth, ScreenHeight
-}
-
 type MenuAction func(run *Run) error
 
 type MenuOption struct {
@@ -1087,7 +1105,7 @@ func (menu *Menu) Update(run *Run) error {
             case ebiten.KeyArrowUp:
                 menu.Selected -= 1
                 if menu.Selected < 0 {
-                    menu.Selected = 1
+                    menu.Selected = len(menu.Options) - 1
                 }
             case ebiten.KeyArrowDown:
                 menu.Selected = (menu.Selected + 1) % len(menu.Options)
@@ -1096,15 +1114,6 @@ func (menu *Menu) Update(run *Run) error {
                 if err != nil {
                     return err
                 }
-
-                /*
-                if menu.Selected == 0 {
-                    run.Mode = RunGame
-                }
-                if menu.Selected == 1 {
-                    return ebiten.Termination
-                }
-                */
         }
     }
 
@@ -1143,12 +1152,15 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 
     _, height := text.Measure("X", &face, 0)
 
+    // FIXME: compute this
+    optionWidth := 150
+
     for i, option := range menu.Options {
         drawColor := color.RGBA{R: 255, G: 255, B: 255, A: 32}
         if menu.Selected == i {
             drawColor = color.RGBA{R: 255, G: 255, B: 255, A: uint8(a)}
         }
-        vector.DrawFilledRect(screen, float32(x - 10), float32(y - 10), 100, float32(height + 10 + 10), premultiplyAlpha(drawColor), true)
+        vector.DrawFilledRect(screen, float32(x - 10), float32(y - 10), float32(optionWidth), float32(height + 10 + 10), premultiplyAlpha(drawColor), true)
 
         op := &text.DrawOptions{}
         op.GeoM.Translate(x, y)
@@ -1160,14 +1172,45 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
     }
 }
 
-func createMenu(font *text.GoTextFaceSource) *Menu {
+func createMenu(audioContext *audio.Context) (*Menu, error) {
 
     var options []*MenuOption
 
     options = append(options, &MenuOption{
-        Text: "Play",
+        Text: "New game",
         Action: func(run *Run) error {
             run.Mode = RunGame
+
+            if run.Game != nil {
+                run.Game.Cancel()
+            }
+
+            game, err := MakeGame(audioContext)
+            if err != nil {
+                return err
+            }
+
+            run.Game = game
+
+            return nil
+        },
+
+    })
+
+    options = append(options, &MenuOption{
+        Text: "Continue",
+        Action: func(run *Run) error {
+            run.Mode = RunGame
+
+            if run.Game == nil {
+                game, err := MakeGame(audioContext)
+                if err != nil {
+                    return err
+                }
+
+                run.Game = game
+            }
+
             return nil
         },
     })
@@ -1179,10 +1222,15 @@ func createMenu(font *text.GoTextFaceSource) *Menu {
         },
     })
 
+    font, err := fontLib.LoadFont()
+    if err != nil {
+        return nil, err
+    }
+
     return &Menu{
         Font: font,
         Options: options,
-    }
+    }, nil
 }
 
 type RunMode int
@@ -1211,7 +1259,9 @@ func (run *Run) Layout(outsideWidth int, outsideHeight int) (int, int) {
 }
 
 func (run *Run) Draw(screen *ebiten.Image) {
-    run.Game.Draw(screen)
+    if run.Game != nil {
+        run.Game.Draw(screen)
+    }
 
     if run.Mode == RunMenu {
         vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: 92}, true)
@@ -1226,43 +1276,33 @@ func (run *Run) Draw(screen *ebiten.Image) {
     */
 }
 
-func main() {
-    log.SetFlags(log.Ldate | log.Lshortfile | log.Lmicroseconds)
-
-    ebiten.SetWindowSize(ScreenWidth, ScreenHeight)
-    ebiten.SetWindowTitle("Shooter")
-    ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
-
-    log.Printf("Loading objects")
-
+func MakeGame(audioContext *audio.Context) (*Game, error) {
     player, err := MakePlayer(ScreenWidth / 2, ScreenHeight - 100)
     if err != nil {
-        log.Printf("Failed to make player: %v", err)
-        return
+        return nil, err
     }
 
     background, err := MakeBackground()
     if err != nil {
-        log.Printf("Failed to make background: %v", err)
-        return
+        return nil, err
     }
 
     font, err := fontLib.LoadFont()
     if err != nil {
-        log.Printf("Failed to load font: %v", err)
-        return
+        return nil, err
     }
 
     shaderManager, err := MakeShaderManager()
     if err != nil {
-        log.Printf("Failed to make shaders: %v", err)
-        return
+        return nil, err
     }
 
-    soundManager, err := MakeSoundManager()
+    quitContext, cancel := context.WithCancel(context.Background())
+
+    soundManager, err := MakeSoundManager(quitContext, audioContext)
     if err != nil {
-        log.Printf("Failed to make sound manager: %v", err)
-        return
+        cancel()
+        return nil, err
     }
 
     game := Game{
@@ -1273,25 +1313,66 @@ func main() {
         ImageManager: MakeImageManager(),
         SoundManager: soundManager,
         FadeIn: 0,
+        Quit: quitContext,
+        Cancel: cancel,
     }
-
-    menu := createMenu(font)
 
     err = game.MakeEnemies(5)
     if err != nil {
-        log.Printf("Failed to make enemies: %v", err)
-        return
+        cancel()
+        return nil, err
     }
 
     err = game.PreloadAssets()
     if err != nil {
-        log.Printf("Failed to preload assets: %v", err)
+        cancel()
+        return nil, err
+    }
+
+    return &game, nil
+}
+
+func main() {
+    log.SetFlags(log.Ldate | log.Lshortfile | log.Lmicroseconds)
+
+    profile := true
+
+    if profile {
+        cpuProfile, err := os.Create("profile.cpu")
+        if err != nil {
+            log.Printf("Unable to create profile.cpu: %v", err)
+        } else {
+            defer cpuProfile.Close()
+            pprof.StartCPUProfile(cpuProfile)
+            defer pprof.StopCPUProfile()
+        }
+    }
+
+    ebiten.SetWindowSize(ScreenWidth, ScreenHeight)
+    ebiten.SetWindowTitle("Shooter")
+    ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+
+    log.Printf("Loading objects")
+
+    audioContext := audio.NewContext(48000)
+
+    menu, err := createMenu(audioContext)
+    if err != nil {
+        log.Printf("Unable to create menu: %v", err)
         return
     }
 
+    /*
+    game, err := MakeGame()
+    if err != nil {
+        log.Printf("Unable to create game: %v", err)
+        return
+    }
+    */
+
     run := Run{
         Mode: RunMenu,
-        Game: &game,
+        Game: nil,
         Menu: menu,
     }
 
@@ -1302,4 +1383,14 @@ func main() {
     }
 
     log.Printf("Bye!")
+
+    if profile {
+        memProfile, err := os.Create("profile.mem")
+        if err != nil {
+            log.Printf("Unable to create profile.mem: %v", err)
+        } else {
+            defer memProfile.Close()
+            pprof.WriteHeapProfile(memProfile)
+        }
+    }
 }
