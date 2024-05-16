@@ -1050,6 +1050,10 @@ func (game *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
 type Menu struct {
     Font *text.GoTextFaceSource
     Counter uint64
+    Selected int
+
+    HoldUp bool
+    HoldDown bool
 }
 
 func (menu *Menu) Update() error {
@@ -1058,17 +1062,52 @@ func (menu *Menu) Update() error {
     keys := make([]ebiten.Key, 0)
     keys = inpututil.AppendPressedKeys(keys)
 
+    pressedUp := false
+    pressedDown := false
+
     for _, key := range keys {
-        if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
-            return ebiten.Termination
+        switch key {
+            case ebiten.KeyEscape, ebiten.KeyCapsLock: return ebiten.Termination
+            case ebiten.KeyArrowUp:
+                pressedUp = true
+            case ebiten.KeyArrowDown:
+                pressedDown = true
         }
+    }
+
+    if pressedUp && !menu.HoldUp {
+        menu.HoldUp = true
+        menu.Selected -= 1
+        if menu.Selected < 0 {
+            menu.Selected = 1
+        }
+    } else if !pressedUp {
+        menu.HoldUp = false
+    }
+
+    if pressedDown && !menu.HoldDown {
+        menu.HoldDown = true
+        menu.Selected = (menu.Selected + 1) % 2
+    } else if !pressedDown {
+        menu.HoldDown = false
     }
 
     return nil
 }
 
+func premultiplyAlpha(value color.RGBA) color.RGBA {
+    a := float32(value.A) / 255.0
+
+    return color.RGBA{
+        R: uint8(float32(value.R) * a),
+        G: uint8(float32(value.G) * a),
+        B: uint8(float32(value.B) * a),
+        A: value.A,
+    }
+}
+
 func (menu *Menu) Draw(screen *ebiten.Image) {
-    screen.Fill(color.RGBA{0, 0, 0, 0xff})
+    // screen.Fill(color.RGBA{0, 0, 0, 0xff})
 
     var x float64 = 200
     var y float64 = 200
@@ -1083,20 +1122,27 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
     }
 
     // vector.DrawFilledRect(screen, float32(x - 10), float32(y - 10), 100, 30, &color.RGBA{R: 255, G: 255, B: 255, A: uint8(menu.Counter % 255)}, true)
-    c := uint8(255.0 * float32(a) / 255)
 
     face := text.GoTextFace{Source: menu.Font, Size: 20}
+
+    options := []string{"Play", "Quit"}
     _, height := text.Measure("Play", &face, 0)
 
-    vector.DrawFilledRect(screen, float32(x - 10), float32(y - 10), 100, float32(height + 10 + 10), &color.RGBA{R: c, G: c, B: c, A: uint8(a)}, true)
-    // vector.DrawFilledRect(screen, float32(x - 10), float32(y - 10), 100, 30, &color.RGBA{R: 255, G: 255, B: 255, A: uint8(128)}, true)
-    // vector.DrawFilledRect(screen, float32(x + 10), float32(y + 10), 100, 30, &color.RGBA{R: 255, G: 0, B: 0, A: uint8(0)}, true)
+    for i, option := range options {
+        drawColor := color.RGBA{R: 255, G: 255, B: 255, A: 32}
+        if menu.Selected == i {
+            drawColor = color.RGBA{R: 255, G: 255, B: 255, A: uint8(a)}
+        }
+        vector.DrawFilledRect(screen, float32(x - 10), float32(y - 10), 100, float32(height + 10 + 10), premultiplyAlpha(drawColor), true)
 
-    op := &text.DrawOptions{}
-    op.GeoM.Translate(x, y)
-    red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
-    op.ColorScale.ScaleWithColor(red)
-    text.Draw(screen, fmt.Sprintf("Play"), &face, op)
+        op := &text.DrawOptions{}
+        op.GeoM.Translate(x, y)
+        red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
+        op.ColorScale.ScaleWithColor(red)
+        text.Draw(screen, fmt.Sprintf(option), &face, op)
+
+        y += float64(height + 40)
+    }
 }
 
 type Run struct {
