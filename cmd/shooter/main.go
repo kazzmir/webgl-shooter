@@ -1048,6 +1048,55 @@ func (game *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
 }
 
 type Menu struct {
+    Font *text.GoTextFaceSource
+    Counter uint64
+}
+
+func (menu *Menu) Update() error {
+    menu.Counter = (menu.Counter + 1)
+
+    keys := make([]ebiten.Key, 0)
+    keys = inpututil.AppendPressedKeys(keys)
+
+    for _, key := range keys {
+        if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
+            return ebiten.Termination
+        }
+    }
+
+    return nil
+}
+
+func (menu *Menu) Draw(screen *ebiten.Image) {
+    screen.Fill(color.RGBA{0, 0, 0, 0xff})
+
+    var x float64 = 200
+    var y float64 = 200
+
+    angle := float64(menu.Counter % 360) * math.Pi / 180.0 * 9
+    // log.Printf("Counter: %v angle: %v", menu.Counter % 360, angle)
+
+    // angle = 90.0 * math.Pi / 180.0
+    a := int((math.Sin(angle) + 1) * 128)
+    if a > 255 {
+        a = 255
+    }
+
+    // vector.DrawFilledRect(screen, float32(x - 10), float32(y - 10), 100, 30, &color.RGBA{R: 255, G: 255, B: 255, A: uint8(menu.Counter % 255)}, true)
+    c := uint8(255.0 * float32(a) / 255)
+
+    face := text.GoTextFace{Source: menu.Font, Size: 20}
+    _, height := text.Measure("Play", &face, 0)
+
+    vector.DrawFilledRect(screen, float32(x - 10), float32(y - 10), 100, float32(height + 10 + 10), &color.RGBA{R: c, G: c, B: c, A: uint8(a)}, true)
+    // vector.DrawFilledRect(screen, float32(x - 10), float32(y - 10), 100, 30, &color.RGBA{R: 255, G: 255, B: 255, A: uint8(128)}, true)
+    // vector.DrawFilledRect(screen, float32(x + 10), float32(y + 10), 100, 30, &color.RGBA{R: 255, G: 0, B: 0, A: uint8(0)}, true)
+
+    op := &text.DrawOptions{}
+    op.GeoM.Translate(x, y)
+    red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
+    op.ColorScale.ScaleWithColor(red)
+    text.Draw(screen, fmt.Sprintf("Play"), &face, op)
 }
 
 type Run struct {
@@ -1056,7 +1105,11 @@ type Run struct {
 }
 
 func (run *Run) Update() error {
-    return run.Game.Update()
+    if run.Menu != nil {
+        return run.Menu.Update()
+    } else {
+        return run.Game.Update()
+    }
 }
 
 func (run *Run) Layout(outsideWidth int, outsideHeight int) (int, int) {
@@ -1064,7 +1117,11 @@ func (run *Run) Layout(outsideWidth int, outsideHeight int) (int, int) {
 }
 
 func (run *Run) Draw(screen *ebiten.Image) {
-    run.Game.Draw(screen)
+    if run.Menu != nil {
+        run.Menu.Draw(screen)
+    } else {
+        run.Game.Draw(screen)
+    }
 }
 
 func main() {
@@ -1116,6 +1173,10 @@ func main() {
         FadeIn: 0,
     }
 
+    menu := Menu{
+        Font: font,
+    }
+
     err = game.MakeEnemies(5)
     if err != nil {
         log.Printf("Failed to make enemies: %v", err)
@@ -1130,7 +1191,7 @@ func main() {
 
     run := Run{
         Game: &game,
-        Menu: nil,
+        Menu: &menu,
     }
 
     log.Printf("Running")
