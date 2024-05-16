@@ -1072,6 +1072,10 @@ func (menu *Menu) Update() error {
                 pressedUp = true
             case ebiten.KeyArrowDown:
                 pressedDown = true
+            case ebiten.KeyEnter:
+                if menu.Selected == 1 {
+                    return ebiten.Termination
+                }
         }
     }
 
