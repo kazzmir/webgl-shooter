@@ -186,6 +186,18 @@ func MakeShaderManager() (*ShaderManager, error) {
     }, nil
 }
 
+type Movement interface {
+    Move(x float64, y float64) (float64, float64)
+}
+
+type LinearMovement struct {
+    velocityX, velocityY float64
+}
+
+func (linear *LinearMovement) Move(x float64, y float64) (float64, float64) {
+    return x + linear.velocityX, y + linear.velocityY
+}
+
 type Enemy interface {
     Move(imageManager *ImageManager) []*Bullet
     Hit(bullet *Bullet)
@@ -198,11 +210,12 @@ type Enemy interface {
 
 type NormalEnemy struct {
     x, y float64
-    velocityX, velocityY float64
+    // velocityX, velocityY float64
     Life float64
     pic *ebiten.Image
     Flip bool
     hurt int
+    move Movement
 }
 
 func (enemy *NormalEnemy) Coords() (float64, float64) {
@@ -226,8 +239,12 @@ func (enemy *NormalEnemy) Hit(bullet *Bullet) {
 }
 
 func (enemy *NormalEnemy) Move(imageManager *ImageManager) []*Bullet {
+    enemy.x, enemy.y = enemy.move.Move(enemy.x, enemy.y)
+
+    /*
     enemy.x += enemy.velocityX
     enemy.y += enemy.velocityY
+    */
 
     /*
     if enemy.y > ScreenHeight + 50 {
@@ -331,12 +348,11 @@ func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
         */
 }
 
-func MakeEnemy1(x float64, y float64, image *ebiten.Image) (Enemy, error) {
+func MakeEnemy1(x float64, y float64, image *ebiten.Image, move Movement) (Enemy, error) {
     return &NormalEnemy{
         x: x,
         y: y,
-        velocityX: 0,
-        velocityY: 2,
+        move: move,
         Life: 10,
         pic: image,
         Flip: true,
@@ -344,12 +360,11 @@ func MakeEnemy1(x float64, y float64, image *ebiten.Image) (Enemy, error) {
     }, nil
 }
 
-func MakeEnemy2(x float64, y float64, pic *ebiten.Image) (Enemy, error) {
+func MakeEnemy2(x float64, y float64, pic *ebiten.Image, move Movement) (Enemy, error) {
     return &NormalEnemy{
         x: x,
         y: y,
-        velocityX: 0,
-        velocityY: 2,
+        move: move,
         Life: 10,
         pic: pic,
         Flip: false,
@@ -606,8 +621,8 @@ func MakePlayer(x, y float64) (*Player, error) {
         rawImage: playerImage,
         pic: ebiten.NewImageFromImage(playerImage),
         // Gun: &BasicGun{},
-        // Gun: &DualBasicGun{},
-        Gun: &BeamGun{},
+        Gun: &DualBasicGun{},
+        // Gun: &BeamGun{},
         Jump: -50,
         Score: 0,
         SoundShoot: soundChan,
@@ -865,7 +880,7 @@ func MakeGroupGeneratorCircle(radius int, many int) chan Coordinate {
     return out
 }
 
-func (game *Game) MakeEnemy(x float64, y float64, kind int) error {
+func (game *Game) MakeEnemy(x float64, y float64, kind int, move Movement) error {
     var enemy Enemy
     var err error
 
@@ -875,13 +890,13 @@ func (game *Game) MakeEnemy(x float64, y float64, kind int) error {
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy1(x, y, pic)
+            enemy, err = MakeEnemy1(x, y, pic, move)
         case 1:
             pic, err := game.ImageManager.LoadImage(gameImages.ImageEnemy2)
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy2(x, y, pic)
+            enemy, err = MakeEnemy2(x, y, pic, move)
     }
 
     if err != nil {
@@ -909,8 +924,13 @@ func (game *Game) MakeEnemies(count int) error {
         y := float64(-500)
         kind := rand.Intn(2)
 
+        move := &LinearMovement{
+            velocityX: rand.Float64() * 2 - 1,
+            velocityY: 2,
+        }
+
         for coord := range generator {
-            err := game.MakeEnemy(x + coord.x, y + coord.y, kind)
+            err := game.MakeEnemy(x + coord.x, y + coord.y, kind, move)
             if err != nil {
                 return err
             }
