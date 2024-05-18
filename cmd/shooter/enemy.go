@@ -171,13 +171,6 @@ func (enemy *NormalEnemy) IsAlive() bool {
 func (enemy *NormalEnemy) Hit(bullet *Bullet) {
     enemy.hurt = 10
     enemy.Life -= bullet.Strength
-    if enemy.Life <= 0 {
-        /*
-        enemy.x = randomFloat(50, ScreenWidth - 50)
-        enemy.y = randomFloat(-500, -50)
-        enemy.Life = 10
-        */
-    }
 }
 
 func (enemy *NormalEnemy) Move(player *Player, imageManager *ImageManager) []*Bullet {
