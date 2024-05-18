@@ -240,7 +240,7 @@ func (circular *CircularMovement) Coords(x float64, y float64) (float64, float64
 }
 
 type Enemy interface {
-    Move(imageManager *ImageManager) []*Bullet
+    Move(player *Player, imageManager *ImageManager) []*Bullet
     Hit(bullet *Bullet)
     Coords() (float64, float64)
     IsAlive() bool
@@ -279,7 +279,7 @@ func (enemy *NormalEnemy) Hit(bullet *Bullet) {
     }
 }
 
-func (enemy *NormalEnemy) Move(imageManager *ImageManager) []*Bullet {
+func (enemy *NormalEnemy) Move(player *Player, imageManager *ImageManager) []*Bullet {
     enemy.x, enemy.y = enemy.move.Move(enemy.x, enemy.y)
 
     /*
@@ -1023,7 +1023,7 @@ func (game *Game) Update(run *Run) error {
     game.Player.Move()
 
     for _, enemy := range game.Enemies {
-        bullets := enemy.Move(game.ImageManager)
+        bullets := enemy.Move(game.Player, game.ImageManager)
         game.EnemyBullets = append(game.EnemyBullets, bullets...)
     }
 
