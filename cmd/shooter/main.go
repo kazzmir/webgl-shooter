@@ -188,14 +188,55 @@ func MakeShaderManager() (*ShaderManager, error) {
 
 type Movement interface {
     Move(x float64, y float64) (float64, float64)
+    Coords(x float64, y float64) (float64, float64)
+    Copy() Movement
 }
 
 type LinearMovement struct {
     velocityX, velocityY float64
 }
 
+func (linear *LinearMovement) Copy() Movement {
+    return &LinearMovement{
+        velocityX: linear.velocityX,
+        velocityY: linear.velocityY,
+    }
+}
+
 func (linear *LinearMovement) Move(x float64, y float64) (float64, float64) {
     return x + linear.velocityX, y + linear.velocityY
+}
+
+func (linear *LinearMovement) Coords(x float64, y float64) (float64, float64) {
+    return x, y
+}
+
+type CircularMovement struct {
+    radius float64
+    angle uint64
+    speed float64
+    velocityX float64
+    velocityY float64
+}
+
+func (circular *CircularMovement) Copy() Movement {
+    return &CircularMovement{
+        radius: circular.radius,
+        angle: circular.angle,
+        speed: circular.speed,
+        velocityX: circular.velocityX,
+        velocityY: circular.velocityY,
+    }
+}
+
+func (circular *CircularMovement) Move(x float64, y float64) (float64, float64) {
+    circular.angle += 1
+    return x + circular.velocityX, y + circular.velocityY
+}
+
+func (circular *CircularMovement) Coords(x float64, y float64) (float64, float64) {
+    radians := float64(circular.angle) * circular.speed * math.Pi / 180.0
+    return x + circular.radius * math.Cos(radians), y + circular.radius * math.Sin(radians)
 }
 
 type Enemy interface {
@@ -219,7 +260,7 @@ type NormalEnemy struct {
 }
 
 func (enemy *NormalEnemy) Coords() (float64, float64) {
-    return enemy.x, enemy.y
+    return enemy.move.Coords(enemy.x, enemy.y)
 }
 
 func (enemy *NormalEnemy) IsAlive() bool {
@@ -261,9 +302,10 @@ func (enemy *NormalEnemy) Move(imageManager *ImageManager) []*Bullet {
         if err != nil {
             log.Printf("Unable to load bullet: %v", err)
         } else {
+            useX, useY := enemy.move.Coords(enemy.x, enemy.y)
             bullet := Bullet{
-                x: enemy.x,
-                y: enemy.y + float64(enemy.pic.Bounds().Dy()) / 2,
+                x: useX,
+                y: useY + float64(enemy.pic.Bounds().Dy()) / 2,
                 Strength: 1,
                 velocityX: 0,
                 velocityY: 1.5,
@@ -282,16 +324,20 @@ func (enemy *NormalEnemy) Move(imageManager *ImageManager) []*Bullet {
 func (enemy* NormalEnemy) Collision(x float64, y float64) bool {
     bounds := enemy.pic.Bounds()
 
-    enemyX := enemy.x - float64(bounds.Dx()) / 2
-    enemyY := enemy.y - float64(bounds.Dy()) / 2
+    useX, useY := enemy.move.Coords(enemy.x, enemy.y)
+
+    enemyX := useX - float64(bounds.Dx()) / 2
+    enemyY := useY - float64(bounds.Dy()) / 2
 
     return x >= enemyX && x <= enemyX + float64(bounds.Dx()) && y >= enemyY && y <= enemyY + float64(bounds.Dy())
 }
 
 func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
 
-    enemyX := enemy.x - float64(enemy.pic.Bounds().Dx()) / 2
-    enemyY := enemy.y - float64(enemy.pic.Bounds().Dy()) / 2
+    useX, useY := enemy.move.Coords(enemy.x, enemy.y)
+
+    enemyX := useX - float64(enemy.pic.Bounds().Dx()) / 2
+    enemyY := useY - float64(enemy.pic.Bounds().Dy()) / 2
 
     // draw shadow
     shaderOptions := &ebiten.DrawRectShaderOptions{}
@@ -908,6 +954,26 @@ func (game *Game) MakeEnemy(x float64, y float64, kind int, move Movement) error
     return nil
 }
 
+func makeMovement() Movement {
+    switch rand.Intn(2) {
+        case 0:
+            return &LinearMovement{
+                velocityX: rand.Float64() * 2 - 1,
+                velocityY: 2,
+            }
+        case 1:
+            return &CircularMovement{
+                radius: 75,
+                angle: 0,
+                speed: rand.Float64() * 2 + 0.8,
+                velocityX: 0,
+                velocityY: 2,
+            }
+    }
+
+    return nil
+}
+
 func (game *Game) MakeEnemies(count int) error {
 
     for i := 0; i < count; i++ {
@@ -921,16 +987,13 @@ func (game *Game) MakeEnemies(count int) error {
         }
 
         x := randomFloat(50, ScreenWidth - 50)
-        y := float64(-500)
+        y := float64(-200)
         kind := rand.Intn(2)
 
-        move := &LinearMovement{
-            velocityX: rand.Float64() * 2 - 1,
-            velocityY: 2,
-        }
+        move := makeMovement()
 
         for coord := range generator {
-            err := game.MakeEnemy(x + coord.x, y + coord.y, kind, move)
+            err := game.MakeEnemy(x + coord.x, y + coord.y, kind, move.Copy())
             if err != nil {
                 return err
             }
