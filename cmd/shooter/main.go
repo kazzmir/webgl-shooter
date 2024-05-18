@@ -877,7 +877,7 @@ func (run *Run) Draw(screen *ebiten.Image) {
     }
 
     if run.Mode == RunMenu {
-        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: 92}, true)
+        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{R: 0, G: 0, B: 0, A: 92}, true)
         run.Menu.Draw(screen)
     }
 
