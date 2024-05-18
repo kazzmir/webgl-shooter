@@ -83,6 +83,62 @@ func makeMovement() Movement {
     return nil
 }
 
+type EnemyGun interface {
+    Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet
+}
+
+type EnemyGun1 struct {
+}
+
+func (gun *EnemyGun1) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
+    bulletPic, err := imageManager.LoadAnimation(gameImages.ImageRotate1)
+    if err != nil {
+        log.Printf("Unable to load bullet: %v", err)
+        return nil
+    } else {
+        bullet := Bullet{
+            x: x,
+            y: y,
+            Strength: 1,
+            velocityX: 0,
+            velocityY: 1.5,
+            pic: nil,
+            animation: bulletPic,
+            alive: true,
+        }
+
+        return []*Bullet{&bullet}
+    }
+}
+
+type EnemyGun2 struct {
+}
+
+func (gun *EnemyGun2) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
+    bulletPic, err := imageManager.LoadAnimation(gameImages.ImageRotate1)
+    if err != nil {
+        log.Printf("Unable to load bullet: %v", err)
+        return nil
+    } else {
+        // in radians
+        angleToPlayer := math.Atan2(player.y - y, player.x - x)
+        speed := 1.1
+
+        bullet := Bullet{
+            x: x,
+            y: y,
+            Strength: 1,
+            velocityX: math.Cos(angleToPlayer) * speed,
+            velocityY: math.Sin(angleToPlayer) * speed,
+            pic: nil,
+            animation: bulletPic,
+            alive: true,
+        }
+
+        return []*Bullet{&bullet}
+    }
+}
+
 type Enemy interface {
     Move(player *Player, imageManager *ImageManager) []*Bullet
     Hit(bullet *Bullet)
@@ -100,6 +156,7 @@ type NormalEnemy struct {
     pic *ebiten.Image
     Flip bool
     hurt int
+    gun EnemyGun
     move Movement
 }
 
@@ -141,28 +198,14 @@ func (enemy *NormalEnemy) Move(player *Player, imageManager *ImageManager) []*Bu
         enemy.hurt -= 1
     }
 
-    if rand.Intn(100) == 0 {
-        bulletPic, err := imageManager.LoadAnimation(gameImages.ImageRotate1)
-        if err != nil {
-            log.Printf("Unable to load bullet: %v", err)
-        } else {
-            useX, useY := enemy.move.Coords(enemy.x, enemy.y)
-            bullet := Bullet{
-                x: useX,
-                y: useY + float64(enemy.pic.Bounds().Dy()) / 2,
-                Strength: 1,
-                velocityX: 0,
-                velocityY: 1.5,
-                pic: nil,
-                animation: bulletPic,
-                alive: true,
-            }
+    var bullets []*Bullet
 
-            return []*Bullet{&bullet}
-        }
+    if rand.Intn(100) == 0 {
+        useX, useY := enemy.move.Coords(enemy.x, enemy.y)
+        bullets = enemy.gun.Shoot(useX, useY + float64(enemy.pic.Bounds().Dy()) / 2, player, imageManager)
     }
 
-    return nil
+    return bullets
 }
 
 func (enemy* NormalEnemy) Collision(x float64, y float64) bool {
@@ -245,6 +288,7 @@ func MakeEnemy1(x float64, y float64, image *ebiten.Image, move Movement) (Enemy
         move: move,
         Life: 10,
         pic: image,
+        gun: &EnemyGun2{},
         Flip: true,
         hurt: 0,
     }, nil
@@ -257,6 +301,7 @@ func MakeEnemy2(x float64, y float64, pic *ebiten.Image, move Movement) (Enemy, 
         move: move,
         Life: 10,
         pic: pic,
+        gun: &EnemyGun1{},
         Flip: false,
         hurt: 0,
     }, nil
