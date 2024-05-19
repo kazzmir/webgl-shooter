@@ -149,6 +149,8 @@ type Enemy interface {
     Draw(screen *ebiten.Image, shaders *ShaderManager)
     // returns true if this enemy is colliding with the point
     Collision(x, y float64) bool
+
+    Dead() chan struct{}
 }
 
 type NormalEnemy struct {
@@ -161,6 +163,7 @@ type NormalEnemy struct {
     hurt int
     gun EnemyGun
     move Movement
+    dead chan struct{}
 }
 
 func (enemy *NormalEnemy) Coords() (float64, float64) {
@@ -174,6 +177,10 @@ func (enemy *NormalEnemy) IsAlive() bool {
 func (enemy *NormalEnemy) Hit(bullet *Bullet) {
     enemy.hurt = 10
     enemy.Life -= bullet.Strength
+
+    if enemy.Life <= 0 {
+        close(enemy.dead)
+    }
 }
 
 func (enemy *NormalEnemy) Move(player *Player, imageManager *ImageManager) []*Bullet {
@@ -207,6 +214,10 @@ func (enemy* NormalEnemy) Collision(x float64, y float64) bool {
     }
 
     return false
+}
+
+func (enemy *NormalEnemy) Dead() chan struct{} {
+    return enemy.dead
 }
 
 func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
@@ -282,6 +293,7 @@ func MakeEnemy1(x float64, y float64, rawImage image.Image, image *ebiten.Image,
         gun: &EnemyGun2{},
         Flip: true,
         hurt: 0,
+        dead: make(chan struct{}),
     }, nil
 }
 
@@ -296,6 +308,7 @@ func MakeEnemy2(x float64, y float64, rawImage image.Image, pic *ebiten.Image, m
         gun: &EnemyGun1{},
         Flip: false,
         hurt: 0,
+        dead: make(chan struct{}),
     }, nil
 }
 
@@ -351,12 +364,13 @@ func MakeBoss1(x float64, y float64, rawImage image.Image, pic *ebiten.Image) (E
             moveY: 100,
             counter: 100,
         },
-        Life: 1000,
+        Life: 500,
         rawImage: rawImage,
         pic: pic,
         gun: &EnemyGun1{},
         Flip: false,
         hurt: 0,
+        dead: make(chan struct{}),
     }, nil
 }
 

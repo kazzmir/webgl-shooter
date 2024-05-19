@@ -7,9 +7,11 @@ import (
     "time"
     "os"
     "bytes"
+    "errors"
     "math/rand"
     "math"
     "sync"
+    "sync/atomic"
     "context"
     "runtime/pprof"
 
@@ -606,6 +608,7 @@ func (manager *SoundManager) PlayLoop(name audioFiles.AudioName) {
 }
 
 const GameFadeIn = 20
+const GameFadeOut = 40
 
 type Game struct {
     Player *Player
@@ -619,9 +622,14 @@ type Game struct {
     ImageManager *ImageManager
     SoundManager *SoundManager
     FadeIn int
+    FadeOut int
 
     BossMode bool
+    // runs one time when the boss should appear
     DoBoss sync.Once
+    // runs one time when the level ends
+    DoEnd sync.Once
+    End atomic.Bool
 
     MusicPlayer sync.Once
 
@@ -630,6 +638,10 @@ type Game struct {
 
     // number of ticks the game has run
     Counter uint64
+}
+
+func (game *Game) Close() {
+    game.Cancel()
 }
 
 func (game *Game) MakeEnemy(x float64, y float64, kind int, move Movement) error {
@@ -702,9 +714,25 @@ func (game *Game) MakeEnemies(count int) error {
     return nil
 }
 
+var LevelEnd error = errors.New("end of level")
+
 func (game *Game) Update(run *Run) error {
 
     game.Counter += 1
+
+    if game.End.Load() {
+        game.DoEnd.Do(func(){
+            game.FadeOut = GameFadeOut * 3
+        })
+    }
+
+    if game.FadeOut > 0 {
+        game.FadeOut -= 1
+
+        if game.FadeOut == 0 {
+            return LevelEnd
+        }
+    }
 
     if game.FadeIn < GameFadeIn {
         game.FadeIn += 1
@@ -809,13 +837,15 @@ func (game *Game) Update(run *Run) error {
     }
     game.Enemies = enemyOut
 
-    if !game.BossMode {
+    if !game.BossMode && !game.End.Load(){
         if len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.Intn(100) == 0) {
             game.MakeEnemies(1)
         }
 
         // create the boss after 2 minutes
-        if game.Counter > 60 * 120 && rand.Intn(1000) == 0 {
+        const bossTime = 60 * 120
+        // const bossTime = 60 * 1
+        if game.Counter > bossTime && rand.Intn(1000) == 0 {
             game.BossMode = true
             game.DoBoss.Do(func(){
                 log.Printf("Created boss!")
@@ -828,6 +858,19 @@ func (game *Game) Update(run *Run) error {
                         log.Printf("Unable to make boss: %v", err)
                     } else {
                         game.Enemies = append(game.Enemies, boss)
+
+                        go func(){
+                            for {
+                                select {
+                                    case <-game.Quit.Done():
+                                        return
+                                    case <-boss.Dead():
+                                        game.End.Store(true)
+                                        return
+                                }
+                            }
+                        }()
+
                     }
                 }
             })
@@ -864,6 +907,10 @@ func (game *Game) Draw(screen *ebiten.Image) {
         vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: uint8(255 - game.FadeIn * 255 / GameFadeIn)}, true)
     }
 
+    if game.FadeOut > 0 && game.FadeOut <= GameFadeOut {
+        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: uint8(255 - game.FadeOut * 255 / GameFadeOut)}, true)
+    }
+
     // vector.StrokeRect(screen, 0, 0, 100, 100, 3, &color.RGBA{R: 255, G: 0, B: 0, A: 128}, true)
     // vector.DrawFilledRect(screen, 0, 0, 100, 100, &color.RGBA{R: 255, G: 0, B: 0, A: 64}, true)
 
@@ -896,8 +943,6 @@ func premultiplyAlpha(value color.RGBA) color.RGBA {
     }
 }
 
-
-
 type RunMode int
 const (
     RunGame RunMode = iota
@@ -912,7 +957,16 @@ type Run struct {
 
 func (run *Run) Update() error {
     switch run.Mode {
-        case RunGame: return run.Game.Update(run)
+        case RunGame:
+            err := run.Game.Update(run)
+            if errors.Is(err, LevelEnd) {
+                run.Game.Close()
+                run.Game = nil
+                run.Mode = RunMenu
+                return nil
+            } else {
+                return err
+            }
         case RunMenu: return run.Menu.Update(run)
     }
 
