@@ -443,34 +443,43 @@ func MakePlayer(x, y float64) (*Player, error) {
     }, nil
 }
 
+type ImagePair struct {
+    Image *ebiten.Image
+    Raw image.Image
+}
+
 type ImageManager struct {
-    Images map[gameImages.Image]*ebiten.Image
+    Images map[gameImages.Image]ImagePair
 }
 
 func MakeImageManager() *ImageManager {
     return &ImageManager{
-        Images: make(map[gameImages.Image]*ebiten.Image),
+        Images: make(map[gameImages.Image]ImagePair),
     }
 }
 
-func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, error) {
+func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, image.Image, error) {
     if image, ok := manager.Images[name]; ok {
-        return image, nil
+        return image.Image, image.Raw, nil
     }
 
     loaded, err := gameImages.LoadImage(name)
     if err != nil {
-        return nil, err
+        return nil, nil, err
     }
 
     converted := ebiten.NewImageFromImage(loaded)
 
-    manager.Images[name] = converted
-    return converted, nil
+    manager.Images[name] = ImagePair{
+        Image: converted,
+        Raw: loaded,
+    }
+
+    return converted, loaded, nil
 }
 
 func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, error) {
-    loaded, err := manager.LoadImage(name)
+    loaded, _, err := manager.LoadImage(name)
     if err != nil {
         return nil, err
     }
@@ -611,6 +620,9 @@ type Game struct {
     SoundManager *SoundManager
     FadeIn int
 
+    BossMode bool
+    DoBoss sync.Once
+
     MusicPlayer sync.Once
 
     Quit context.Context
@@ -623,29 +635,29 @@ func (game *Game) MakeEnemy(x float64, y float64, kind int, move Movement) error
 
     switch kind {
         case 0:
-            pic, err := game.ImageManager.LoadImage(gameImages.ImageEnemy1)
+            pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy1)
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy1(x, y, pic, move)
+            enemy, err = MakeEnemy1(x, y, raw, pic, move)
         case 1:
-            pic, err := game.ImageManager.LoadImage(gameImages.ImageEnemy2)
+            pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy2)
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy2(x, y, pic, move)
+            enemy, err = MakeEnemy2(x, y, raw, pic, move)
         case 2:
-            pic, err := game.ImageManager.LoadImage(gameImages.ImageEnemy3)
+            pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy3)
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy2(x, y, pic, move)
+            enemy, err = MakeEnemy2(x, y, raw, pic, move)
         case 3:
-            pic, err := game.ImageManager.LoadImage(gameImages.ImageEnemy4)
+            pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy4)
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy2(x, y, pic, move)
+            enemy, err = MakeEnemy2(x, y, raw, pic, move)
 
     }
 
@@ -792,8 +804,29 @@ func (game *Game) Update(run *Run) error {
     }
     game.Enemies = enemyOut
 
-    if len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.Intn(100) == 0) {
-        game.MakeEnemies(1)
+    if !game.BossMode {
+        if len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.Intn(100) == 0) {
+            game.MakeEnemies(1)
+        }
+
+        if rand.Intn(1000) == 0 {
+            game.BossMode = true
+            game.DoBoss.Do(func(){
+                log.Printf("Created boss!")
+                boss1Pic, rawImage, err := game.ImageManager.LoadImage(gameImages.ImageBoss1)
+                if err != nil {
+                    log.Printf("Unable to load boss: %v", err)
+                } else {
+                    boss, err := MakeBoss1(ScreenWidth / 2, -150, rawImage, boss1Pic)
+                    if err != nil {
+                        log.Printf("Unable to make boss: %v", err)
+                    } else {
+                        game.Enemies = append(game.Enemies, boss)
+                    }
+                }
+            })
+        }
+
     }
 
     return nil
@@ -939,6 +972,7 @@ func MakeGame(audioContext *audio.Context) (*Game, error) {
         ImageManager: MakeImageManager(),
         SoundManager: soundManager,
         FadeIn: 0,
+        BossMode: false,
         Quit: quitContext,
         Cancel: cancel,
     }

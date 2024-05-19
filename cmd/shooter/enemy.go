@@ -5,6 +5,8 @@ import (
     "math"
     "math/rand"
 
+    "image"
+
     gameImages "github.com/kazzmir/webgl-shooter/images"
 
     "github.com/hajimehoshi/ebiten/v2"
@@ -153,6 +155,7 @@ type NormalEnemy struct {
     x, y float64
     // velocityX, velocityY float64
     Life float64
+    rawImage image.Image
     pic *ebiten.Image
     Flip bool
     hurt int
@@ -176,17 +179,6 @@ func (enemy *NormalEnemy) Hit(bullet *Bullet) {
 func (enemy *NormalEnemy) Move(player *Player, imageManager *ImageManager) []*Bullet {
     enemy.x, enemy.y = enemy.move.Move(enemy.x, enemy.y)
 
-    /*
-    enemy.x += enemy.velocityX
-    enemy.y += enemy.velocityY
-    */
-
-    /*
-    if enemy.y > ScreenHeight + 50 {
-        enemy.y = -100
-    }
-    */
-
     if enemy.hurt > 0 {
         enemy.hurt -= 1
     }
@@ -209,7 +201,12 @@ func (enemy* NormalEnemy) Collision(x float64, y float64) bool {
     enemyX := useX - float64(bounds.Dx()) / 2
     enemyY := useY - float64(bounds.Dy()) / 2
 
-    return x >= enemyX && x <= enemyX + float64(bounds.Dx()) && y >= enemyY && y <= enemyY + float64(bounds.Dy())
+    if x >= enemyX && x <= enemyX + float64(bounds.Dx()) && y >= enemyY && y <= enemyY + float64(bounds.Dy()) {
+        _, _, _, a := enemy.rawImage.At(int(x - enemyX), int(y - enemyY)).RGBA()
+        return a > 200
+    }
+
+    return false
 }
 
 func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
@@ -274,12 +271,13 @@ func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
         */
 }
 
-func MakeEnemy1(x float64, y float64, image *ebiten.Image, move Movement) (Enemy, error) {
+func MakeEnemy1(x float64, y float64, rawImage image.Image, image *ebiten.Image, move Movement) (Enemy, error) {
     return &NormalEnemy{
         x: x,
         y: y,
         move: move,
         Life: 10,
+        rawImage: rawImage,
         pic: image,
         gun: &EnemyGun2{},
         Flip: true,
@@ -287,12 +285,74 @@ func MakeEnemy1(x float64, y float64, image *ebiten.Image, move Movement) (Enemy
     }, nil
 }
 
-func MakeEnemy2(x float64, y float64, pic *ebiten.Image, move Movement) (Enemy, error) {
+func MakeEnemy2(x float64, y float64, rawImage image.Image, pic *ebiten.Image, move Movement) (Enemy, error) {
     return &NormalEnemy{
         x: x,
         y: y,
         move: move,
         Life: 10,
+        rawImage: rawImage,
+        pic: pic,
+        gun: &EnemyGun1{},
+        Flip: false,
+        hurt: 0,
+    }, nil
+}
+
+type Boss1Movement struct {
+    // location we want to move to
+    moveX, moveY float64
+    // count how long we are at one position
+    counter uint64
+}
+
+func distance(x1, y1, x2, y2 float64) float64 {
+    return math.Sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
+}
+
+func (boss *Boss1Movement) Copy() Movement {
+    return &Boss1Movement{
+        moveX: boss.moveX,
+        moveY: boss.moveY,
+        counter: boss.counter,
+    }
+}
+
+func (boss *Boss1Movement) Coords(x float64, y float64) (float64, float64) {
+    return x, y
+}
+
+func (boss *Boss1Movement) Move(x float64, y float64) (float64, float64) {
+
+    speed := 1.5
+
+    if distance(x, y, boss.moveX, boss.moveY) < speed * 2 {
+        if boss.counter == 0 {
+            boss.moveX = randomFloat(100, ScreenWidth - 100)
+            boss.moveY = randomFloat(100, ScreenHeight - 100)
+            boss.counter = uint64(rand.Intn(200) + 200)
+        } else {
+            boss.counter -= 1
+        }
+
+        return x, y
+    } else {
+        angle := math.Atan2(boss.moveY - y, boss.moveX - x)
+        return x + math.Cos(angle) * speed, y + math.Sin(angle) * speed
+    }
+}
+
+func MakeBoss1(x float64, y float64, rawImage image.Image, pic *ebiten.Image) (Enemy, error) {
+    return &NormalEnemy{
+        x: x,
+        y: y,
+        move: &Boss1Movement{
+            moveX: ScreenWidth / 2,
+            moveY: 100,
+            counter: 100,
+        },
+        Life: 1000,
+        rawImage: rawImage,
         pic: pic,
         gun: &EnemyGun1{},
         Flip: false,

@@ -25,7 +25,7 @@ func (basic *BasicGun) DoSound(soundManager *SoundManager) {
 func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
     velocityY := -2.5
 
-    pic, err := imageManager.LoadImage(gameImages.ImageBullet)
+    pic, _, err := imageManager.LoadImage(gameImages.ImageBullet)
     if err != nil {
         return nil, err
     }
@@ -57,7 +57,7 @@ func (dual *DualBasicGun) DoSound(soundManager *SoundManager) {
 func (dual *DualBasicGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
     velocityY := -2.5
 
-    pic, err := imageManager.LoadImage(gameImages.ImageBullet)
+    pic, _, err := imageManager.LoadImage(gameImages.ImageBullet)
     if err != nil {
         return nil, err
     }
