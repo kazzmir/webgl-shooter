@@ -627,6 +627,9 @@ type Game struct {
 
     Quit context.Context
     Cancel context.CancelFunc
+
+    // number of ticks the game has run
+    Counter uint64
 }
 
 func (game *Game) MakeEnemy(x float64, y float64, kind int, move Movement) error {
@@ -700,6 +703,8 @@ func (game *Game) MakeEnemies(count int) error {
 }
 
 func (game *Game) Update(run *Run) error {
+
+    game.Counter += 1
 
     if game.FadeIn < GameFadeIn {
         game.FadeIn += 1
@@ -809,7 +814,8 @@ func (game *Game) Update(run *Run) error {
             game.MakeEnemies(1)
         }
 
-        if rand.Intn(1000) == 0 {
+        // create the boss after 2 minutes
+        if game.Counter > 60 * 120 && rand.Intn(1000) == 0 {
             game.BossMode = true
             game.DoBoss.Do(func(){
                 log.Printf("Created boss!")
