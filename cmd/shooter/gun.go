@@ -111,3 +111,35 @@ func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]
 
     return []*Bullet{&bullet}, nil
 }
+
+type MissleGun struct {
+}
+
+func (missle *MissleGun) Rate() float64 {
+    return 2
+}
+
+func (missle *MissleGun) DoSound(soundManager *SoundManager) {
+    soundManager.Play(audioFiles.AudioShoot1)
+}
+
+func (missle *MissleGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
+    velocityY := -2.1
+
+    pic, _, err := imageManager.LoadImage(gameImages.ImageMissle1)
+    if err != nil {
+        return nil, err
+    }
+
+    bullet := Bullet{
+        x: x,
+        y: y,
+        Strength: 10,
+        alive: true,
+        velocityX: 0,
+        velocityY: velocityY,
+        pic: pic,
+    }
+
+    return []*Bullet{&bullet}, nil
+}
