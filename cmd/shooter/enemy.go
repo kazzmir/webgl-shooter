@@ -37,6 +37,34 @@ func (linear *LinearMovement) Coords(x float64, y float64) (float64, float64) {
     return x, y
 }
 
+type SineMovement struct {
+    amplitude float64
+    angle float64
+    velocityX, velocityY float64
+}
+
+func (sine *SineMovement) Copy() Movement {
+    return &SineMovement{
+        amplitude: sine.amplitude,
+        angle: sine.angle,
+        velocityX: sine.velocityX,
+        velocityY: sine.velocityY,
+    }
+}
+
+func (sine *SineMovement) Move(x float64, y float64) (float64, float64) {
+    sine.angle += 3
+    if sine.angle > 360 {
+        sine.angle -= 360
+    }
+    return x + sine.velocityX, y + sine.velocityY
+}
+
+func (sine *SineMovement) Coords(x float64, y float64) (float64, float64) {
+    radians := sine.angle * math.Pi / 180.0
+    return x + sine.amplitude * math.Cos(radians), y
+}
+
 type CircularMovement struct {
     radius float64
     angle uint64
@@ -66,7 +94,7 @@ func (circular *CircularMovement) Coords(x float64, y float64) (float64, float64
 }
 
 func makeMovement() Movement {
-    switch rand.Intn(2) {
+    switch rand.Intn(3) {
         case 0:
             return &LinearMovement{
                 velocityX: randomFloat(-1, 1),
@@ -79,6 +107,12 @@ func makeMovement() Movement {
                 speed: randomFloat(0.8, 2.8),
                 velocityX: 0,
                 velocityY: 2,
+            }
+        case 2:
+            return &SineMovement{
+                amplitude: randomFloat(50, 100),
+                velocityX: 0,
+                velocityY: randomFloat(1, 2),
             }
     }
 
