@@ -117,7 +117,7 @@ type EnemyGun2 struct {
 }
 
 func (gun *EnemyGun2) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
-    bulletPic, err := imageManager.LoadAnimation(gameImages.ImageRotate1)
+    bulletPic, _, err := imageManager.LoadImage(gameImages.ImageBulletSmallBlue)
     if err != nil {
         log.Printf("Unable to load bullet: %v", err)
         return nil
@@ -132,8 +132,8 @@ func (gun *EnemyGun2) Shoot(x float64, y float64, player *Player, imageManager *
             Strength: 1,
             velocityX: math.Cos(angleToPlayer) * speed,
             velocityY: math.Sin(angleToPlayer) * speed,
-            pic: nil,
-            animation: bulletPic,
+            pic: bulletPic,
+            animation: nil,
             alive: true,
         }
 
