@@ -1,6 +1,7 @@
 package main
 
 import (
+    "fmt"
     "math"
     "image/color"
 
@@ -13,11 +14,12 @@ import (
     "github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-type MenuAction func(run *Run) error
+type MenuAction func(self *MenuOption, run *Run, key ebiten.Key) error
 
 type MenuOption struct {
     Text string
     Action MenuAction
+    Respond []ebiten.Key
 }
 
 type Menu struct {
@@ -25,6 +27,16 @@ type Menu struct {
     Counter uint64
     Options []*MenuOption
     Selected int
+}
+
+func (option *MenuOption) DoesRespond(key ebiten.Key) bool {
+    for _, respond := range option.Respond {
+        if respond == key {
+            return true
+        }
+    }
+
+    return false
 }
 
 func (menu *Menu) Update(run *Run) error {
@@ -35,7 +47,10 @@ func (menu *Menu) Update(run *Run) error {
 
     for _, key := range keys {
         switch key {
-            case ebiten.KeyEscape, ebiten.KeyCapsLock: return ebiten.Termination
+            case ebiten.KeyEscape, ebiten.KeyCapsLock:
+                if run.Game != nil {
+                    run.Mode = RunGame
+                }
             case ebiten.KeyArrowUp:
                 menu.Selected -= 1
                 if menu.Selected < 0 {
@@ -43,10 +58,13 @@ func (menu *Menu) Update(run *Run) error {
                 }
             case ebiten.KeyArrowDown:
                 menu.Selected = (menu.Selected + 1) % len(menu.Options)
-            case ebiten.KeyEnter:
-                err := menu.Options[menu.Selected].Action(run)
-                if err != nil {
-                    return err
+            default:
+                option := menu.Options[menu.Selected]
+                if option.DoesRespond(key) {
+                    err := option.Action(option, run, key)
+                    if err != nil {
+                        return err
+                    }
                 }
         }
     }
@@ -101,14 +119,14 @@ func createMenu(audioContext *audio.Context) (*Menu, error) {
 
     options = append(options, &MenuOption{
         Text: "New game",
-        Action: func(run *Run) error {
+        Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
             run.Mode = RunGame
 
             if run.Game != nil {
                 run.Game.Cancel()
             }
 
-            game, err := MakeGame(audioContext)
+            game, err := MakeGame(audioContext, run)
             if err != nil {
                 return err
             }
@@ -117,16 +135,51 @@ func createMenu(audioContext *audio.Context) (*Menu, error) {
 
             return nil
         },
+        Respond: []ebiten.Key{ebiten.KeyEnter},
+    })
 
+    soundMuted := false
+    lastVolume := 100.0
+    options = append(options, &MenuOption{
+        Text: fmt.Sprintf("Sound 100"),
+        Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
+            switch key {
+                case ebiten.KeyArrowLeft:
+                    if !soundMuted {
+                        run.DecreaseVolume()
+                        lastVolume = run.GetVolume()
+                    }
+                case ebiten.KeyArrowRight:
+                    if !soundMuted {
+                        run.IncreaseVolume()
+                        lastVolume = run.GetVolume()
+                    }
+                case ebiten.KeyEnter:
+                    soundMuted = !soundMuted
+                    if soundMuted {
+                        run.SetVolume(0)
+                    } else {
+                        run.SetVolume(lastVolume)
+                    }
+            }
+
+            if soundMuted {
+                self.Text = "Sound Muted"
+            } else {
+                self.Text = fmt.Sprintf("Sound %v", run.GetVolume())
+            }
+            return nil
+        },
+        Respond: []ebiten.Key{ebiten.KeyArrowLeft, ebiten.KeyArrowRight, ebiten.KeyEnter},
     })
 
     options = append(options, &MenuOption{
         Text: "Continue",
-        Action: func(run *Run) error {
+        Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
             run.Mode = RunGame
 
             if run.Game == nil {
-                game, err := MakeGame(audioContext)
+                game, err := MakeGame(audioContext, run)
                 if err != nil {
                     return err
                 }
@@ -136,13 +189,15 @@ func createMenu(audioContext *audio.Context) (*Menu, error) {
 
             return nil
         },
+        Respond: []ebiten.Key{ebiten.KeyEnter},
     })
 
     options = append(options, &MenuOption{
         Text: "Quit",
-        Action: func(run *Run) error {
+        Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
             return ebiten.Termination
         },
+        Respond: []ebiten.Key{ebiten.KeyEnter},
     })
 
     font, err := fontLib.LoadFont()

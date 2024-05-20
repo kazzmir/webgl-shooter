@@ -520,14 +520,24 @@ type SoundManager struct {
     Context *audio.Context
     SampleRate int
     Quit context.Context
+    Volume float64
 }
 
-func MakeSoundManager(quit context.Context, audioContext *audio.Context) (*SoundManager, error) {
+func (manager *SoundManager) SetVolume(volume float64){
+    manager.Volume = volume
+}
+
+func (manager *SoundManager) GetVolume() float64 {
+    return manager.Volume
+}
+
+func MakeSoundManager(quit context.Context, audioContext *audio.Context, volume float64) (*SoundManager, error) {
     manager := SoundManager{
         Sounds: make(map[audioFiles.AudioName]*SoundHandler),
         SampleRate: 48000,
         Context: audioContext,
         Quit: quit,
+        Volume: volume,
     }
 
     return &manager, manager.LoadAll()
@@ -585,7 +595,9 @@ func (manager *SoundManager) LoadAll() error {
 
 func (manager *SoundManager) Play(name audioFiles.AudioName) {
     if handler, ok := manager.Sounds[name]; ok {
-        handler.Make().Play()
+        player := handler.Make()
+        player.SetVolume(manager.GetVolume() / 100.0)
+        player.Play()
     }
 }
 
@@ -596,16 +608,19 @@ func (manager *SoundManager) PlayLoop(name audioFiles.AudioName) {
             if err != nil {
                 log.Printf("Failed to play audio loop %v: %v", name, err)
             } else {
+                player.SetVolume(manager.GetVolume() / 100.0)
                 go func(){
                     for {
                         select {
                             case <-manager.Quit.Done():
                                 player.Close()
                                 return
-                            case <-time.After(1 * time.Second):
+                            case <-time.After(100 * time.Millisecond):
                                 if !player.IsPlaying() {
                                     return
                                 }
+
+                                player.SetVolume(manager.GetVolume() / 100.0)
                         }
                     }
                 }()
@@ -962,6 +977,38 @@ type Run struct {
     Game *Game
     Menu *Menu
     Mode RunMode
+    Volume float64
+}
+
+func (run *Run) GetVolume() float64 {
+    return run.Volume
+}
+
+func (run *Run) updateVolume(){
+    if run.Game != nil {
+        run.Game.SoundManager.SetVolume(run.Volume)
+    }
+}
+
+func (run *Run) SetVolume(volume float64){
+    run.Volume = volume
+    run.updateVolume()
+}
+
+func (run *Run) IncreaseVolume() {
+    run.Volume += 10
+    if run.Volume > 100 {
+        run.Volume = 100
+    }
+    run.updateVolume()
+}
+
+func (run *Run) DecreaseVolume() {
+    run.Volume -= 10
+    if run.Volume < 0 {
+        run.Volume = 0
+    }
+    run.updateVolume()
 }
 
 func (run *Run) Update() error {
@@ -1004,7 +1051,7 @@ func (run *Run) Draw(screen *ebiten.Image) {
     */
 }
 
-func MakeGame(audioContext *audio.Context) (*Game, error) {
+func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
     player, err := MakePlayer(ScreenWidth / 2, ScreenHeight - 100)
     if err != nil {
         return nil, err
@@ -1027,7 +1074,7 @@ func MakeGame(audioContext *audio.Context) (*Game, error) {
 
     quitContext, cancel := context.WithCancel(context.Background())
 
-    soundManager, err := MakeSoundManager(quitContext, audioContext)
+    soundManager, err := MakeSoundManager(quitContext, audioContext, run.GetVolume())
     if err != nil {
         cancel()
         return nil, err
@@ -1103,6 +1150,7 @@ func main() {
         Mode: RunMenu,
         Game: nil,
         Menu: menu,
+        Volume: 100,
     }
 
     log.Printf("Running")
