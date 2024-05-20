@@ -383,13 +383,21 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
     }
     for _, key := range keys {
         if key == ebiten.KeyArrowUp {
-            player.velocityY -= playerAccel;
+            player.velocityY -= playerAccel
         } else if key == ebiten.KeyArrowDown {
-            player.velocityY += playerAccel;
+            player.velocityY += playerAccel
         } else if key == ebiten.KeyArrowLeft {
-            player.velocityX -= playerAccel;
+            player.velocityX -= playerAccel
         } else if key == ebiten.KeyArrowRight {
-            player.velocityX += playerAccel;
+            player.velocityX += playerAccel
+        } else if key == ebiten.KeyDigit1 {
+            player.Gun = &BasicGun{}
+        } else if key == ebiten.KeyDigit2 {
+            player.Gun = &DualBasicGun{}
+        } else if key == ebiten.KeyDigit3 {
+            player.Gun = &BeamGun{}
+        } else if key == ebiten.KeyDigit4 {
+            player.Gun = &MissleGun{}
         } else if key == ebiten.KeyShift && player.Jump <= -50 {
             player.Jump = JumpDuration
         // FIXME: make ebiten understand key mapping
