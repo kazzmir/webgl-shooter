@@ -205,6 +205,17 @@ type Player struct {
     SoundShoot chan bool
 }
 
+func (player *Player) Bounds() image.Rectangle {
+    bounds := player.rawImage.Bounds()
+
+    x1 := player.x - float64(bounds.Dx()) / 2
+    y1 := player.y - float64(bounds.Dy()) / 2
+    x2 := x1 + float64(bounds.Dx())
+    y2 := y1 + float64(bounds.Dy())
+
+    return image.Rect(int(x1), int(y1), int(x2), int(y2))
+}
+
 func (player *Player) Collide(x float64, y float64) bool {
     bounds := player.rawImage.Bounds()
 
@@ -636,7 +647,26 @@ func (manager *SoundManager) PlayLoop(name audioFiles.AudioName) {
 const GameFadeIn = 20
 const GameFadeOut = 40
 
+type GameCounter struct {
+    Limit int
+    Counter int
+}
+
+func (counter *GameCounter) Do(f func()) {
+    if counter.Counter == 0 {
+        f()
+        counter.Counter = counter.Limit
+    }
+}
+
+func (counter *GameCounter) Update() {
+    if counter.Counter > 0 {
+        counter.Counter -= 1
+    }
+}
+
 type Game struct {
+    Counters map[string]*GameCounter
     Player *Player
     Background *Background
     Bullets []*Bullet
@@ -664,6 +694,22 @@ type Game struct {
 
     // number of ticks the game has run
     Counter uint64
+}
+
+func (game *Game) GetCounter(name string, limit int) *GameCounter {
+    use, ok := game.Counters[name]
+    if ok {
+        return use
+    }
+
+    counter := GameCounter{
+        Counter: 0,
+        Limit: limit,
+    }
+
+    game.Counters[name] = &counter
+
+    return game.Counters[name]
 }
 
 func (game *Game) Close() {
@@ -748,7 +794,12 @@ func (game *Game) MakeEnemies(count int) error {
 
 var LevelEnd error = errors.New("end of level")
 
+func (game *Game) UpdateCounters() {
+}
+
 func (game *Game) Update(run *Run) error {
+
+    game.UpdateCounters()
 
     game.Counter += 1
 
@@ -786,6 +837,35 @@ func (game *Game) Update(run *Run) error {
     for _, enemy := range game.Enemies {
         bullets := enemy.Move(game.Player, game.ImageManager)
         game.EnemyBullets = append(game.EnemyBullets, bullets...)
+
+        collideX, collideY, isCollide := enemy.CollidePlayer(game.Player)
+
+        if isCollide {
+            game.GetCounter("player hit enemy", 30).Do(func(){
+                game.SoundManager.Play(audioFiles.AudioHit1)
+            })
+
+            animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit)
+            if err != nil {
+                log.Printf("Could not load hit animation: %v", err)
+            } else {
+                game.Explosions = append(game.Explosions, MakeAnimatedExplosion(collideX, collideY, animation))
+            }
+
+            enemy.Damage(1)
+
+            if ! enemy.IsAlive() {
+                game.SoundManager.Play(audioFiles.AudioExplosion3)
+
+                animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
+                if err == nil {
+                    x, y := enemy.Coords()
+                    game.Explosions = append(game.Explosions, MakeAnimatedExplosion(x, y, animation))
+                } else {
+                    log.Printf("Could not load explosion sheet: %v", err)
+                }
+            }
+        }
     }
 
     explosionOut := make([]Explosion, 0)
@@ -1089,6 +1169,7 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
     }
 
     game := Game{
+        Counters: make(map[string]*GameCounter),
         Background: background,
         Player: player,
         Font: font,

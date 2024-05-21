@@ -188,11 +188,14 @@ func (gun *EnemyGun2) Shoot(x float64, y float64, player *Player, imageManager *
 type Enemy interface {
     Move(player *Player, imageManager *ImageManager) []*Bullet
     Hit(bullet *Bullet)
+    Damage(amount float64)
     Coords() (float64, float64)
     IsAlive() bool
+    Bounds() image.Rectangle
     Draw(screen *ebiten.Image, shaders *ShaderManager)
     // returns true if this enemy is colliding with the point
     Collision(x, y float64) bool
+    CollidePlayer(player *Player) (float64, float64, bool)
 
     Dead() chan struct{}
 }
@@ -210,8 +213,55 @@ type NormalEnemy struct {
     dead chan struct{}
 }
 
+func (enemy *NormalEnemy) Damage(amount float64) {
+    enemy.Life -= amount
+    if enemy.Life <= 0 {
+        close(enemy.dead)
+    }
+}
+
+func (enemy *NormalEnemy) Bounds() image.Rectangle {
+    x, y := enemy.Coords()
+
+    bounds := enemy.pic.Bounds()
+
+    return image.Rect(
+        int(x - float64(bounds.Dx()) / 2),
+        int(y - float64(bounds.Dy()) / 2),
+        int(x + float64(bounds.Dx()) / 2),
+        int(y + float64(bounds.Dy()) / 2),
+    )
+}
+
 func (enemy *NormalEnemy) Coords() (float64, float64) {
     return enemy.move.Coords(enemy.x, enemy.y)
+}
+
+func (enemy *NormalEnemy) CollidePlayer(player *Player) (float64, float64, bool) {
+    bounds := enemy.Bounds()
+    playerBounds := player.Bounds()
+
+    overlap := bounds.Intersect(playerBounds)
+    if overlap.Empty() {
+        return 0, 0, false
+    }
+
+    samplePoints := int(math.Sqrt(float64(overlap.Dx() * overlap.Dy())))
+    if samplePoints < 3 {
+        samplePoints = 3
+    }
+
+    for i := 0; i < samplePoints; i++ {
+        x := randomFloat(float64(overlap.Min.X), float64(overlap.Max.X))
+        y := randomFloat(float64(overlap.Min.Y), float64(overlap.Max.Y))
+
+        if enemy.Collision(x, y) && player.Collide(x, y) {
+            return x, y, true
+        }
+
+    }
+
+    return 0, 0, false
 }
 
 func (enemy *NormalEnemy) IsAlive() bool {
@@ -219,12 +269,7 @@ func (enemy *NormalEnemy) IsAlive() bool {
 }
 
 func (enemy *NormalEnemy) Hit(bullet *Bullet) {
-    enemy.hurt = 10
-    enemy.Life -= bullet.Strength
-
-    if enemy.Life <= 0 {
-        close(enemy.dead)
-    }
+    enemy.Damage(bullet.Strength)
 }
 
 func (enemy *NormalEnemy) Move(player *Player, imageManager *ImageManager) []*Bullet {
