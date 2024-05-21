@@ -198,7 +198,8 @@ type Player struct {
     rawImage image.Image
     pic *ebiten.Image
     Gun Gun
-    Score int
+    Score uint64
+    Kills uint64
     RedShader *ebiten.Shader
     ShadowShader *ebiten.Shader
     Counter int
@@ -325,10 +326,15 @@ var AlphaBlender ebiten.Blend = ebiten.Blend{
 }
 
 func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *text.GoTextFaceSource) {
+    face := &text.GoTextFace{Source: font, Size: 15} 
+
     op := &text.DrawOptions{}
     op.GeoM.Translate(1, 1)
     op.ColorScale.ScaleWithColor(color.White)
-    text.Draw(screen, fmt.Sprintf("Score: %v", player.Score), &text.GoTextFace{Source: font, Size: 15}, op)
+    text.Draw(screen, fmt.Sprintf("Score: %v", player.Score), face, op)
+
+    op.GeoM.Translate(1, 20)
+    text.Draw(screen, fmt.Sprintf("Kills: %v", player.Kills), face, op)
 
     playerX := player.x - float64(player.pic.Bounds().Dx()) / 2
     playerY := player.y - float64(player.pic.Bounds().Dy()) / 2
@@ -847,6 +853,8 @@ func (game *Game) Update(run *Run) error {
             enemy.Damage(1)
 
             if ! enemy.IsAlive() {
+                game.Player.Score += 1
+                game.Player.Kills += 1
                 game.SoundManager.Play(audioFiles.AudioExplosion3)
 
                 animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
@@ -869,6 +877,7 @@ func (game *Game) Update(run *Run) error {
     }
     game.Explosions = explosionOut
 
+    // run bullet physics at 3x
     for i := 0; i < 3; i++ {
         var outBullets []*Bullet
         for _, bullet := range game.Bullets {
@@ -879,6 +888,7 @@ func (game *Game) Update(run *Run) error {
                     game.Player.Score += 1
                     enemy.Hit(bullet)
                     if ! enemy.IsAlive() {
+                        game.Player.Kills += 1
                         game.SoundManager.Play(audioFiles.AudioExplosion3)
 
                         animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
@@ -993,7 +1003,7 @@ func (game *Game) Draw(screen *ebiten.Image) {
     }
 
     for _, explosion := range game.Explosions {
-        explosion.Draw(game.ShaderManager, screen)
+        explosion.Draw(screen, game.ShaderManager)
     }
 
     // ebitenutil.DebugPrint(screen, "debugging")

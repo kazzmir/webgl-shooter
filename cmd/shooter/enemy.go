@@ -187,6 +187,7 @@ func (gun *EnemyGun2) Shoot(x float64, y float64, player *Player, imageManager *
 
 type Enemy interface {
     Move(player *Player, imageManager *ImageManager) []*Bullet
+    // maybe dont need this method since we can just call Damage()
     Hit(bullet *Bullet)
     Damage(amount float64)
     Coords() (float64, float64)
@@ -195,8 +196,10 @@ type Enemy interface {
     Draw(screen *ebiten.Image, shaders *ShaderManager)
     // returns true if this enemy is colliding with the point
     Collision(x, y float64) bool
+    // returns the x,y coordinate of where the collision occurred, and true/false if a collision occurred
     CollidePlayer(player *Player) (float64, float64, bool)
 
+    // a channel to select on to see if this enemy is dead
     Dead() chan struct{}
 }
 

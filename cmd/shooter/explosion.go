@@ -8,7 +8,7 @@ import (
 type Explosion interface {
     Move()
     IsAlive() bool
-    Draw(shaderManager *ShaderManager, screen *ebiten.Image)
+    Draw(screen *ebiten.Image, shaderManager *ShaderManager)
 }
 
 type SimpleExplosion struct {
@@ -39,7 +39,7 @@ func (explosion *SimpleExplosion) IsAlive() bool {
     return explosion.life > 0
 }
 
-func (explosion *SimpleExplosion) Draw(shaderManager *ShaderManager, screen *ebiten.Image) {
+func (explosion *SimpleExplosion) Draw(screen *ebiten.Image, shaderManager *ShaderManager) {
     bounds := explosion.pic.Bounds()
     posX := explosion.x - float64(bounds.Dx()) / 2
     posY := explosion.y - float64(bounds.Dy()) / 2
@@ -84,7 +84,7 @@ func (explosion *AnimatedExplosion) IsAlive() bool {
     return explosion.animation.IsAlive()
 }
 
-func (explosion *AnimatedExplosion) Draw(shaderManager *ShaderManager, screen *ebiten.Image) {
+func (explosion *AnimatedExplosion) Draw(screen *ebiten.Image, shaderManager *ShaderManager) {
     explosion.animation.Draw(screen, explosion.x, explosion.y)
 }
 
