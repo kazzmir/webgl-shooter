@@ -217,18 +217,10 @@ func (player *Player) Bounds() image.Rectangle {
 }
 
 func (player *Player) Collide(x float64, y float64) bool {
-    bounds := player.rawImage.Bounds()
-
-    x1 := player.x - float64(bounds.Dx()) / 2
-    y1 := player.y - float64(bounds.Dy()) / 2
-    x2 := x1 + float64(bounds.Dx())
-    y2 := y1 + float64(bounds.Dy())
-
-    // within the bounding box, now do pixel-perfect detection
-    if x >= x1 && x <= x2 && y >= y1 && y <= y2 {
-        // get the pixel color
-        cx := int(x - x1)
-        cy := int(y - y1)
+    bounds := player.Bounds()
+    if int(x) >= bounds.Min.X && int(x) <= bounds.Max.X && int(y) >= bounds.Min.Y && int(y) <= bounds.Max.Y {
+        cx := int(x) - bounds.Min.X
+        cy := int(y) - bounds.Min.Y
         c := player.rawImage.At(cx, cy)
         _, _, _, a := c.RGBA()
         if a > 200 {

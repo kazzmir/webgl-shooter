@@ -214,6 +214,7 @@ type NormalEnemy struct {
 }
 
 func (enemy *NormalEnemy) Damage(amount float64) {
+    enemy.hurt = 10
     enemy.Life -= amount
     if enemy.Life <= 0 {
         close(enemy.dead)
