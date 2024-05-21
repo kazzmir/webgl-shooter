@@ -31,7 +31,7 @@ import (
     "github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-const debugForceBoss = true
+const debugForceBoss = false
 
 const ScreenWidth = 1024
 const ScreenHeight = 768
