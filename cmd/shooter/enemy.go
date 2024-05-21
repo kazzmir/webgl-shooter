@@ -12,6 +12,8 @@ import (
     "github.com/hajimehoshi/ebiten/v2"
 )
 
+func ptr[T any](obj T) *T { return &obj }
+
 type Movement interface {
     Move(x float64, y float64) (float64, float64)
     Coords(x float64, y float64) (float64, float64)
@@ -127,52 +129,60 @@ type EnemyGun1 struct {
 }
 
 func (gun *EnemyGun1) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
-    bulletPic, err := imageManager.LoadAnimation(gameImages.ImageRotate1)
-    if err != nil {
-        log.Printf("Unable to load bullet: %v", err)
-        return nil
-    } else {
-        bullet := Bullet{
-            x: x,
-            y: y,
-            Strength: 1,
-            velocityX: 0,
-            velocityY: 1.5,
-            pic: nil,
-            animation: bulletPic,
-            alive: true,
-        }
+    if rand.Intn(100) == 0 {
+        bulletPic, err := imageManager.LoadAnimation(gameImages.ImageRotate1)
+        if err != nil {
+            log.Printf("Unable to load bullet: %v", err)
+            return nil
+        } else {
+            bullet := Bullet{
+                x: x,
+                y: y,
+                Strength: 1,
+                velocityX: 0,
+                velocityY: 1.5,
+                pic: nil,
+                animation: bulletPic,
+                alive: true,
+            }
 
-        return []*Bullet{&bullet}
+            return []*Bullet{&bullet}
+        }
     }
+
+    return nil
 }
 
 type EnemyGun2 struct {
 }
 
 func (gun *EnemyGun2) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
-    bulletPic, _, err := imageManager.LoadImage(gameImages.ImageBulletSmallBlue)
-    if err != nil {
-        log.Printf("Unable to load bullet: %v", err)
-        return nil
-    } else {
-        // in radians
-        angleToPlayer := math.Atan2(player.y - y, player.x - x)
-        speed := 1.1
+    if rand.Intn(100) == 0 {
+        bulletPic, _, err := imageManager.LoadImage(gameImages.ImageBulletSmallBlue)
+        if err != nil {
+            log.Printf("Unable to load bullet: %v", err)
+            return nil
+        } else {
+            // in radians
+            angleToPlayer := math.Atan2(player.y - y, player.x - x)
+            speed := 1.1
 
-        bullet := Bullet{
-            x: x,
-            y: y,
-            Strength: 1,
-            velocityX: math.Cos(angleToPlayer) * speed,
-            velocityY: math.Sin(angleToPlayer) * speed,
-            pic: bulletPic,
-            animation: nil,
-            alive: true,
+            bullet := Bullet{
+                x: x,
+                y: y,
+                Strength: 1,
+                velocityX: math.Cos(angleToPlayer) * speed,
+                velocityY: math.Sin(angleToPlayer) * speed,
+                pic: bulletPic,
+                animation: nil,
+                alive: true,
+            }
+
+            return []*Bullet{&bullet}
         }
-
-        return []*Bullet{&bullet}
     }
+
+    return nil
 }
 
 type Enemy interface {
@@ -226,10 +236,8 @@ func (enemy *NormalEnemy) Move(player *Player, imageManager *ImageManager) []*Bu
 
     var bullets []*Bullet
 
-    if rand.Intn(100) == 0 {
-        useX, useY := enemy.move.Coords(enemy.x, enemy.y)
-        bullets = enemy.gun.Shoot(useX, useY + float64(enemy.pic.Bounds().Dy()) / 2, player, imageManager)
-    }
+    useX, useY := enemy.move.Coords(enemy.x, enemy.y)
+    bullets = enemy.gun.Shoot(useX, useY + float64(enemy.pic.Bounds().Dy()) / 2, player, imageManager)
 
     return bullets
 }
@@ -346,6 +354,104 @@ func MakeEnemy2(x float64, y float64, rawImage image.Image, pic *ebiten.Image, m
     }, nil
 }
 
+type BossGun1 struct {
+    shot1count uint32
+    shot2count uint32
+}
+
+func MakeBossGun1() BossGun1 {
+    return BossGun1{
+        shot1count: 0,
+        shot2count: 0,
+    }
+}
+
+func (gun *BossGun1) NormalShot(x float64, y float64, imageManager *ImageManager) *Bullet {
+    bulletPic, err := imageManager.LoadAnimation(gameImages.ImageRotate1)
+    if err != nil {
+        log.Printf("Unable to load bullet: %v", err)
+        return nil
+    } else {
+        bullet := Bullet{
+            x: x,
+            y: y,
+            Strength: 1,
+            velocityX: 0,
+            velocityY: 1.5,
+            pic: nil,
+            animation: bulletPic,
+            alive: true,
+        }
+
+        return &bullet
+    }
+}
+
+func (gun *BossGun1) AimShot(x float64, y float64, player *Player, imageManager *ImageManager) *Bullet {
+    bulletPic, _, err := imageManager.LoadImage(gameImages.ImageBulletSmallBlue)
+    if err != nil {
+        log.Printf("Unable to load bullet: %v", err)
+        return nil
+    } else {
+        // in radians
+        angleToPlayer := math.Atan2(player.y - y, player.x - x)
+        speed := 1.8
+
+        bullet := Bullet{
+            x: x,
+            y: y,
+            Strength: 1,
+            velocityX: math.Cos(angleToPlayer) * speed,
+            velocityY: math.Sin(angleToPlayer) * speed,
+            pic: bulletPic,
+            animation: nil,
+            alive: true,
+        }
+
+        return &bullet
+    }
+}
+
+func (gun *BossGun1) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
+
+    const shot1rate = 30
+    const shot2rate = 20
+
+    if gun.shot1count == 0 && rand.Intn(50) == 0 {
+        gun.shot1count = shot1rate * 3
+    }
+
+    if gun.shot2count == 0 && rand.Intn(100) == 0 {
+        gun.shot2count = shot2rate * 3
+    }
+
+    var bullets []*Bullet
+
+    if gun.shot1count > 0 && gun.shot1count % shot1rate == 0 {
+        bullet := gun.NormalShot(x, y, imageManager)
+        if bullet != nil {
+            bullets = append(bullets, bullet)
+        }
+    }
+
+    if gun.shot2count > 0 && gun.shot2count % shot2rate == 0 {
+        bullet := gun.AimShot(x, y, player, imageManager)
+        if bullet != nil {
+            bullets = append(bullets, bullet)
+        }
+    }
+
+    if gun.shot1count > 0 {
+        gun.shot1count -= 1
+    }
+
+    if gun.shot2count > 0 {
+        gun.shot2count -= 1
+    }
+
+    return bullets
+}
+
 type Boss1Movement struct {
     // location we want to move to
     moveX, moveY float64
@@ -401,7 +507,7 @@ func MakeBoss1(x float64, y float64, rawImage image.Image, pic *ebiten.Image) (E
         Life: 500,
         rawImage: rawImage,
         pic: pic,
-        gun: &EnemyGun1{},
+        gun: ptr(MakeBossGun1()),
         Flip: false,
         hurt: 0,
         dead: make(chan struct{}),

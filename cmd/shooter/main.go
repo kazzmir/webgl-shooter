@@ -31,6 +31,8 @@ import (
     "github.com/hajimehoshi/ebiten/v2/vector"
 )
 
+const debugForceBoss = true
+
 const ScreenWidth = 1024
 const ScreenHeight = 768
 
@@ -875,7 +877,7 @@ func (game *Game) Update(run *Run) error {
         // create the boss after 2 minutes
         const bossTime = 60 * 120
         // const bossTime = 60 * 1
-        if game.Counter > bossTime && rand.Intn(1000) == 0 {
+        if debugForceBoss || (game.Counter > bossTime && rand.Intn(1000) == 0) {
             game.BossMode = true
             game.DoBoss.Do(func(){
                 log.Printf("Created boss!")
