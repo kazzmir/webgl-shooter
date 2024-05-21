@@ -354,19 +354,63 @@ func MakeEnemy2(x float64, y float64, rawImage image.Image, pic *ebiten.Image, m
     }, nil
 }
 
-type BossGun1 struct {
-    shot1count uint32
-    shot2count uint32
+type GunPattern struct {
+    rate uint32
+    counter uint32
+    repeat uint32
+    probability int
+    gun EnemyGun
 }
 
-func MakeBossGun1() BossGun1 {
-    return BossGun1{
-        shot1count: 0,
-        shot2count: 0,
+func (gun *GunPattern) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
+    if gun.counter == 0 && rand.Intn(gun.probability) == 0 {
+        gun.counter = gun.rate * gun.repeat
+    }
+
+    var bullets []*Bullet
+
+    if gun.counter > 0 && gun.counter % gun.rate == 0 {
+        bullets = gun.gun.Shoot(x, y, player, imageManager)
+    }
+
+    if gun.counter > 0 {
+        gun.counter -= 1
+    }
+
+    return bullets
+}
+
+func MakeGunPattern(rate uint32, repeat uint32, probability int, gun EnemyGun) EnemyGun {
+    return &GunPattern{
+        rate: rate,
+        counter: 0,
+        repeat: repeat,
+        probability: probability,
+        gun: gun,
     }
 }
 
-func (gun *BossGun1) NormalShot(x float64, y float64, imageManager *ImageManager) *Bullet {
+type GunComposite struct {
+    guns []EnemyGun
+}
+
+func (gun *GunComposite) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
+    var bullets []*Bullet
+
+    for _, g := range gun.guns {
+        b := g.Shoot(x, y, player, imageManager)
+        if b != nil {
+            bullets = append(bullets, b...)
+        }
+    }
+
+    return bullets
+}
+
+type BossGunNormal struct {
+}
+
+func (gun *BossGunNormal) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
     bulletPic, err := imageManager.LoadAnimation(gameImages.ImageRotate1)
     if err != nil {
         log.Printf("Unable to load bullet: %v", err)
@@ -383,11 +427,14 @@ func (gun *BossGun1) NormalShot(x float64, y float64, imageManager *ImageManager
             alive: true,
         }
 
-        return &bullet
+        return []*Bullet{&bullet}
     }
 }
 
-func (gun *BossGun1) AimShot(x float64, y float64, player *Player, imageManager *ImageManager) *Bullet {
+type BossGunAim struct {
+}
+
+func (gun *BossGunAim) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
     bulletPic, _, err := imageManager.LoadImage(gameImages.ImageBulletSmallBlue)
     if err != nil {
         log.Printf("Unable to load bullet: %v", err)
@@ -408,48 +455,17 @@ func (gun *BossGun1) AimShot(x float64, y float64, player *Player, imageManager 
             alive: true,
         }
 
-        return &bullet
+        return []*Bullet{&bullet}
     }
 }
 
-func (gun *BossGun1) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
-
-    const shot1rate = 30
-    const shot2rate = 20
-
-    if gun.shot1count == 0 && rand.Intn(50) == 0 {
-        gun.shot1count = shot1rate * 3
+func MakeBossGun1() EnemyGun {
+    return &GunComposite{
+        guns: []EnemyGun{
+            MakeGunPattern(30, 3, 50, &BossGunNormal{}),
+            MakeGunPattern(20, 3, 100, &BossGunAim{}),
+        },
     }
-
-    if gun.shot2count == 0 && rand.Intn(100) == 0 {
-        gun.shot2count = shot2rate * 3
-    }
-
-    var bullets []*Bullet
-
-    if gun.shot1count > 0 && gun.shot1count % shot1rate == 0 {
-        bullet := gun.NormalShot(x, y, imageManager)
-        if bullet != nil {
-            bullets = append(bullets, bullet)
-        }
-    }
-
-    if gun.shot2count > 0 && gun.shot2count % shot2rate == 0 {
-        bullet := gun.AimShot(x, y, player, imageManager)
-        if bullet != nil {
-            bullets = append(bullets, bullet)
-        }
-    }
-
-    if gun.shot1count > 0 {
-        gun.shot1count -= 1
-    }
-
-    if gun.shot2count > 0 {
-        gun.shot2count -= 1
-    }
-
-    return bullets
 }
 
 type Boss1Movement struct {
@@ -507,7 +523,7 @@ func MakeBoss1(x float64, y float64, rawImage image.Image, pic *ebiten.Image) (E
         Life: 500,
         rawImage: rawImage,
         pic: pic,
-        gun: ptr(MakeBossGun1()),
+        gun: MakeBossGun1(),
         Flip: false,
         hurt: 0,
         dead: make(chan struct{}),
