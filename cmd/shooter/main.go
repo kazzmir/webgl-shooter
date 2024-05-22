@@ -194,10 +194,9 @@ type Player struct {
     x, y float64
     Jump int
     velocityX, velocityY float64
-    bulletCounter float64
     rawImage image.Image
     pic *ebiten.Image
-    Gun Gun
+    Guns []Gun
     Score uint64
     Kills uint64
     RedShader *ebiten.Shader
@@ -268,30 +267,38 @@ func (player *Player) Move() {
         player.y = ScreenHeight
     }
 
-    if player.bulletCounter > 0 {
-        player.bulletCounter -= 1
+    for _, gun := range player.Guns {
+        gun.Update()
     }
 }
 
 func (player *Player) Shoot(imageManager *ImageManager, soundManager *SoundManager) []*Bullet {
 
-    bullets, err := player.Gun.Shoot(imageManager, player.x, player.y - float64(player.pic.Bounds().Dy()) / 2)
-    if err != nil {
-        log.Printf("Could not create bullets: %v", err)
-        return nil
-    }
+    var bullets []*Bullet
 
-    select {
-    case <-player.SoundShoot:
-        // soundManager.Play(audioFiles.AudioShoot1)
-        player.Gun.DoSound(soundManager)
-        go func(){
-            time.Sleep(10 * time.Millisecond)
-            player.SoundShoot <- true
-        }()
-    default:
-    }
+    for _, gun := range player.Guns {
+        if gun.IsEnabled() {
+            more, err := gun.Shoot(imageManager, player.x, player.y - float64(player.pic.Bounds().Dy()) / 2)
+            if err != nil {
+                log.Printf("Could not create bullets: %v", err)
+            } else {
+                if more != nil {
+                    bullets = append(bullets, more...)
 
+                    select {
+                        case <-player.SoundShoot:
+                            // soundManager.Play(audioFiles.AudioShoot1)
+                            gun.DoSound(soundManager)
+                            go func(){
+                                time.Sleep(10 * time.Millisecond)
+                                player.SoundShoot <- true
+                            }()
+                        default:
+                    }
+                }
+            }
+        }
+    }
 
     return bullets
 
@@ -325,7 +332,7 @@ var AlphaBlender ebiten.Blend = ebiten.Blend{
     BlendOperationAlpha:         ebiten.BlendOperationAdd,
 }
 
-func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *text.GoTextFaceSource) {
+func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageManger *ImageManager, font *text.GoTextFaceSource) {
     face := &text.GoTextFace{Source: font, Size: 15} 
 
     op := &text.DrawOptions{}
@@ -378,6 +385,22 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, font *t
     options.Uniforms["Color"] = []float32{0, 0, float32((math.Sin(float64(player.Counter) * 7 * math.Pi / 180.0) + 1) / 2), 1}
     // options.Uniforms["Color"] = []float32{0, 0, 1, 1}
     screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.EdgeShader, options)
+
+    var iconX float64 = 150
+    var iconY float64 = 3
+    for _, gun := range player.Guns {
+        gun.DrawIcon(screen, imageManger, font, iconX, iconY)
+        iconX += 30
+    }
+}
+
+func enableGun[T Gun] (guns []Gun) {
+    for _, gun := range guns {
+        switch gun.(type) {
+            case T:
+                gun.SetEnabled(!gun.IsEnabled())
+        }
+    }
 }
 
 func (player *Player) HandleKeys(game *Game, run *Run) error {
@@ -392,6 +415,7 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
         playerAccel = 3
         maxVelocity = 5.5
     }
+
     for _, key := range keys {
         if key == ebiten.KeyArrowUp {
             player.velocityY -= playerAccel
@@ -401,20 +425,16 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
             player.velocityX -= playerAccel
         } else if key == ebiten.KeyArrowRight {
             player.velocityX += playerAccel
-        } else if key == ebiten.KeyDigit1 {
-            player.Gun = &BasicGun{}
-        } else if key == ebiten.KeyDigit2 {
-            player.Gun = &DualBasicGun{}
+            // player.Gun = &BasicGun{}
         } else if key == ebiten.KeyDigit3 {
-            player.Gun = &BeamGun{}
+            // player.Gun = &BeamGun{}
         } else if key == ebiten.KeyDigit4 {
-            player.Gun = &MissleGun{}
+            // player.Gun = &MissleGun{}
         } else if key == ebiten.KeyShift && player.Jump <= -50 {
             player.Jump = JumpDuration
         // FIXME: make ebiten understand key mapping
-        } else if key == ebiten.KeySpace && game.Player.bulletCounter <= 0 {
+        } else if key == ebiten.KeySpace {
             game.Bullets = append(game.Bullets, game.Player.Shoot(game.ImageManager, game.SoundManager)...)
-            player.bulletCounter = 60.0 / game.Player.Gun.Rate()
         }
     }
 
@@ -427,6 +447,10 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
         if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
             // return ebiten.Termination
             run.Mode = RunMenu
+        } else if key == ebiten.KeyDigit1 {
+            enableGun[*BasicGun](player.Guns)
+        } else if key == ebiten.KeyDigit2 {
+            enableGun[*DualBasicGun](player.Guns)
         }
     }
 
@@ -457,7 +481,10 @@ func MakePlayer(x, y float64) (*Player, error) {
         pic: ebiten.NewImageFromImage(playerImage),
         // Gun: &BasicGun{},
         // Gun: &DualBasicGun{},
-        Gun: &MissleGun{},
+        Guns: []Gun{
+            &BasicGun{enabled: true},
+            &DualBasicGun{enabled: false},
+        },
         // Gun: &BeamGun{},
         Jump: -50,
         Score: 0,
@@ -1007,7 +1034,7 @@ func (game *Game) Draw(screen *ebiten.Image) {
     }
 
     // ebitenutil.DebugPrint(screen, "debugging")
-    game.Player.Draw(screen, game.ShaderManager, game.Font)
+    game.Player.Draw(screen, game.ShaderManager, game.ImageManager, game.Font)
 
     for _, bullet := range game.Bullets {
         bullet.Draw(screen)
