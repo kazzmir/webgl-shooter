@@ -197,6 +197,7 @@ type Player struct {
     rawImage image.Image
     pic *ebiten.Image
     Guns []Gun
+    GunEnergy float64
     Score uint64
     Kills uint64
     RedShader *ebiten.Shader
@@ -267,6 +268,11 @@ func (player *Player) Move() {
         player.y = ScreenHeight
     }
 
+    player.GunEnergy += 0.4
+    if player.GunEnergy > 100 {
+        player.GunEnergy = 100
+    }
+
     for _, gun := range player.Guns {
         gun.Update()
     }
@@ -277,12 +283,13 @@ func (player *Player) Shoot(imageManager *ImageManager, soundManager *SoundManag
     var bullets []*Bullet
 
     for _, gun := range player.Guns {
-        if gun.IsEnabled() {
+        if gun.IsEnabled() && gun.EnergyUsed() <= player.GunEnergy {
             more, err := gun.Shoot(imageManager, player.x, player.y - float64(player.pic.Bounds().Dy()) / 2)
             if err != nil {
                 log.Printf("Could not create bullets: %v", err)
             } else {
                 if more != nil {
+                    player.GunEnergy -= gun.EnergyUsed()
                     bullets = append(bullets, more...)
 
                     select {
@@ -342,6 +349,9 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
 
     op.GeoM.Translate(1, 20)
     text.Draw(screen, fmt.Sprintf("Kills: %v", player.Kills), face, op)
+
+    op.GeoM.Translate(1, 40)
+    text.Draw(screen, fmt.Sprintf("Energy: %.2f", player.GunEnergy), face, op)
 
     playerX := player.x - float64(player.pic.Bounds().Dx()) / 2
     playerY := player.y - float64(player.pic.Bounds().Dy()) / 2
@@ -480,6 +490,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         pic: ebiten.NewImageFromImage(playerImage),
         // Gun: &BasicGun{},
         // Gun: &DualBasicGun{},
+        GunEnergy: 100,
         Guns: []Gun{
             &BasicGun{enabled: true},
             &DualBasicGun{enabled: false},

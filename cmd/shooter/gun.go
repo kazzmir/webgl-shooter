@@ -22,11 +22,16 @@ type Gun interface {
     IsEnabled() bool
     SetEnabled(bool)
     Update()
+    EnergyUsed() float64
 }
 
 type BasicGun struct {
     enabled bool
     counter int
+}
+
+func (basic *BasicGun) EnergyUsed() float64 {
+    return 1
 }
 
 func (basic *BasicGun) Update() {
@@ -111,6 +116,10 @@ func (dual *DualBasicGun) Update() {
     }
 }
 
+func (dual *DualBasicGun) EnergyUsed() float64 {
+    return 2
+}
+
 func (dual *DualBasicGun) IsEnabled() bool {
     return dual.enabled
 }
@@ -171,6 +180,10 @@ func (beam *BeamGun) Update() {
     }
 }
 
+func (beam *BeamGun) EnergyUsed() float64 {
+    return 2.5
+}
+
 func (beam *BeamGun) IsEnabled() bool {
     return beam.enabled
 }
@@ -227,6 +240,10 @@ func (missle *MissleGun) Update() {
     if missle.counter > 0 {
         missle.counter -= 1
     }
+}
+
+func (missle *MissleGun) EnergyUsed() float64 {
+    return 5
 }
 
 func (missle *MissleGun) IsEnabled() bool {
