@@ -10,6 +10,7 @@ import (
     "errors"
     "math/rand"
     "math"
+    "strconv"
     "sync"
     "sync/atomic"
     "context"
@@ -396,10 +397,22 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
     // options.Uniforms["Color"] = []float32{0, 0, 1, 1}
     screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.EdgeShader, options)
 
+    gunFace := &text.GoTextFace{Source: font, Size: 10}
+
     var iconX float64 = 150
     var iconY float64 = 3
-    for _, gun := range player.Guns {
-        gun.DrawIcon(screen, imageManger, font, iconX, iconY)
+    for i, gun := range player.Guns {
+        gun.DrawIcon(screen, imageManger, iconX, iconY)
+
+        op := &text.DrawOptions{}
+        op.GeoM.Translate(iconX + 5, iconY + 8)
+        var color_ color.RGBA = color.RGBA{0xff, 0xff, 0xff, 0xff}
+        if !gun.IsEnabled() {
+            color_ = color.RGBA{0xff, 0, 0, 0xff}
+        }
+        op.ColorScale.ScaleWithColor(color_)
+        text.Draw(screen, strconv.Itoa(i+1), gunFace, op)
+
         iconX += 30
     }
 }
