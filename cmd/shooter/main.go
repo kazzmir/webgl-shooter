@@ -425,11 +425,6 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
             player.velocityX -= playerAccel
         } else if key == ebiten.KeyArrowRight {
             player.velocityX += playerAccel
-            // player.Gun = &BasicGun{}
-        } else if key == ebiten.KeyDigit3 {
-            // player.Gun = &BeamGun{}
-        } else if key == ebiten.KeyDigit4 {
-            // player.Gun = &MissleGun{}
         } else if key == ebiten.KeyShift && player.Jump <= -50 {
             player.Jump = JumpDuration
         // FIXME: make ebiten understand key mapping
@@ -451,6 +446,10 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
             enableGun[*BasicGun](player.Guns)
         } else if key == ebiten.KeyDigit2 {
             enableGun[*DualBasicGun](player.Guns)
+        } else if key == ebiten.KeyDigit3 {
+            enableGun[*BeamGun](player.Guns)
+        } else if key == ebiten.KeyDigit4 {
+            enableGun[*MissleGun](player.Guns)
         }
     }
 
@@ -484,6 +483,8 @@ func MakePlayer(x, y float64) (*Player, error) {
         Guns: []Gun{
             &BasicGun{enabled: true},
             &DualBasicGun{enabled: false},
+            &BeamGun{enabled: false},
+            &MissleGun{enabled: false},
         },
         // Gun: &BeamGun{},
         Jump: -50,

@@ -4,6 +4,8 @@ import (
     gameImages "github.com/kazzmir/webgl-shooter/images"
     audioFiles "github.com/kazzmir/webgl-shooter/audio"
 
+    _ "log"
+
     "strconv"
     "image/color"
 
@@ -45,19 +47,27 @@ func (basic *BasicGun) Rate() float64 {
     return 10
 }
 
-func drawGunBox(screen *ebiten.Image, x float64, y float64, n int, font *text.GoTextFaceSource) {
+func drawGunBox(screen *ebiten.Image, x float64, y float64, n int, font *text.GoTextFaceSource, color_ color.Color) {
     size := 20
-    vector.StrokeRect(screen, float32(x), float32(y), float32(size), float32(size), 2, &color.RGBA{R: 255, G: 255, B: 255, A: 255}, true)
+    vector.StrokeRect(screen, float32(x), float32(y), float32(size), float32(size), 2, color_, true)
 
     face := &text.GoTextFace{Source: font, Size: 10}
     op := &text.DrawOptions{}
     op.GeoM.Translate(x + 5, y + 8)
-    op.ColorScale.ScaleWithColor(color.White)
+    op.ColorScale.ScaleWithColor(color_)
     text.Draw(screen, strconv.Itoa(n), face, op)
 }
 
+func iconColor(enabled bool) color.Color {
+    if enabled {
+        return color.White
+    } else {
+        return color.RGBA{R: 255, G: 0, B: 0, A: 255}
+    }
+}
+
 func (basic *BasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, font *text.GoTextFaceSource, x float64, y float64) {
-    drawGunBox(screen, x, y, 1, font)
+    drawGunBox(screen, x, y, 1, font, iconColor(basic.enabled))
 }
 
 func (basic *BasicGun) DoSound(soundManager *SoundManager) {
@@ -114,7 +124,7 @@ func (dual *DualBasicGun) Rate() float64 {
 }
 
 func (dual *DualBasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, font *text.GoTextFaceSource, x float64, y float64) {
-    drawGunBox(screen, x, y, 2, font)
+    drawGunBox(screen, x, y, 2, font, iconColor(dual.enabled))
 }
 
 func (dual *DualBasicGun) DoSound(soundManager *SoundManager) {
@@ -178,16 +188,15 @@ func (beam *BeamGun) DoSound(soundManager *SoundManager) {
 }
 
 func (beam *BeamGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, font *text.GoTextFaceSource, x float64, y float64) {
-    drawGunBox(screen, x, y, 3, font)
+    drawGunBox(screen, x, y, 3, font, iconColor(beam.enabled))
 }
 
 func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
-    if beam.enabled && beam.counter > 0 {
+    if beam.enabled && beam.counter == 0 {
         beam.counter = int(60.0 / beam.Rate())
         velocityY := -2.3
 
         animation, err := imageManager.LoadAnimation(gameImages.ImageBeam1)
-        // animation, err := imageManager.LoadAnimation(gameImages.ImageRotate1)
         if err != nil {
             return nil, err
         }
@@ -237,7 +246,7 @@ func (missle *MissleGun) DoSound(soundManager *SoundManager) {
 }
 
 func (missle *MissleGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, font *text.GoTextFaceSource, x float64, y float64) {
-    drawGunBox(screen, x, y, 4, font)
+    drawGunBox(screen, x, y, 4, font, iconColor(missle.enabled))
 }
 
 func (missle *MissleGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
