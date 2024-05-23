@@ -340,7 +340,7 @@ var AlphaBlender ebiten.Blend = ebiten.Blend{
     BlendOperationAlpha:         ebiten.BlendOperationAdd,
 }
 
-func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageManger *ImageManager, font *text.GoTextFaceSource) {
+func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageManager *ImageManager, font *text.GoTextFaceSource) {
     face := &text.GoTextFace{Source: font, Size: 15} 
 
     op := &text.DrawOptions{}
@@ -402,7 +402,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
     var iconX float64 = 150
     var iconY float64 = 3
     for i, gun := range player.Guns {
-        gun.DrawIcon(screen, imageManger, iconX, iconY)
+        gun.DrawIcon(screen, imageManager, iconX, iconY)
 
         op := &text.DrawOptions{}
         op.GeoM.Translate(iconX + 5, iconY + 8)
@@ -414,6 +414,21 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         text.Draw(screen, strconv.Itoa(i+1), gunFace, op)
 
         iconX += 30
+    }
+
+    energy, _, err := imageManager.LoadImage(gameImages.ImageEnergy)
+    if err != nil {
+        log.Printf("Could not load energy image: %v", err)
+    } else {
+        options := &ebiten.DrawImageOptions{}
+        useHeight := player.GunEnergy / 100.0 * float64(energy.Bounds().Dy())
+
+        options.GeoM.Translate(5, 100 + float64(energy.Bounds().Dy()) - useHeight)
+
+        vector.StrokeRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), 1, premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 200}), true)
+
+        sub := energy.SubImage(image.Rect(0, energy.Bounds().Dy() - int(useHeight), energy.Bounds().Dx(), energy.Bounds().Dy())).(*ebiten.Image)
+        screen.DrawImage(sub, options)
     }
 }
 
@@ -532,9 +547,35 @@ func MakeImageManager() *ImageManager {
     }
 }
 
+func (manager *ImageManager) CreateEnergyImage() image.Image {
+    out := image.NewRGBA(image.Rect(0, 0, 15, 250))
+
+    for y := 0; y < out.Bounds().Dy(); y++ {
+        for x := 0; x < out.Bounds().Dx(); x++ {
+            v := 255 - out.Bounds().Dy() + y
+            if v > 255 {
+                v = 255
+            }
+            out.Set(x, out.Bounds().Dy() - y - 1, premultiplyAlpha(color.RGBA{0, 0, uint8(v), 210}))
+        }
+    }
+
+    return out
+}
+
 func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, image.Image, error) {
     if image, ok := manager.Images[name]; ok {
         return image.Image, image.Raw, nil
+    }
+
+    if name == gameImages.ImageEnergy {
+        raw := manager.CreateEnergyImage()
+        converted := ebiten.NewImageFromImage(raw)
+        manager.Images[name] = ImagePair{
+            Image: converted,
+            Raw: raw,
+        }
+        return converted, raw, nil
     }
 
     loaded, err := gameImages.LoadImage(name)

@@ -30,6 +30,7 @@ const ImageWave1 = Image("wave1")
 const ImageRotate1 = Image("rotate1")
 const ImageMissle1 = Image("missle1")
 const ImageBulletSmallBlue = Image("bullet-small-blue")
+const ImageEnergy = Image("energy")
 
 //go:embed player/player.png
 var playerImage []byte
