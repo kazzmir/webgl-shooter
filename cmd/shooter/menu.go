@@ -113,7 +113,7 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
     }
 }
 
-func createMenu(audioContext *audio.Context) (*Menu, error) {
+func createMenu(audioContext *audio.Context, initialVolume float64) (*Menu, error) {
 
     var options []*MenuOption
 
@@ -139,9 +139,9 @@ func createMenu(audioContext *audio.Context) (*Menu, error) {
     })
 
     soundMuted := false
-    lastVolume := 100.0
+    lastVolume := initialVolume
     options = append(options, &MenuOption{
-        Text: fmt.Sprintf("Sound 100"),
+        Text: fmt.Sprintf("Sound %v", initialVolume),
         Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
             switch key {
                 case ebiten.KeyArrowLeft:

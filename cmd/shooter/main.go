@@ -37,6 +37,9 @@ const debugForceBoss = false
 const ScreenWidth = 1024
 const ScreenHeight = 768
 
+const MaxEnergy = 100.0
+const EnergyIncreasePerFrame = 0.4
+
 func onScreen(x float64, y float64, margin float64) bool {
     return x > -margin && x < ScreenWidth + margin && y > -margin && y < ScreenHeight + margin
 }
@@ -269,9 +272,9 @@ func (player *Player) Move() {
         player.y = ScreenHeight
     }
 
-    player.GunEnergy += 0.4
-    if player.GunEnergy > 100 {
-        player.GunEnergy = 100
+    player.GunEnergy += EnergyIncreasePerFrame
+    if player.GunEnergy > MaxEnergy {
+        player.GunEnergy = MaxEnergy
     }
 
     for _, gun := range player.Guns {
@@ -421,7 +424,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         log.Printf("Could not load energy image: %v", err)
     } else {
         options := &ebiten.DrawImageOptions{}
-        useHeight := player.GunEnergy / 100.0 * float64(energy.Bounds().Dy())
+        useHeight := player.GunEnergy / MaxEnergy * float64(energy.Bounds().Dy())
 
         options.GeoM.Translate(5, 100 + float64(energy.Bounds().Dy()) - useHeight)
 
@@ -518,7 +521,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         pic: ebiten.NewImageFromImage(playerImage),
         // Gun: &BasicGun{},
         // Gun: &DualBasicGun{},
-        GunEnergy: 100,
+        GunEnergy: MaxEnergy,
         Guns: []Gun{
             &BasicGun{enabled: true},
             &DualBasicGun{enabled: false},
@@ -1316,7 +1319,9 @@ func main() {
 
     audioContext := audio.NewContext(48000)
 
-    menu, err := createMenu(audioContext)
+    var initialVolume float64 = 80
+
+    menu, err := createMenu(audioContext, initialVolume)
     if err != nil {
         log.Printf("Unable to create menu: %v", err)
         return
@@ -1334,7 +1339,7 @@ func main() {
         Mode: RunMenu,
         Game: nil,
         Menu: menu,
-        Volume: 100,
+        Volume: initialVolume,
     }
 
     log.Printf("Running")
