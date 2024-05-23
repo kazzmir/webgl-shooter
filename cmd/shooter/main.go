@@ -208,6 +208,8 @@ type Player struct {
     ShadowShader *ebiten.Shader
     Counter int
     SoundShoot chan bool
+
+    PowerupEnergy int
 }
 
 func (player *Player) Bounds() image.Rectangle {
@@ -280,6 +282,10 @@ func (player *Player) Move() {
     for _, gun := range player.Guns {
         gun.Update()
     }
+
+    if player.PowerupEnergy > 0 {
+        player.PowerupEnergy -= 1
+    }
 }
 
 func (player *Player) Shoot(imageManager *ImageManager, soundManager *SoundManager) []*Bullet {
@@ -287,13 +293,15 @@ func (player *Player) Shoot(imageManager *ImageManager, soundManager *SoundManag
     var bullets []*Bullet
 
     for _, gun := range player.Guns {
-        if gun.IsEnabled() && gun.EnergyUsed() <= player.GunEnergy {
+        if gun.IsEnabled() && (player.PowerupEnergy > 0 || gun.EnergyUsed() <= player.GunEnergy) {
             more, err := gun.Shoot(imageManager, player.x, player.y - float64(player.pic.Bounds().Dy()) / 2)
             if err != nil {
                 log.Printf("Could not create bullets: %v", err)
             } else {
                 if more != nil {
-                    player.GunEnergy -= gun.EnergyUsed()
+                    if player.PowerupEnergy == 0 {
+                        player.GunEnergy -= gun.EnergyUsed()
+                    }
                     bullets = append(bullets, more...)
 
                     select {
@@ -355,7 +363,11 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
     text.Draw(screen, fmt.Sprintf("Kills: %v", player.Kills), face, op)
 
     op.GeoM.Translate(1, 40)
-    text.Draw(screen, fmt.Sprintf("Energy: %.2f", player.GunEnergy), face, op)
+    if player.PowerupEnergy > 0 {
+        text.Draw(screen, fmt.Sprintf("Energy: MAX"), face, op)
+    } else {
+        text.Draw(screen, fmt.Sprintf("Energy: %.2f", player.GunEnergy), face, op)
+    }
 
     playerX := player.x - float64(player.pic.Bounds().Dx()) / 2
     playerY := player.y - float64(player.pic.Bounds().Dy()) / 2
@@ -423,15 +435,20 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
     if err != nil {
         log.Printf("Could not load energy image: %v", err)
     } else {
-        options := &ebiten.DrawImageOptions{}
-        useHeight := player.GunEnergy / MaxEnergy * float64(energy.Bounds().Dy())
+        if player.PowerupEnergy > 0 {
+            vector.DrawFilledRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), color.RGBA{R: 0x7e, G: 0x29, B: 0xd6, A: 0xff}, true)
+        } else {
 
-        options.GeoM.Translate(5, 100 + float64(energy.Bounds().Dy()) - useHeight)
+            options := &ebiten.DrawImageOptions{}
+            useHeight := player.GunEnergy / MaxEnergy * float64(energy.Bounds().Dy())
 
-        vector.StrokeRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), 1, premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 200}), true)
+            options.GeoM.Translate(5, 100 + float64(energy.Bounds().Dy()) - useHeight)
 
-        sub := energy.SubImage(image.Rect(0, energy.Bounds().Dy() - int(useHeight), energy.Bounds().Dx(), energy.Bounds().Dy())).(*ebiten.Image)
-        screen.DrawImage(sub, options)
+            vector.StrokeRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), 1, premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 200}), true)
+
+            sub := energy.SubImage(image.Rect(0, energy.Bounds().Dy() - int(useHeight), energy.Bounds().Dx(), energy.Bounds().Dy())).(*ebiten.Image)
+            screen.DrawImage(sub, options)
+        }
     }
 }
 
