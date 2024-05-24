@@ -43,6 +43,68 @@ func onScreen(x float64, y float64, margin float64) bool {
     return x > -margin && x < ScreenWidth + margin && y > -margin && y < ScreenHeight + margin
 }
 
+type Powerup interface {
+    Move()
+    Collide(player *Player) bool
+    Activate(player *Player)
+    OnScreen() bool
+    Draw(screen *ebiten.Image)
+}
+
+type PowerupEnergy struct {
+    x, y float64
+    velocityX float64
+    velocityY float64
+}
+
+func (powerup *PowerupEnergy) Move() {
+    powerup.x += powerup.velocityX
+    powerup.y += powerup.velocityY
+}
+
+func (powerup *PowerupEnergy) OnScreen() bool {
+    return powerup.y < ScreenHeight + 20
+}
+
+func (powerup *PowerupEnergy) Activate(player *Player){
+    player.PowerupEnergy = 60 * 5
+}
+
+var PowerupColor color.Color = color.RGBA{R: 0x7e, G: 0x29, B: 0xd6, A: 0xff}
+
+func (powerup *PowerupEnergy) Draw(screen *ebiten.Image){
+    var size float64 = 14
+    vector.DrawFilledRect(screen, float32(powerup.x - size/2), float32(powerup.y - size/2), float32(size), float32(size), PowerupColor, true)
+}
+
+func (powerup *PowerupEnergy) Collide(player *Player) bool {
+    size := 14
+    bounds := image.Rect(int(powerup.x-float64(size)/2), int(powerup.y-float64(size)/2), size, size)
+    playerBounds := player.Bounds()
+
+    overlap := bounds.Intersect(playerBounds)
+    if overlap.Empty() {
+        return false
+    }
+
+    samplePoints := int(math.Sqrt(float64(overlap.Dx() * overlap.Dy())))
+    if samplePoints < 3 {
+        samplePoints = 3
+    }
+
+    for i := 0; i < samplePoints; i++ {
+        x := randomFloat(float64(overlap.Min.X), float64(overlap.Max.X))
+        y := randomFloat(float64(overlap.Min.Y), float64(overlap.Max.Y))
+
+        if player.Collide(x, y) {
+            return true
+        }
+
+    }
+
+    return false
+}
+
 type Bullet struct {
     x, y float64
     Strength float64
@@ -436,7 +498,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         log.Printf("Could not load energy image: %v", err)
     } else {
         if player.PowerupEnergy > 0 {
-            vector.DrawFilledRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), color.RGBA{R: 0x7e, G: 0x29, B: 0xd6, A: 0xff}, true)
+            vector.DrawFilledRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), PowerupColor, true)
         } else {
 
             options := &ebiten.DrawImageOptions{}
