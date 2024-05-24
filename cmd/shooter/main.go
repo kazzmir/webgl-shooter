@@ -37,7 +37,6 @@ const debugForceBoss = false
 const ScreenWidth = 1024
 const ScreenHeight = 768
 
-const MaxEnergy = 100.0
 const EnergyIncreasePerFrame = 0.4
 
 func onScreen(x float64, y float64, margin float64) bool {
@@ -202,6 +201,7 @@ type Player struct {
     pic *ebiten.Image
     Guns []Gun
     GunEnergy float64
+    MaxEnergy float64
     Score uint64
     Kills uint64
     RedShader *ebiten.Shader
@@ -275,8 +275,8 @@ func (player *Player) Move() {
     }
 
     player.GunEnergy += EnergyIncreasePerFrame
-    if player.GunEnergy > MaxEnergy {
-        player.GunEnergy = MaxEnergy
+    if player.GunEnergy > player.MaxEnergy {
+        player.GunEnergy = player.MaxEnergy
     }
 
     for _, gun := range player.Guns {
@@ -440,9 +440,9 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         } else {
 
             options := &ebiten.DrawImageOptions{}
-            useHeight := player.GunEnergy / MaxEnergy * float64(energy.Bounds().Dy())
+            useHeight := int(player.GunEnergy / player.MaxEnergy * float64(energy.Bounds().Dy()))
 
-            options.GeoM.Translate(5, 100 + float64(energy.Bounds().Dy()) - useHeight)
+            options.GeoM.Translate(5, 100 + float64(energy.Bounds().Dy()) - float64(useHeight))
 
             vector.StrokeRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), 1, premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 200}), true)
 
@@ -538,7 +538,8 @@ func MakePlayer(x, y float64) (*Player, error) {
         pic: ebiten.NewImageFromImage(playerImage),
         // Gun: &BasicGun{},
         // Gun: &DualBasicGun{},
-        GunEnergy: MaxEnergy,
+        GunEnergy: 100.0,
+        MaxEnergy: 100.0,
         Guns: []Gun{
             &BasicGun{enabled: true},
             &DualBasicGun{enabled: false},
