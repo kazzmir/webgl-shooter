@@ -174,6 +174,22 @@ func createMenu(audioContext *audio.Context, initialVolume float64) (*Menu, erro
     })
 
     options = append(options, &MenuOption{
+        Text: "Fullscreen",
+        Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
+            ebiten.SetFullscreen(!ebiten.IsFullscreen())
+
+            if ebiten.IsFullscreen() {
+                self.Text = "Windowed"
+            } else {
+                self.Text = "Fullscreen"
+            }
+
+            return nil
+        },
+        Respond: []ebiten.Key{ebiten.KeyEnter},
+    })
+
+    options = append(options, &MenuOption{
         Text: "Continue",
         Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
             run.Mode = RunGame
