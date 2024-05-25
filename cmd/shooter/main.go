@@ -1414,7 +1414,7 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
 func main() {
     log.SetFlags(log.Ldate | log.Lshortfile | log.Lmicroseconds)
 
-    profile := true
+    profile := false
 
     if profile {
         cpuProfile, err := os.Create("profile.cpu")
