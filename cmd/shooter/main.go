@@ -47,7 +47,7 @@ type Powerup interface {
     Move()
     Collide(player *Player) bool
     Activate(player *Player)
-    OnScreen() bool
+    IsAlive() bool
     Draw(screen *ebiten.Image)
 }
 
@@ -55,6 +55,17 @@ type PowerupEnergy struct {
     x, y float64
     velocityX float64
     velocityY float64
+    activated bool
+}
+
+func MakePowerupEnergy(x float64, y float64) Powerup {
+    return &PowerupEnergy{
+        x: x,
+        y: y,
+        velocityX: 0,
+        velocityY: 1.5,
+        activated: false,
+    }
 }
 
 func (powerup *PowerupEnergy) Move() {
@@ -62,12 +73,15 @@ func (powerup *PowerupEnergy) Move() {
     powerup.y += powerup.velocityY
 }
 
-func (powerup *PowerupEnergy) OnScreen() bool {
-    return powerup.y < ScreenHeight + 20
+func (powerup *PowerupEnergy) IsAlive() bool {
+    return !powerup.activated && powerup.y < ScreenHeight + 20
 }
 
 func (powerup *PowerupEnergy) Activate(player *Player){
-    player.PowerupEnergy = 60 * 5
+    if !powerup.activated {
+        player.PowerupEnergy = 60 * 10
+        powerup.activated = true
+    }
 }
 
 var PowerupColor color.Color = color.RGBA{R: 0x7e, G: 0x29, B: 0xd6, A: 0xff}
@@ -847,6 +861,7 @@ type Game struct {
     EnemyBullets []*Bullet
     Font *text.GoTextFaceSource
     Enemies []Enemy
+    Powerups []Powerup
     Explosions []Explosion
     ShaderManager *ShaderManager
     ImageManager *ImageManager
@@ -1007,6 +1022,23 @@ func (game *Game) Update(run *Run) error {
     }
 
     game.Player.Move()
+
+    if rand.Intn(1000) == 0 {
+        game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
+    }
+
+    var powerupOut []Powerup
+    for _, powerup := range game.Powerups {
+        powerup.Move()
+        if powerup.Collide(game.Player) {
+            powerup.Activate(game.Player)
+        }
+
+        if powerup.IsAlive() {
+            powerupOut = append(powerupOut, powerup)
+        }
+    }
+    game.Powerups = powerupOut
 
     for _, enemy := range game.Enemies {
         bullets := enemy.Move(game.Player, game.ImageManager)
@@ -1176,6 +1208,10 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
     for _, enemy := range game.Enemies {
         enemy.Draw(screen, game.ShaderManager)
+    }
+
+    for _, powerup := range game.Powerups {
+        powerup.Draw(screen)
     }
 
     for _, explosion := range game.Explosions {
