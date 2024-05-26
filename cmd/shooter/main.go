@@ -93,7 +93,11 @@ func (powerup *PowerupEnergy) Draw(screen *ebiten.Image){
 
 func (powerup *PowerupEnergy) Collide(player *Player) bool {
     size := 14
-    bounds := image.Rect(int(powerup.x-float64(size)/2), int(powerup.y-float64(size)/2), size, size)
+    x1 := powerup.x - float64(size)/2
+    y1 := powerup.y - float64(size)/2
+    x2 := x1 + float64(size)
+    y2 := y1 + float64(size)
+    bounds := image.Rect(int(x1), int(y1), int(x2), int(y2))
     playerBounds := player.Bounds()
 
     overlap := bounds.Intersect(playerBounds)
