@@ -43,12 +43,20 @@ func onScreen(x float64, y float64, margin float64) bool {
     return x > -margin && x < ScreenWidth + margin && y > -margin && y < ScreenHeight + margin
 }
 
+func drawCenteredImage(screen *ebiten.Image, pic *ebiten.Image, x float64, y float64){
+    x1 := x - float64(pic.Bounds().Dx()) / 2
+    y1 := y - float64(pic.Bounds().Dy()) / 2
+    options := &ebiten.DrawImageOptions{}
+    options.GeoM.Translate(x1, y1)
+    screen.DrawImage(pic, options)
+}
+
 type Powerup interface {
     Move()
-    Collide(player *Player) bool
+    Collide(player *Player, imageManager *ImageManager) bool
     Activate(player *Player)
     IsAlive() bool
-    Draw(screen *ebiten.Image)
+    Draw(screen *ebiten.Image, imageManager *ImageManager)
 }
 
 type PowerupEnergy struct {
@@ -56,6 +64,7 @@ type PowerupEnergy struct {
     velocityX float64
     velocityY float64
     activated bool
+    angle uint64
 }
 
 func MakePowerupEnergy(x float64, y float64) Powerup {
@@ -65,12 +74,14 @@ func MakePowerupEnergy(x float64, y float64) Powerup {
         velocityX: 0,
         velocityY: 1.5,
         activated: false,
+        angle: 0,
     }
 }
 
 func (powerup *PowerupEnergy) Move() {
     powerup.x += powerup.velocityX
     powerup.y += powerup.velocityY
+    powerup.angle += 1
 }
 
 func (powerup *PowerupEnergy) IsAlive() bool {
@@ -86,17 +97,40 @@ func (powerup *PowerupEnergy) Activate(player *Player){
 
 var PowerupColor color.Color = color.RGBA{R: 0x7e, G: 0x29, B: 0xd6, A: 0xff}
 
-func (powerup *PowerupEnergy) Draw(screen *ebiten.Image){
-    var size float64 = 14
-    vector.DrawFilledRect(screen, float32(powerup.x - size/2), float32(powerup.y - size/2), float32(size), float32(size), PowerupColor, true)
+func (powerup *PowerupEnergy) Draw(screen *ebiten.Image, imageManager *ImageManager){
+
+    pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup1)
+    if err != nil {
+        log.Printf("Could not load powerup image: %v", err)
+        return
+    }
+
+    width := float64(pic.Bounds().Dx())
+    height := float64(pic.Bounds().Dy())
+
+    // x1 := powerup.x - width / 2
+    // y1 := powerup.y - height / 2
+    options := &ebiten.DrawImageOptions{}
+
+    // translate such that center is at origin
+    options.GeoM.Translate(-width/2, -height/2)
+    // rotate
+    options.GeoM.Rotate(float64(powerup.angle) * math.Pi / 180.0)
+
+    options.GeoM.Translate(powerup.x, powerup.y)
+    screen.DrawImage(pic, options)
 }
 
-func (powerup *PowerupEnergy) Collide(player *Player) bool {
-    size := 14
-    x1 := powerup.x - float64(size)/2
-    y1 := powerup.y - float64(size)/2
-    x2 := x1 + float64(size)
-    y2 := y1 + float64(size)
+func (powerup *PowerupEnergy) Collide(player *Player, imageManager *ImageManager) bool {
+    pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup1)
+    if err != nil {
+        return false
+    }
+
+    x1 := powerup.x - float64(pic.Bounds().Dx())/2
+    y1 := powerup.y - float64(pic.Bounds().Dy())/2
+    x2 := x1 + float64(pic.Bounds().Dx())
+    y2 := y1 + float64(pic.Bounds().Dy())
     bounds := image.Rect(int(x1), int(y1), int(x2), int(y2))
     playerBounds := player.Bounds()
 
@@ -137,11 +171,7 @@ func (bullet *Bullet) Draw(screen *ebiten.Image) {
     if bullet.animation != nil {
         bullet.animation.Draw(screen, bullet.x, bullet.y)
     } else if bullet.pic != nil {
-        x1 := bullet.x - float64(bullet.pic.Bounds().Dx()) / 2
-        y1 := bullet.y - float64(bullet.pic.Bounds().Dy()) / 2
-        options := &ebiten.DrawImageOptions{}
-        options.GeoM.Translate(x1, y1)
-        screen.DrawImage(bullet.pic, options)
+        drawCenteredImage(screen, bullet.pic, bullet.x, bullet.y)
     }
 }
 
@@ -511,7 +541,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         iconX += 30
     }
 
-    energy, _, err := imageManager.LoadImage(gameImages.ImageEnergy)
+    energy, _, err := imageManager.LoadImage(gameImages.ImageEnergyBar)
     if err != nil {
         log.Printf("Could not load energy image: %v", err)
     } else {
@@ -669,7 +699,7 @@ func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, im
         return image.Image, image.Raw, nil
     }
 
-    if name == gameImages.ImageEnergy {
+    if name == gameImages.ImageEnergyBar {
         raw := manager.CreateEnergyImage()
         converted := ebiten.NewImageFromImage(raw)
         manager.Images[name] = ImagePair{
@@ -1027,14 +1057,14 @@ func (game *Game) Update(run *Run) error {
 
     game.Player.Move()
 
-    if rand.Intn(1000) == 0 {
+    if rand.Intn(100) == 0 {
         game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
     }
 
     var powerupOut []Powerup
     for _, powerup := range game.Powerups {
         powerup.Move()
-        if powerup.Collide(game.Player) {
+        if powerup.Collide(game.Player, game.ImageManager) {
             powerup.Activate(game.Player)
         }
 
@@ -1215,7 +1245,7 @@ func (game *Game) Draw(screen *ebiten.Image) {
     }
 
     for _, powerup := range game.Powerups {
-        powerup.Draw(screen)
+        powerup.Draw(screen, game.ImageManager)
     }
 
     for _, explosion := range game.Explosions {

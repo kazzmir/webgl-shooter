@@ -20,6 +20,7 @@ const ImageEnemy2 = Image("enemy2")
 const ImageEnemy3 = Image("enemy3")
 const ImageEnemy4 = Image("enemy4")
 const ImageEnemy5 = Image("enemy5")
+const ImageEnergyBar = Image("energy")
 const ImageBoss1 = Image("boss1")
 const ImageExplosion1 = Image("explosion1")
 const ImageExplosion2 = Image("explosion2")
@@ -30,7 +31,7 @@ const ImageWave1 = Image("wave1")
 const ImageRotate1 = Image("rotate1")
 const ImageMissle1 = Image("missle1")
 const ImageBulletSmallBlue = Image("bullet-small-blue")
-const ImageEnergy = Image("energy")
+const ImagePowerup1 = Image("powerup1")
 
 //go:embed player/player.png
 var playerImage []byte
@@ -73,6 +74,9 @@ var explosion1Image []byte
 
 //go:embed misc/explosion2-anim.png
 var explosion2Animation []byte
+
+//go:embed misc/powerup1.png
+var powerup1Image []byte
 
 //go:embed bullet/missle1.png
 var missle1Image []byte
@@ -122,6 +126,7 @@ func LoadImage(name Image) (image.Image, error) {
         case ImageHit2: return loadPng(hit2Image)
         case ImageMissle1: return loadPng(missle1Image)
         case ImageBulletSmallBlue: return loadPng(bulletSmallBlueImage)
+        case ImagePowerup1: return loadPng(powerup1Image)
     }
 
     return nil, fmt.Errorf("no such image: %s", name)
