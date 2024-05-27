@@ -32,6 +32,9 @@ var Explosion2Data []byte
 //go:embed effects/explosion3.ogg
 var Explosion3Data []byte
 
+//go:embed effects/energy.ogg
+var EnergyData []byte
+
 type AudioName string
 
 const AudioHit1 = AudioName("hit1")
@@ -41,8 +44,9 @@ const AudioStellarPulseSong = AudioName("stellar-pulse")
 const AudioExplosion1 = AudioName("explosion1")
 const AudioExplosion2 = AudioName("explosion2")
 const AudioExplosion3 = AudioName("explosion3")
+const AudioEnergy = AudioName("energy")
 
-var AllSounds []AudioName = []AudioName{AudioHit1, AudioHit2, AudioShoot1, AudioStellarPulseSong, AudioExplosion1, AudioExplosion2, AudioExplosion3}
+var AllSounds []AudioName = []AudioName{AudioHit1, AudioHit2, AudioShoot1, AudioStellarPulseSong, AudioExplosion1, AudioExplosion2, AudioExplosion3, AudioEnergy}
 
 func LoadSound(name AudioName, sampleRate int) (io.Reader, error) {
     switch name {
@@ -53,6 +57,7 @@ func LoadSound(name AudioName, sampleRate int) (io.Reader, error) {
         case AudioExplosion1: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Explosion1Data))
         case AudioExplosion2: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Explosion2Data))
         case AudioExplosion3: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Explosion3Data))
+        case AudioEnergy: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(EnergyData))
     }
 
     return nil, fmt.Errorf("No such audio effect %v", name)

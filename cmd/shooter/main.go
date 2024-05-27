@@ -54,7 +54,7 @@ func drawCenteredImage(screen *ebiten.Image, pic *ebiten.Image, x float64, y flo
 type Powerup interface {
     Move()
     Collide(player *Player, imageManager *ImageManager) bool
-    Activate(player *Player)
+    Activate(player *Player, soundManager *SoundManager)
     IsAlive() bool
     Draw(screen *ebiten.Image, imageManager *ImageManager)
 }
@@ -88,10 +88,11 @@ func (powerup *PowerupEnergy) IsAlive() bool {
     return !powerup.activated && powerup.y < ScreenHeight + 20
 }
 
-func (powerup *PowerupEnergy) Activate(player *Player){
+func (powerup *PowerupEnergy) Activate(player *Player, soundManager *SoundManager){
     if !powerup.activated {
         player.PowerupEnergy = 60 * 10
         powerup.activated = true
+        soundManager.Play(audioFiles.AudioEnergy)
     }
 }
 
@@ -1057,15 +1058,17 @@ func (game *Game) Update(run *Run) error {
 
     game.Player.Move()
 
-    if rand.Intn(100) == 0 {
+    /*
+    if rand.Intn(1000) == 0 {
         game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
     }
+    */
 
     var powerupOut []Powerup
     for _, powerup := range game.Powerups {
         powerup.Move()
         if powerup.Collide(game.Player, game.ImageManager) {
-            powerup.Activate(game.Player)
+            powerup.Activate(game.Player, game.SoundManager)
         }
 
         if powerup.IsAlive() {
@@ -1132,6 +1135,11 @@ func (game *Game) Update(run *Run) error {
                     if ! enemy.IsAlive() {
                         game.Player.Kills += 1
                         game.SoundManager.Play(audioFiles.AudioExplosion3)
+
+                        // create a powerup every X kills
+                        if game.Player.Kills % 20 == 0 {
+                            game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
+                        }
 
                         animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
                         if err == nil {
