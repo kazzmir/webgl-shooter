@@ -265,6 +265,13 @@ type Player struct {
     PowerupEnergy int
 }
 
+func (player *Player) Damage(amount float64) {
+    player.Health -= amount
+    if player.Health < 0 {
+        player.Health = 0
+    }
+}
+
 func (player *Player) Bounds() image.Rectangle {
     bounds := player.rawImage.Bounds()
 
@@ -1054,6 +1061,7 @@ func (game *Game) Update(run *Run) error {
             }
 
             enemy.Damage(1)
+            game.Player.Damage(1)
 
             if ! enemy.IsAlive() {
                 game.Player.Score += 1
@@ -1133,6 +1141,8 @@ func (game *Game) Update(run *Run) error {
 
             if game.Player.Collide(bullet.x, bullet.y) {
                 game.SoundManager.Play(audioFiles.AudioHit2)
+
+                game.Player.Damage(bullet.Strength)
 
                 animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit2)
                 if err == nil {
