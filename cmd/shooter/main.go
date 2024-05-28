@@ -43,119 +43,18 @@ func onScreen(x float64, y float64, margin float64) bool {
     return x > -margin && x < ScreenWidth + margin && y > -margin && y < ScreenHeight + margin
 }
 
+func toFloatArray(color color.Color) []float32 {
+    r, g, b, a := color.RGBA()
+    var max float32 = 65535.0
+    return []float32{float32(r) / max, float32(g) / max, float32(b) / max, float32(a) / max}
+}
+
 func drawCenteredImage(screen *ebiten.Image, pic *ebiten.Image, x float64, y float64){
     x1 := x - float64(pic.Bounds().Dx()) / 2
     y1 := y - float64(pic.Bounds().Dy()) / 2
     options := &ebiten.DrawImageOptions{}
     options.GeoM.Translate(x1, y1)
     screen.DrawImage(pic, options)
-}
-
-type Powerup interface {
-    Move()
-    Collide(player *Player, imageManager *ImageManager) bool
-    Activate(player *Player, soundManager *SoundManager)
-    IsAlive() bool
-    Draw(screen *ebiten.Image, imageManager *ImageManager)
-}
-
-type PowerupEnergy struct {
-    x, y float64
-    velocityX float64
-    velocityY float64
-    activated bool
-    angle uint64
-}
-
-func MakePowerupEnergy(x float64, y float64) Powerup {
-    return &PowerupEnergy{
-        x: x,
-        y: y,
-        velocityX: 0,
-        velocityY: 1.5,
-        activated: false,
-        angle: 0,
-    }
-}
-
-func (powerup *PowerupEnergy) Move() {
-    powerup.x += powerup.velocityX
-    powerup.y += powerup.velocityY
-    powerup.angle += 1
-}
-
-func (powerup *PowerupEnergy) IsAlive() bool {
-    return !powerup.activated && powerup.y < ScreenHeight + 20
-}
-
-func (powerup *PowerupEnergy) Activate(player *Player, soundManager *SoundManager){
-    if !powerup.activated {
-        player.PowerupEnergy = 60 * 10
-        powerup.activated = true
-        soundManager.Play(audioFiles.AudioEnergy)
-    }
-}
-
-var PowerupColor color.Color = color.RGBA{R: 0x7e, G: 0x29, B: 0xd6, A: 0xff}
-
-func (powerup *PowerupEnergy) Draw(screen *ebiten.Image, imageManager *ImageManager){
-
-    pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup1)
-    if err != nil {
-        log.Printf("Could not load powerup image: %v", err)
-        return
-    }
-
-    width := float64(pic.Bounds().Dx())
-    height := float64(pic.Bounds().Dy())
-
-    // x1 := powerup.x - width / 2
-    // y1 := powerup.y - height / 2
-    options := &ebiten.DrawImageOptions{}
-
-    // translate such that center is at origin
-    options.GeoM.Translate(-width/2, -height/2)
-    // rotate
-    options.GeoM.Rotate(float64(powerup.angle) * math.Pi / 180.0)
-
-    options.GeoM.Translate(powerup.x, powerup.y)
-    screen.DrawImage(pic, options)
-}
-
-func (powerup *PowerupEnergy) Collide(player *Player, imageManager *ImageManager) bool {
-    pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup1)
-    if err != nil {
-        return false
-    }
-
-    x1 := powerup.x - float64(pic.Bounds().Dx())/2
-    y1 := powerup.y - float64(pic.Bounds().Dy())/2
-    x2 := x1 + float64(pic.Bounds().Dx())
-    y2 := y1 + float64(pic.Bounds().Dy())
-    bounds := image.Rect(int(x1), int(y1), int(x2), int(y2))
-    playerBounds := player.Bounds()
-
-    overlap := bounds.Intersect(playerBounds)
-    if overlap.Empty() {
-        return false
-    }
-
-    samplePoints := int(math.Sqrt(float64(overlap.Dx() * overlap.Dy())))
-    if samplePoints < 3 {
-        samplePoints = 3
-    }
-
-    for i := 0; i < samplePoints; i++ {
-        x := randomFloat(float64(overlap.Min.X), float64(overlap.Max.X))
-        y := randomFloat(float64(overlap.Min.Y), float64(overlap.Max.Y))
-
-        if player.Collide(x, y) {
-            return true
-        }
-
-    }
-
-    return false
 }
 
 type Bullet struct {
@@ -1058,12 +957,6 @@ func (game *Game) Update(run *Run) error {
 
     game.Player.Move()
 
-    /*
-    if rand.Intn(1000) == 0 {
-        game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
-    }
-    */
-
     var powerupOut []Powerup
     for _, powerup := range game.Powerups {
         powerup.Move()
@@ -1253,7 +1146,7 @@ func (game *Game) Draw(screen *ebiten.Image) {
     }
 
     for _, powerup := range game.Powerups {
-        powerup.Draw(screen, game.ImageManager)
+        powerup.Draw(screen, game.ImageManager, game.ShaderManager)
     }
 
     for _, explosion := range game.Explosions {
@@ -1443,6 +1336,9 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
         cancel()
         return nil, err
     }
+
+    // for debugging
+    // game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
 
     err = game.PreloadAssets()
     if err != nil {
