@@ -1318,6 +1318,8 @@ type Run struct {
     Game *Game
     Menu *Menu
     Mode RunMode
+    Quit context.Context
+    Cancel context.CancelFunc
     Volume float64
 }
 
@@ -1479,7 +1481,10 @@ func main() {
 
     var initialVolume float64 = 80
 
-    menu, err := createMenu(audioContext, initialVolume)
+    quit, cancel := context.WithCancel(context.Background())
+    defer cancel()
+
+    menu, err := createMenu(quit, audioContext, initialVolume)
     if err != nil {
         log.Printf("Unable to create menu: %v", err)
         return
@@ -1496,6 +1501,8 @@ func main() {
     run := Run{
         Mode: RunMenu,
         Game: nil,
+        Quit: quit,
+        Cancel: cancel,
         Menu: menu,
         Volume: initialVolume,
     }

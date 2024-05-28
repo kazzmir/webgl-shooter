@@ -4,8 +4,10 @@ import (
     "fmt"
     "math"
     "image/color"
+    "context"
 
     fontLib "github.com/kazzmir/webgl-shooter/font"
+    audioFiles "github.com/kazzmir/webgl-shooter/audio"
 
     "github.com/hajimehoshi/ebiten/v2"
     "github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -27,6 +29,7 @@ type Menu struct {
     Counter uint64
     Options []*MenuOption
     Selected int
+    SoundManager *SoundManager
 }
 
 func (option *MenuOption) DoesRespond(key ebiten.Key) bool {
@@ -56,8 +59,10 @@ func (menu *Menu) Update(run *Run) error {
                 if menu.Selected < 0 {
                     menu.Selected = len(menu.Options) - 1
                 }
+                menu.SoundManager.Play(audioFiles.AudioBeep)
             case ebiten.KeyArrowDown:
                 menu.Selected = (menu.Selected + 1) % len(menu.Options)
+                menu.SoundManager.Play(audioFiles.AudioBeep)
             default:
                 option := menu.Options[menu.Selected]
                 if option.DoesRespond(key) {
@@ -113,7 +118,7 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
     }
 }
 
-func createMenu(audioContext *audio.Context, initialVolume float64) (*Menu, error) {
+func createMenu(quit context.Context, audioContext *audio.Context, initialVolume float64) (*Menu, error) {
 
     var options []*MenuOption
 
@@ -221,8 +226,14 @@ func createMenu(audioContext *audio.Context, initialVolume float64) (*Menu, erro
         return nil, err
     }
 
+    soundManager, err := MakeSoundManager(quit, audioContext, initialVolume)
+    if err != nil {
+        return nil, err
+    }
+
     return &Menu{
         Font: font,
         Options: options,
+        SoundManager: soundManager,
     }, nil
 }
