@@ -197,7 +197,7 @@ func (powerup *PowerupHealth) Activate(player *Player, soundManager *SoundManage
     if !powerup.activated {
         player.Health = math.Min(player.MaxHealth, player.Health + 20)
         powerup.activated = true
-        // soundManager.Play(audioFiles.AudioEnergy)
+        soundManager.Play(audioFiles.AudioHealth)
     }
 }
 

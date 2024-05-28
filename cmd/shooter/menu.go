@@ -66,6 +66,7 @@ func (menu *Menu) Update(run *Run) error {
             default:
                 option := menu.Options[menu.Selected]
                 if option.DoesRespond(key) {
+                    menu.SoundManager.Play(audioFiles.AudioBeep)
                     err := option.Action(option, run, key)
                     if err != nil {
                         return err
