@@ -455,10 +455,11 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         options.Blend = AlphaBlender
         options.Images[0] = player.pic
         options.Uniforms = make(map[string]interface{})
-        var radians float32 = math.Pi * float32(player.Jump) * 360 / JumpDuration / 180.0
+        var radians float64 = math.Pi * float64(player.Jump) * 360 / JumpDuration / 180.0
         // radians = math.Pi * 90 / 180
         // log.Printf("Red: %v", radians)
-        options.Uniforms["Red"] = radians
+        // red := vec4(abs(sin(Red) / 3), 0, 0, 0)
+        options.Uniforms["Red"] = toFloatArray(color.RGBA{R: uint8(math.Abs(math.Sin(radians) / 3) * 255), G: 0, B: 0, A: 0})
         bounds := player.pic.Bounds()
         screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.RedShader, options)
     } else {
@@ -1127,7 +1128,7 @@ func (game *Game) Update(run *Run) error {
 
                         // create a powerup every X kills
                         if game.Player.Kills % 20 == 0 {
-                            game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
+                            game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, ScreenWidth-10), -20))
                         }
 
                         animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
@@ -1441,7 +1442,7 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
     }
 
     // for debugging
-    // game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
+    game.Powerups = append(game.Powerups, MakePowerupHealth(randomFloat(10, ScreenWidth-10), -20))
 
     err = game.PreloadAssets()
     if err != nil {

@@ -6,6 +6,7 @@ import (
     "math/rand"
 
     "image"
+    "image/color"
 
     gameImages "github.com/kazzmir/webgl-shooter/images"
 
@@ -340,7 +341,10 @@ func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
         }
         hurtOptions.GeoM.Translate(enemyX, enemyY)
         hurtOptions.Uniforms = make(map[string]interface{})
-        hurtOptions.Uniforms["Red"] = float32(math.Min(1.0, float64(enemy.hurt) / 8.0))
+        // hurtOptions.Uniforms["Red"] = float32(math.Min(1.0, float64(enemy.hurt) / 8.0))
+        angle := math.Min(1.0, float64(enemy.hurt) / 8.0)
+        // options.Uniforms["Red"] = toFloatArray(color.RGBA{R: uint8(math.Abs(math.Sin(radians) / 3) * 255), G: 0, B: 0, A: 0})
+        hurtOptions.Uniforms["Red"] = toFloatArray(color.RGBA{R: uint8(math.Abs(math.Sin(angle) / 3) * 255), G: 0, B: 0, A: 0})
         hurtOptions.Blend = AlphaBlender
         hurtOptions.Images[0] = enemy.pic
         bounds := enemy.pic.Bounds()

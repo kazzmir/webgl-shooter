@@ -5,6 +5,7 @@ import (
     gameImages "github.com/kazzmir/webgl-shooter/images"
 
     "math"
+    "math/rand"
     "log"
     "image"
     "image/color"
@@ -138,3 +139,115 @@ func (powerup *PowerupEnergy) Collide(player *Player, imageManager *ImageManager
     return false
 }
 
+type PowerupHealth struct {
+    x, y float64
+    velocityX float64
+    velocityY float64
+    activated bool
+    counter uint64
+}
+
+func (powerup *PowerupHealth) Move() {
+    powerup.x += powerup.velocityX
+    powerup.y += powerup.velocityY
+    powerup.counter += 1
+}
+
+func (powerup *PowerupHealth) IsAlive() bool {
+    return !powerup.activated && powerup.y < ScreenHeight + 20
+}
+
+func (powerup *PowerupHealth) Collide(player *Player, imageManager *ImageManager) bool {
+    pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup3)
+    if err != nil {
+        return false
+    }
+
+    x1 := powerup.x - float64(pic.Bounds().Dx())/2
+    y1 := powerup.y - float64(pic.Bounds().Dy())/2
+    x2 := x1 + float64(pic.Bounds().Dx())
+    y2 := y1 + float64(pic.Bounds().Dy())
+    bounds := image.Rect(int(x1), int(y1), int(x2), int(y2))
+    playerBounds := player.Bounds()
+
+    overlap := bounds.Intersect(playerBounds)
+    if overlap.Empty() {
+        return false
+    }
+
+    samplePoints := int(math.Sqrt(float64(overlap.Dx() * overlap.Dy())))
+    if samplePoints < 3 {
+        samplePoints = 3
+    }
+
+    for i := 0; i < samplePoints; i++ {
+        x := randomFloat(float64(overlap.Min.X), float64(overlap.Max.X))
+        y := randomFloat(float64(overlap.Min.Y), float64(overlap.Max.Y))
+
+        if player.Collide(x, y) {
+            return true
+        }
+
+    }
+
+    return false
+}
+
+func (powerup *PowerupHealth) Activate(player *Player, soundManager *SoundManager){
+    if !powerup.activated {
+        player.Health = math.Min(player.MaxHealth, player.Health + 20)
+        powerup.activated = true
+        // soundManager.Play(audioFiles.AudioEnergy)
+    }
+}
+
+func (powerup *PowerupHealth) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager){
+
+    pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup3)
+    if err != nil {
+        log.Printf("Could not load powerup image: %v", err)
+        return
+    }
+
+    width := float64(pic.Bounds().Dx())
+    height := float64(pic.Bounds().Dy())
+
+    // x1 := powerup.x - width / 2
+    // y1 := powerup.y - height / 2
+    options := &ebiten.DrawImageOptions{}
+
+    // translate such that center is at origin
+    options.GeoM.Translate(-width/2, -height/2)
+    options.GeoM.Translate(powerup.x, powerup.y)
+    screen.DrawImage(pic, options)
+
+    shaderOptions := &ebiten.DrawRectShaderOptions{}
+    shaderOptions.GeoM.Translate(-width/2, -height/2)
+    shaderOptions.GeoM.Translate(powerup.x, powerup.y)
+    shaderOptions.Uniforms = make(map[string]interface{})
+    v := uint8(math.Abs(math.Sin(float64(powerup.counter) * 4 * math.Pi / 180.0) / 3) * 255)
+    shaderOptions.Uniforms["Red"] = toFloatArray(color.RGBA{R: v, G: v, B: v, A: 0})
+    shaderOptions.Blend = AlphaBlender
+    shaderOptions.Images[0] = pic
+    bounds := pic.Bounds()
+    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.RedShader, shaderOptions)
+}
+
+func MakePowerupHealth(x float64, y float64) Powerup {
+    return &PowerupHealth{
+        x: x,
+        y: y,
+        velocityX: 0,
+        velocityY: 1.5,
+        activated: false,
+    }
+}
+
+func MakeRandomPowerup(x float64, y float64) Powerup {
+    switch rand.Intn(2) {
+        case 0: return MakePowerupEnergy(x, y)
+        case 1: return MakePowerupHealth(x, y)
+    }
+
+    return nil
+}

@@ -2,10 +2,10 @@
 
 package main
 
-var Red float
+var Red vec4
 
 func Fragment(destPosition vec4, srcPosition vec2, color vec4) vec4 {
-    red := vec4(abs(sin(Red) / 3), 0, 0, 0)
-    return imageSrc0UnsafeAt(srcPosition) + red
+    // red := vec4(abs(sin(Red) / 3), 0, 0, 0)
+    return imageSrc0UnsafeAt(srcPosition) + Red
     // return red.rgba
 }
