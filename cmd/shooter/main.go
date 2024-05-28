@@ -272,6 +272,10 @@ func (player *Player) Damage(amount float64) {
     }
 }
 
+func (player *Player) IsAlive() bool {
+    return player.Health > 0
+}
+
 func (player *Player) Bounds() image.Rectangle {
     bounds := player.rawImage.Bounds()
 
@@ -875,6 +879,8 @@ type Game struct {
     FadeIn int
     FadeOut int
 
+    PlayerDied sync.Once
+
     BossMode bool
     // runs one time when the boss should appear
     DoBoss sync.Once
@@ -998,6 +1004,16 @@ func (game *Game) Update(run *Run) error {
 
     game.Counter += 1
 
+    playerDied := func(){
+        game.SoundManager.Play(audioFiles.AudioExplosion3)
+        game.End.Store(true)
+
+        animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
+        if err == nil {
+            game.Explosions = append(game.Explosions, MakeAnimatedExplosion(game.Player.x, game.Player.y, animation))
+        }
+    }
+
     if game.End.Load() {
         game.DoEnd.Do(func(){
             game.FadeOut = GameFadeOut * 3
@@ -1022,12 +1038,14 @@ func (game *Game) Update(run *Run) error {
 
     game.Background.Update()
 
-    err := game.Player.HandleKeys(game, run)
-    if err != nil {
-        return err
-    }
+    if game.Player.IsAlive() {
+        err := game.Player.HandleKeys(game, run)
+        if err != nil {
+            return err
+        }
 
-    game.Player.Move()
+        game.Player.Move()
+    }
 
     var powerupOut []Powerup
     for _, powerup := range game.Powerups {
@@ -1046,34 +1064,39 @@ func (game *Game) Update(run *Run) error {
         bullets := enemy.Move(game.Player, game.ImageManager)
         game.EnemyBullets = append(game.EnemyBullets, bullets...)
 
-        collideX, collideY, isCollide := enemy.CollidePlayer(game.Player)
+        if game.Player.IsAlive() {
+            collideX, collideY, isCollide := enemy.CollidePlayer(game.Player)
 
-        if isCollide {
-            game.GetCounter("player hit enemy", 30).Do(func(){
-                game.SoundManager.Play(audioFiles.AudioHit1)
-            })
+            if isCollide {
+                game.GetCounter("player hit enemy", 30).Do(func(){
+                    game.SoundManager.Play(audioFiles.AudioHit1)
+                })
 
-            animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit)
-            if err != nil {
-                log.Printf("Could not load hit animation: %v", err)
-            } else {
-                game.Explosions = append(game.Explosions, MakeAnimatedExplosion(collideX, collideY, animation))
-            }
-
-            enemy.Damage(1)
-            game.Player.Damage(1)
-
-            if ! enemy.IsAlive() {
-                game.Player.Score += 1
-                game.Player.Kills += 1
-                game.SoundManager.Play(audioFiles.AudioExplosion3)
-
-                animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
-                if err == nil {
-                    x, y := enemy.Coords()
-                    game.Explosions = append(game.Explosions, MakeAnimatedExplosion(x, y, animation))
+                animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit)
+                if err != nil {
+                    log.Printf("Could not load hit animation: %v", err)
                 } else {
-                    log.Printf("Could not load explosion sheet: %v", err)
+                    game.Explosions = append(game.Explosions, MakeAnimatedExplosion(collideX, collideY, animation))
+                }
+
+                enemy.Damage(1)
+                game.Player.Damage(1)
+                if ! game.Player.IsAlive() {
+                    game.PlayerDied.Do(playerDied)
+                }
+
+                if ! enemy.IsAlive() {
+                    game.Player.Score += 1
+                    game.Player.Kills += 1
+                    game.SoundManager.Play(audioFiles.AudioExplosion3)
+
+                    animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
+                    if err == nil {
+                        x, y := enemy.Coords()
+                        game.Explosions = append(game.Explosions, MakeAnimatedExplosion(x, y, animation))
+                    } else {
+                        log.Printf("Could not load explosion sheet: %v", err)
+                    }
                 }
             }
         }
@@ -1139,10 +1162,13 @@ func (game *Game) Update(run *Run) error {
         for _, bullet := range game.EnemyBullets {
             bullet.Move()
 
-            if game.Player.Collide(bullet.x, bullet.y) {
+            if game.Player.IsAlive() && game.Player.Collide(bullet.x, bullet.y) {
                 game.SoundManager.Play(audioFiles.AudioHit2)
 
                 game.Player.Damage(bullet.Strength)
+                if ! game.Player.IsAlive() {
+                    game.PlayerDied.Do(playerDied)
+                }
 
                 animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit2)
                 if err == nil {
@@ -1229,7 +1255,9 @@ func (game *Game) Draw(screen *ebiten.Image) {
     }
 
     // ebitenutil.DebugPrint(screen, "debugging")
-    game.Player.Draw(screen, game.ShaderManager, game.ImageManager, game.Font)
+    if game.Player.IsAlive() {
+        game.Player.Draw(screen, game.ShaderManager, game.ImageManager, game.Font)
+    }
 
     for _, bullet := range game.Bullets {
         bullet.Draw(screen)
