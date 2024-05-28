@@ -43,6 +43,20 @@ func onScreen(x float64, y float64, margin float64) bool {
     return x > -margin && x < ScreenWidth + margin && y > -margin && y < ScreenHeight + margin
 }
 
+func toFloatArray(color color.Color) []float32 {
+    r, g, b, a := color.RGBA()
+    var max float32 = 65535.0
+    return []float32{float32(r) / max, float32(g) / max, float32(b) / max, float32(a) / max}
+}
+
+func drawCenteredImage(screen *ebiten.Image, pic *ebiten.Image, x float64, y float64){
+    x1 := x - float64(pic.Bounds().Dx()) / 2
+    y1 := y - float64(pic.Bounds().Dy()) / 2
+    options := &ebiten.DrawImageOptions{}
+    options.GeoM.Translate(x1, y1)
+    screen.DrawImage(pic, options)
+}
+
 type Bullet struct {
     x, y float64
     Strength float64
@@ -57,11 +71,7 @@ func (bullet *Bullet) Draw(screen *ebiten.Image) {
     if bullet.animation != nil {
         bullet.animation.Draw(screen, bullet.x, bullet.y)
     } else if bullet.pic != nil {
-        x1 := bullet.x - float64(bullet.pic.Bounds().Dx()) / 2
-        y1 := bullet.y - float64(bullet.pic.Bounds().Dy()) / 2
-        options := &ebiten.DrawImageOptions{}
-        options.GeoM.Translate(x1, y1)
-        screen.DrawImage(bullet.pic, options)
+        drawCenteredImage(screen, bullet.pic, bullet.x, bullet.y)
     }
 }
 
@@ -431,12 +441,12 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         iconX += 30
     }
 
-    energy, _, err := imageManager.LoadImage(gameImages.ImageEnergy)
+    energy, _, err := imageManager.LoadImage(gameImages.ImageEnergyBar)
     if err != nil {
         log.Printf("Could not load energy image: %v", err)
     } else {
         if player.PowerupEnergy > 0 {
-            vector.DrawFilledRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), color.RGBA{R: 0x7e, G: 0x29, B: 0xd6, A: 0xff}, true)
+            vector.DrawFilledRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), PowerupColor, true)
         } else {
 
             options := &ebiten.DrawImageOptions{}
@@ -589,7 +599,7 @@ func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, im
         return image.Image, image.Raw, nil
     }
 
-    if name == gameImages.ImageEnergy {
+    if name == gameImages.ImageEnergyBar {
         raw := manager.CreateEnergyImage()
         converted := ebiten.NewImageFromImage(raw)
         manager.Images[name] = ImagePair{
@@ -785,6 +795,7 @@ type Game struct {
     EnemyBullets []*Bullet
     Font *text.GoTextFaceSource
     Enemies []Enemy
+    Powerups []Powerup
     Explosions []Explosion
     ShaderManager *ShaderManager
     ImageManager *ImageManager
@@ -946,6 +957,19 @@ func (game *Game) Update(run *Run) error {
 
     game.Player.Move()
 
+    var powerupOut []Powerup
+    for _, powerup := range game.Powerups {
+        powerup.Move()
+        if powerup.Collide(game.Player, game.ImageManager) {
+            powerup.Activate(game.Player, game.SoundManager)
+        }
+
+        if powerup.IsAlive() {
+            powerupOut = append(powerupOut, powerup)
+        }
+    }
+    game.Powerups = powerupOut
+
     for _, enemy := range game.Enemies {
         bullets := enemy.Move(game.Player, game.ImageManager)
         game.EnemyBullets = append(game.EnemyBullets, bullets...)
@@ -1004,6 +1028,11 @@ func (game *Game) Update(run *Run) error {
                     if ! enemy.IsAlive() {
                         game.Player.Kills += 1
                         game.SoundManager.Play(audioFiles.AudioExplosion3)
+
+                        // create a powerup every X kills
+                        if game.Player.Kills % 20 == 0 {
+                            game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
+                        }
 
                         animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
                         if err == nil {
@@ -1114,6 +1143,10 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
     for _, enemy := range game.Enemies {
         enemy.Draw(screen, game.ShaderManager)
+    }
+
+    for _, powerup := range game.Powerups {
+        powerup.Draw(screen, game.ImageManager, game.ShaderManager)
     }
 
     for _, explosion := range game.Explosions {
@@ -1304,6 +1337,9 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
         return nil, err
     }
 
+    // for debugging
+    // game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
+
     err = game.PreloadAssets()
     if err != nil {
         cancel()
@@ -1316,7 +1352,7 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
 func main() {
     log.SetFlags(log.Ldate | log.Lshortfile | log.Lmicroseconds)
 
-    profile := true
+    profile := false
 
     if profile {
         cpuProfile, err := os.Create("profile.cpu")
