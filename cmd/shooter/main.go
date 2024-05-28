@@ -57,6 +57,47 @@ func drawCenteredImage(screen *ebiten.Image, pic *ebiten.Image, x float64, y flo
     screen.DrawImage(pic, options)
 }
 
+// generates a bunch of colors between start and end, interpolating linerally
+func linearGradient(start color.Color, end color.Color, steps uint32) chan color.RGBA {
+    out := make(chan color.RGBA)
+
+    go func(){
+        var max int32 = 255
+        var i int32
+
+        r1, g1, b1, a1 := start.RGBA()
+        r2, g2, b2, a2 := end.RGBA()
+
+        for i = 0; i < int32(steps); i++ {
+            r := uint8((int32(r1) + (int32(r2) - int32(r1)) * i / int32(steps)) / max)
+            g := uint8((int32(g1) + (int32(g2) - int32(g1)) * i / int32(steps)) / max)
+            b := uint8((int32(b1) + (int32(b2) - int32(b1)) * i / int32(steps)) / max)
+            a := uint8((int32(a1) + (int32(a2) - int32(a1)) * i / int32(steps)) / max)
+
+            out <- color.RGBA{R: r, G: g, B: b, A: a}
+        }
+        close(out)
+    }()
+
+    return out
+}
+
+func createLinearRectangle(width uint32, height uint32, start color.Color, end color.Color) image.Image {
+    out := image.NewRGBA(image.Rect(0, 0, int(width), int(height)))
+
+    gradient := linearGradient(start, end, height)
+
+    for y := 0; y < int(height); y++ {
+        current := premultiplyAlpha(<-gradient)
+
+        for x := 0; x < out.Bounds().Dx(); x++ {
+            out.Set(x, out.Bounds().Dy() - y - 1, current)
+        }
+    }
+
+    return out
+}
+
 type Bullet struct {
     x, y float64
     Strength float64
@@ -579,19 +620,7 @@ func MakeImageManager() *ImageManager {
 }
 
 func (manager *ImageManager) CreateEnergyImage() image.Image {
-    out := image.NewRGBA(image.Rect(0, 0, 15, 250))
-
-    for y := 0; y < out.Bounds().Dy(); y++ {
-        for x := 0; x < out.Bounds().Dx(); x++ {
-            v := 255 - out.Bounds().Dy() + y
-            if v > 255 {
-                v = 255
-            }
-            out.Set(x, out.Bounds().Dy() - y - 1, premultiplyAlpha(color.RGBA{0, 0, uint8(v), 210}))
-        }
-    }
-
-    return out
+    return createLinearRectangle(15, 250, color.RGBA{R: 0, G: 0, B: 5, A: 210}, color.RGBA{R: 0, G: 0, B: 255, A: 210})
 }
 
 func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, image.Image, error) {
