@@ -253,6 +253,8 @@ type Player struct {
     Guns []Gun
     GunEnergy float64
     MaxEnergy float64
+    Health float64
+    MaxHealth float64
     Score uint64
     Kills uint64
     RedShader *ebiten.Shader
@@ -489,7 +491,6 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         if player.PowerupEnergy > 0 {
             vector.DrawFilledRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), PowerupColor, true)
         } else {
-
             options := &ebiten.DrawImageOptions{}
             useHeight := int(player.GunEnergy / player.MaxEnergy * float64(energy.Bounds().Dy()))
 
@@ -500,6 +501,23 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
             sub := energy.SubImage(image.Rect(0, energy.Bounds().Dy() - int(useHeight), energy.Bounds().Dx(), energy.Bounds().Dy())).(*ebiten.Image)
             screen.DrawImage(sub, options)
         }
+    }
+
+    health, _, err := imageManager.LoadImage(gameImages.ImageHealthBar)
+    if err != nil {
+        log.Printf("Could not load health image: %v", err)
+    } else {
+        options := &ebiten.DrawImageOptions{}
+        useHeight := int(player.Health / player.MaxHealth * float64(health.Bounds().Dy()))
+
+        yVal := 400.0
+
+        options.GeoM.Translate(5, yVal + float64(health.Bounds().Dy()) - float64(useHeight))
+
+        vector.StrokeRect(screen, 5, float32(yVal), float32(health.Bounds().Dx()), float32(health.Bounds().Dy()), 1, premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 200}), true)
+
+        sub := health.SubImage(image.Rect(0, health.Bounds().Dy() - int(useHeight), health.Bounds().Dx(), health.Bounds().Dy())).(*ebiten.Image)
+        screen.DrawImage(sub, options)
     }
 }
 
@@ -591,6 +609,8 @@ func MakePlayer(x, y float64) (*Player, error) {
         // Gun: &DualBasicGun{},
         GunEnergy: 100.0,
         MaxEnergy: 100.0,
+        Health: 100.0,
+        MaxHealth: 100.0,
         Guns: []Gun{
             &BasicGun{enabled: true},
             &DualBasicGun{enabled: false},
@@ -623,6 +643,12 @@ func (manager *ImageManager) CreateEnergyImage() image.Image {
     return createLinearRectangle(15, 250, color.RGBA{R: 0, G: 0, B: 5, A: 210}, color.RGBA{R: 0, G: 0, B: 255, A: 210})
 }
 
+func (manager *ImageManager) CreateHealthImage() image.Image {
+    // #f00f26
+    // #e9f366
+    return createLinearRectangle(15, 250, color.RGBA{R: 0xf0, G: 0x0f, B: 0x26, A: 210}, color.RGBA{R: 0xe9, G: 0xf3, B: 0x66, A: 210})
+}
+
 func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, image.Image, error) {
     if image, ok := manager.Images[name]; ok {
         return image.Image, image.Raw, nil
@@ -630,6 +656,16 @@ func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, im
 
     if name == gameImages.ImageEnergyBar {
         raw := manager.CreateEnergyImage()
+        converted := ebiten.NewImageFromImage(raw)
+        manager.Images[name] = ImagePair{
+            Image: converted,
+            Raw: raw,
+        }
+        return converted, raw, nil
+    }
+
+    if name == gameImages.ImageHealthBar {
+        raw := manager.CreateHealthImage()
         converted := ebiten.NewImageFromImage(raw)
         manager.Images[name] = ImagePair{
             Image: converted,
