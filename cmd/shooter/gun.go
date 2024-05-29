@@ -85,7 +85,7 @@ func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) (
             x: x,
             y: y,
             Strength: 1,
-            alive: true,
+            health: 1,
             velocityX: 0,
             velocityY: velocityY,
             pic: pic,
@@ -146,7 +146,7 @@ func (dual *DualBasicGun) Shoot(imageManager *ImageManager, x float64, y float64
             x: x - 10,
             y: y,
             Strength: 1,
-            alive: true,
+            health: 1,
             velocityX: 0,
             velocityY: velocityY,
             pic: pic,
@@ -185,7 +185,7 @@ func (beam *BeamGun) SetEnabled(enabled bool) {
 }
 
 func (beam *BeamGun) Rate() float64 {
-    return 4
+    return 3.5
 }
 
 func (beam *BeamGun) DoSound(soundManager *SoundManager) {
@@ -210,7 +210,7 @@ func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]
             x: x,
             y: y,
             Strength: 2,
-            alive: true,
+            health: 3,
             velocityX: 0,
             velocityY: velocityY,
             animation: animation,
@@ -272,7 +272,7 @@ func (missle *MissleGun) Shoot(imageManager *ImageManager, x float64, y float64)
             x: x,
             y: y,
             Strength: 10,
-            alive: true,
+            health: 1,
             velocityX: 0,
             velocityY: velocityY,
             pic: pic,

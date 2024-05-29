@@ -144,7 +144,7 @@ func (gun *EnemyGun1) Shoot(x float64, y float64, player *Player, imageManager *
                 velocityY: 1.5,
                 pic: nil,
                 animation: bulletPic,
-                alive: true,
+                health: 1,
             }
 
             return []*Bullet{&bullet}
@@ -176,7 +176,7 @@ func (gun *EnemyGun2) Shoot(x float64, y float64, player *Player, imageManager *
                 velocityY: math.Sin(angleToPlayer) * speed,
                 pic: bulletPic,
                 animation: nil,
-                alive: true,
+                health: 1,
             }
 
             return []*Bullet{&bullet}
@@ -477,7 +477,7 @@ func (gun *BossGunNormal) Shoot(x float64, y float64, player *Player, imageManag
             velocityY: 1.5,
             pic: nil,
             animation: bulletPic,
-            alive: true,
+            health: 1,
         }
 
         return []*Bullet{&bullet}
@@ -505,7 +505,7 @@ func (gun *BossGunAim) Shoot(x float64, y float64, player *Player, imageManager 
             velocityY: math.Sin(angleToPlayer) * speed,
             pic: bulletPic,
             animation: nil,
-            alive: true,
+            health: 1,
         }
 
         return []*Bullet{&bullet}

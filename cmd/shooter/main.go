@@ -104,7 +104,11 @@ type Bullet struct {
     velocityX, velocityY float64
     pic *ebiten.Image
     animation *Animation
-    alive bool
+    health int
+}
+
+func (bullet *Bullet) Damage(amount int) {
+    bullet.health -= amount
 }
 
 func (bullet *Bullet) Draw(screen *ebiten.Image) {
@@ -125,12 +129,8 @@ func (bullet *Bullet) Move(){
     }
 }
 
-func (bullet *Bullet) SetDead() {
-    bullet.alive = false
-}
-
 func (bullet *Bullet) IsAlive() bool {
-    return bullet.alive && onScreen(bullet.x, bullet.y, 10)
+    return bullet.health > 0 && onScreen(bullet.x, bullet.y, 10)
 }
 
 type StarPosition struct {
@@ -1128,6 +1128,7 @@ func (game *Game) Update(run *Run) error {
                 if enemy.IsAlive() && enemy.Collision(bullet.x, bullet.y) {
                     game.Player.Score += 1
                     enemy.Hit(bullet)
+                    bullet.Damage(1)
                     if ! enemy.IsAlive() {
                         game.Player.Kills += 1
                         game.SoundManager.Play(audioFiles.AudioExplosion3)
@@ -1145,7 +1146,6 @@ func (game *Game) Update(run *Run) error {
                             log.Printf("Could not load explosion sheet: %v", err)
                         }
                     }
-                    bullet.SetDead()
 
                     game.SoundManager.Play(audioFiles.AudioHit1)
 
@@ -1184,7 +1184,7 @@ func (game *Game) Update(run *Run) error {
                     log.Printf("Could not load explosion sheet: %v", err)
                 }
 
-                bullet.SetDead()
+                bullet.Damage(1)
             }
 
             if bullet.IsAlive() {
