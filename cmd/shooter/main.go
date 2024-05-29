@@ -468,14 +468,20 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         screen.DrawImage(player.pic, options)
     }
 
-    options = &ebiten.DrawRectShaderOptions{}
-    options.GeoM.Translate(playerX, playerY)
-    options.Blend = AlphaBlender
-    options.Images[0] = player.pic
-    options.Uniforms = make(map[string]interface{})
-    options.Uniforms["Color"] = []float32{0, 0, float32((math.Sin(float64(player.Counter) * 7 * math.Pi / 180.0) + 1) / 2), 1}
-    // options.Uniforms["Color"] = []float32{0, 0, 1, 1}
-    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.EdgeShader, options)
+    if player.PowerupEnergy > 0 {
+        options = &ebiten.DrawRectShaderOptions{}
+        options.GeoM.Translate(playerX, playerY)
+        options.Blend = AlphaBlender
+        options.Images[0] = player.pic
+        options.Uniforms = make(map[string]interface{})
+        // options.Uniforms["Color"] = []float32{0, 0, float32((math.Sin(float64(player.Counter) * 7 * math.Pi / 180.0) + 1) / 2), 1}
+        alpha := float32((math.Sin(float64(player.PowerupEnergy) * 7 * math.Pi / 180.0) + 1) / 2)
+        r, g, b, _ := PowerupColor.RGBA()
+        useColor := color.RGBA{R: uint8(r / 255), G: uint8(g / 255), B: uint8(b / 255), A: uint8(255.0 * alpha)}
+        options.Uniforms["Color"] = toFloatArray(useColor)
+        // options.Uniforms["Color"] = []float32{0, 0, 1, 1}
+        screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.EdgeShader, options)
+    }
 
     gunFace := &text.GoTextFace{Source: font, Size: 10}
 
@@ -1444,7 +1450,7 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
     }
 
     // for debugging
-    game.Powerups = append(game.Powerups, MakePowerupHealth(randomFloat(10, ScreenWidth-10), -20))
+    // game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
 
     err = game.PreloadAssets()
     if err != nil {
