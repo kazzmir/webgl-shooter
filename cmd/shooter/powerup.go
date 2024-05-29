@@ -13,6 +13,37 @@ import (
     "github.com/hajimehoshi/ebiten/v2"
 )
 
+type Collidable interface {
+    Bounds() image.Rectangle
+    Collide(x float64, y float64) bool
+}
+
+func isColliding(from image.Rectangle, collidable Collidable) bool {
+    playerBounds := collidable.Bounds()
+
+    overlap := from.Intersect(playerBounds)
+    if overlap.Empty() {
+        return false
+    }
+
+    samplePoints := int(math.Sqrt(float64(overlap.Dx() * overlap.Dy())))
+    if samplePoints < 3 {
+        samplePoints = 3
+    }
+
+    for i := 0; i < samplePoints; i++ {
+        x := randomFloat(float64(overlap.Min.X), float64(overlap.Max.X))
+        y := randomFloat(float64(overlap.Min.Y), float64(overlap.Max.Y))
+
+        if collidable.Collide(x, y) {
+            return true
+        }
+
+    }
+
+    return false
+}
+
 type Powerup interface {
     Move()
     Collide(player *Player, imageManager *ImageManager) bool
@@ -109,34 +140,12 @@ func (powerup *PowerupEnergy) Collide(player *Player, imageManager *ImageManager
         return false
     }
 
-    x1 := powerup.x - float64(pic.Bounds().Dx())/2
-    y1 := powerup.y - float64(pic.Bounds().Dy())/2
-    x2 := x1 + float64(pic.Bounds().Dx())
-    y2 := y1 + float64(pic.Bounds().Dy())
-    bounds := image.Rect(int(x1), int(y1), int(x2), int(y2))
-    playerBounds := player.Bounds()
-
-    overlap := bounds.Intersect(playerBounds)
-    if overlap.Empty() {
-        return false
+    translate := image.Point{
+        X: int(powerup.x - float64(pic.Bounds().Dx())/2),
+        Y: int(powerup.y - float64(pic.Bounds().Dy())/2),
     }
-
-    samplePoints := int(math.Sqrt(float64(overlap.Dx() * overlap.Dy())))
-    if samplePoints < 3 {
-        samplePoints = 3
-    }
-
-    for i := 0; i < samplePoints; i++ {
-        x := randomFloat(float64(overlap.Min.X), float64(overlap.Max.X))
-        y := randomFloat(float64(overlap.Min.Y), float64(overlap.Max.Y))
-
-        if player.Collide(x, y) {
-            return true
-        }
-
-    }
-
-    return false
+    bounds := pic.Bounds().Add(translate)
+    return isColliding(bounds, player)
 }
 
 type PowerupHealth struct {
@@ -163,34 +172,12 @@ func (powerup *PowerupHealth) Collide(player *Player, imageManager *ImageManager
         return false
     }
 
-    x1 := powerup.x - float64(pic.Bounds().Dx())/2
-    y1 := powerup.y - float64(pic.Bounds().Dy())/2
-    x2 := x1 + float64(pic.Bounds().Dx())
-    y2 := y1 + float64(pic.Bounds().Dy())
-    bounds := image.Rect(int(x1), int(y1), int(x2), int(y2))
-    playerBounds := player.Bounds()
-
-    overlap := bounds.Intersect(playerBounds)
-    if overlap.Empty() {
-        return false
+    translate := image.Point{
+        X: int(powerup.x - float64(pic.Bounds().Dx())/2),
+        Y: int(powerup.y - float64(pic.Bounds().Dy())/2),
     }
-
-    samplePoints := int(math.Sqrt(float64(overlap.Dx() * overlap.Dy())))
-    if samplePoints < 3 {
-        samplePoints = 3
-    }
-
-    for i := 0; i < samplePoints; i++ {
-        x := randomFloat(float64(overlap.Min.X), float64(overlap.Max.X))
-        y := randomFloat(float64(overlap.Min.Y), float64(overlap.Max.Y))
-
-        if player.Collide(x, y) {
-            return true
-        }
-
-    }
-
-    return false
+    bounds := pic.Bounds().Add(translate)
+    return isColliding(bounds, player)
 }
 
 func (powerup *PowerupHealth) Activate(player *Player, soundManager *SoundManager){
