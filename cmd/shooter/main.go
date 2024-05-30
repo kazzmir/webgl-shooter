@@ -294,7 +294,7 @@ func (player *Player) Collide(x float64, y float64) bool {
         cy := int(y) - bounds.Min.Y
         c := player.rawImage.At(cx, cy)
         _, _, _, a := c.RGBA()
-        if a > 200 {
+        if a > 200 * 255 {
             return true
         }
     }
@@ -877,6 +877,7 @@ type Game struct {
     Bullets []*Bullet
     EnemyBullets []*Bullet
     Font *text.GoTextFaceSource
+    Asteroids []*Asteroid
     Enemies []Enemy
     Powerups []Powerup
     Explosions []Explosion
@@ -1054,6 +1055,26 @@ func (game *Game) Update(run *Run) error {
         game.Player.Move()
     }
 
+    for _, asteroid := range game.Asteroids {
+        asteroid.Move()
+        if asteroid.Collide(game.Player, game.ImageManager) {
+            game.Player.Damage(1)
+            asteroid.Damage(1)
+
+            if ! game.Player.IsAlive() {
+                game.PlayerDied.Do(playerDied)
+            }
+
+            if !asteroid.IsAlive() {
+                game.SoundManager.Play(audioFiles.AudioExplosion3)
+                animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
+                if err == nil {
+                    game.Explosions = append(game.Explosions, MakeAnimatedExplosion(asteroid.x, asteroid.y, animation))
+                }
+            }
+        }
+    }
+
     var powerupOut []Powerup
     for _, powerup := range game.Powerups {
         powerup.Move()
@@ -1124,28 +1145,11 @@ func (game *Game) Update(run *Run) error {
         for _, bullet := range game.Bullets {
             bullet.Move()
 
-            for _, enemy := range game.Enemies {
-                if enemy.IsAlive() && enemy.Collision(bullet.x, bullet.y) {
+            for _, asteroid := range game.Asteroids {
+                if asteroid.IsAlive() && asteroid.Collision(bullet.x, bullet.y, game.ImageManager) {
+                    asteroid.Damage(bullet.Strength)
                     game.Player.Score += 1
-                    enemy.Hit(bullet)
                     bullet.Damage(1)
-                    if ! enemy.IsAlive() {
-                        game.Player.Kills += 1
-                        game.SoundManager.Play(audioFiles.AudioExplosion3)
-
-                        // create a powerup every X kills
-                        if game.Player.Kills % 20 == 0 {
-                            game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, ScreenWidth-10), -20))
-                        }
-
-                        animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
-                        if err == nil {
-                            x, y := enemy.Coords()
-                            game.Explosions = append(game.Explosions, MakeAnimatedExplosion(x, y, animation))
-                        } else {
-                            log.Printf("Could not load explosion sheet: %v", err)
-                        }
-                    }
 
                     game.SoundManager.Play(audioFiles.AudioHit1)
 
@@ -1155,7 +1159,52 @@ func (game *Game) Update(run *Run) error {
                     } else {
                         game.Explosions = append(game.Explosions, MakeAnimatedExplosion(bullet.x, bullet.y, animation))
                     }
-                    break
+
+                    if ! asteroid.IsAlive() {
+                        game.SoundManager.Play(audioFiles.AudioExplosion3)
+                        animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
+                        if err == nil {
+                            game.Explosions = append(game.Explosions, MakeAnimatedExplosion(asteroid.x, asteroid.y, animation))
+                        }
+                        break
+                    }
+                }
+            }
+
+            if bullet.IsAlive() {
+                for _, enemy := range game.Enemies {
+                    if enemy.IsAlive() && enemy.Collision(bullet.x, bullet.y) {
+                        game.Player.Score += 1
+                        enemy.Hit(bullet)
+                        bullet.Damage(1)
+                        if ! enemy.IsAlive() {
+                            game.Player.Kills += 1
+                            game.SoundManager.Play(audioFiles.AudioExplosion3)
+
+                            // create a powerup every X kills
+                            if game.Player.Kills % 20 == 0 {
+                                game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, ScreenWidth-10), -20))
+                            }
+
+                            animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
+                            if err == nil {
+                                x, y := enemy.Coords()
+                                game.Explosions = append(game.Explosions, MakeAnimatedExplosion(x, y, animation))
+                            } else {
+                                log.Printf("Could not load explosion sheet: %v", err)
+                            }
+                        }
+
+                        game.SoundManager.Play(audioFiles.AudioHit1)
+
+                        animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit)
+                        if err != nil {
+                            log.Printf("Could not load hit animation: %v", err)
+                        } else {
+                            game.Explosions = append(game.Explosions, MakeAnimatedExplosion(bullet.x, bullet.y, animation))
+                        }
+                        break
+                    }
                 }
             }
 
@@ -1202,9 +1251,21 @@ func (game *Game) Update(run *Run) error {
     }
     game.Enemies = enemyOut
 
+    asteroidOut := make([]*Asteroid, 0)
+    for _, asteroid := range game.Asteroids {
+        if asteroid.IsAlive() {
+            asteroidOut = append(asteroidOut, asteroid)
+        }
+    }
+    game.Asteroids = asteroidOut
+
     if !game.BossMode && !game.End.Load(){
         if len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.Intn(100) == 0) {
             game.MakeEnemies(1)
+        }
+
+        if len(game.Asteroids) < 15 && rand.Intn(200) == 0 {
+            game.Asteroids = append(game.Asteroids, MakeAsteroid(randomFloat(-50, ScreenWidth + 50), -50))
         }
 
         // create the boss after 2 minutes
@@ -1259,6 +1320,10 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
     for _, explosion := range game.Explosions {
         explosion.Draw(screen, game.ShaderManager)
+    }
+
+    for _, asteroid := range game.Asteroids {
+        asteroid.Draw(screen, game.ImageManager, game.ShaderManager)
     }
 
     // ebitenutil.DebugPrint(screen, "debugging")

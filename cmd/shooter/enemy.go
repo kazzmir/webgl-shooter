@@ -302,7 +302,7 @@ func (enemy* NormalEnemy) Collision(x float64, y float64) bool {
 
     if x >= enemyX && x <= enemyX + float64(bounds.Dx()) && y >= enemyY && y <= enemyY + float64(bounds.Dy()) {
         _, _, _, a := enemy.rawImage.At(int(x - enemyX), int(y - enemyY)).RGBA()
-        return a > 200
+        return a > 200 * 255
     }
 
     return false
