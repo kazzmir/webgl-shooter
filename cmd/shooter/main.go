@@ -302,6 +302,14 @@ func (player *Player) Collide(x float64, y float64) bool {
     return false
 }
 
+func (player *Player) EnableNextGun(){
+    switch len(player.Guns) {
+        case 1: player.Guns = append(player.Guns, &DualBasicGun{enabled: true})
+        case 2: player.Guns = append(player.Guns, &BeamGun{enabled: true})
+        case 3: player.Guns = append(player.Guns, &MissleGun{enabled: true})
+    }
+}
+
 func (player *Player) Move() {
     player.Counter += 1
 
@@ -631,9 +639,9 @@ func MakePlayer(x, y float64) (*Player, error) {
         MaxHealth: 100.0,
         Guns: []Gun{
             &BasicGun{enabled: true},
-            &DualBasicGun{enabled: false},
-            &BeamGun{enabled: false},
-            &MissleGun{enabled: false},
+            // &DualBasicGun{enabled: false},
+            // &BeamGun{enabled: false},
+            // &MissleGun{enabled: false},
         },
         // Gun: &BeamGun{},
         Jump: -50,
@@ -1515,7 +1523,7 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
     }
 
     // for debugging
-    // game.Powerups = append(game.Powerups, MakePowerupEnergy(randomFloat(10, ScreenWidth-10), -20))
+    // game.Powerups = append(game.Powerups, MakePowerupWeapon(randomFloat(10, ScreenWidth-10), -20))
 
     err = game.PreloadAssets()
     if err != nil {
