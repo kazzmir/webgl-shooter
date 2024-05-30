@@ -1267,6 +1267,10 @@ func (game *Game) Update(run *Run) error {
     }
     game.Asteroids = asteroidOut
 
+    if rand.Intn(6000) == 0 {
+        game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, ScreenWidth-10), -20))
+    }
+
     if !game.BossMode && !game.End.Load(){
         if len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.Intn(100) == 0) {
             game.MakeEnemies(1)
@@ -1516,14 +1520,14 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
         Cancel: cancel,
     }
 
-    err = game.MakeEnemies(5)
+    err = game.MakeEnemies(2)
     if err != nil {
         cancel()
         return nil, err
     }
 
     // for debugging
-    // game.Powerups = append(game.Powerups, MakePowerupWeapon(randomFloat(10, ScreenWidth-10), -20))
+    // Energygame.Powerups = append(game.Powerups, MakePowerupWeapon(randomFloat(10, ScreenWidth-10), -20))
 
     err = game.PreloadAssets()
     if err != nil {
