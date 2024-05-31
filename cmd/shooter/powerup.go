@@ -13,6 +13,18 @@ import (
     "github.com/hajimehoshi/ebiten/v2"
 )
 
+func drawCenter(screen *ebiten.Image, img *ebiten.Image, x float64, y float64) {
+    width := float64(img.Bounds().Dx())
+    height := float64(img.Bounds().Dy())
+
+    options := &ebiten.DrawImageOptions{}
+
+    // translate such that center is at origin
+    options.GeoM.Translate(-width/2, -height/2)
+    options.GeoM.Translate(x, y)
+    screen.DrawImage(img, options)
+}
+
 type Collidable interface {
     Bounds() image.Rectangle
     Collide(x float64, y float64) bool
@@ -278,6 +290,14 @@ func (powerup *PowerupWeapon) Draw(screen *ebiten.Image, imageManager *ImageMana
         log.Printf("Could not load powerup image: %v", err)
         return
     }
+
+    blurred, err := imageManager.BlurImage(gameImages.ImagePowerup4, 1.2, 2, color.RGBA{R: 255, G: 255, B: 0, A: 255})
+    if err != nil {
+        log.Printf("Unable to create blur: %v", err)
+        return
+    }
+
+    drawCenter(screen, blurred, powerup.x, powerup.y)
 
     width := float64(pic.Bounds().Dx())
     height := float64(pic.Bounds().Dy())

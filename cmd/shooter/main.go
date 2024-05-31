@@ -23,6 +23,7 @@ import (
     gameImages "github.com/kazzmir/webgl-shooter/images"
     fontLib "github.com/kazzmir/webgl-shooter/font"
     audioFiles "github.com/kazzmir/webgl-shooter/audio"
+    blurLib "github.com/kazzmir/webgl-shooter/lib/blur"
 
     "github.com/hajimehoshi/ebiten/v2"
     _ "github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -673,6 +674,29 @@ func (manager *ImageManager) CreateHealthImage() image.Image {
     // #f00f26
     // #e9f366
     return createLinearRectangle(15, 250, color.RGBA{R: 0xf0, G: 0x0f, B: 0x26, A: 210}, color.RGBA{R: 0xe9, G: 0xf3, B: 0x66, A: 210})
+}
+
+func (manager *ImageManager) BlurImage(name gameImages.Image, factor float64, blur int, blurColor color.Color) (*ebiten.Image, error) {
+
+    blurName := name + "-blur"
+
+    if image, ok := manager.Images[blurName]; ok {
+        return image.Image, nil
+    }
+
+    _, raw, err := manager.LoadImage(name)
+    if err != nil {
+        return nil, err
+    }
+
+    blurred := blurLib.MakeBlur(raw, factor, blur, blurColor)
+    converted := ebiten.NewImageFromImage(blurred)
+    manager.Images[blurName] = ImagePair{
+        Image: converted,
+        Raw: blurred,
+    }
+
+    return converted, nil
 }
 
 func (manager *ImageManager) LoadImage(name gameImages.Image) (*ebiten.Image, image.Image, error) {
@@ -1527,7 +1551,7 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
     }
 
     // for debugging
-    // Energygame.Powerups = append(game.Powerups, MakePowerupWeapon(randomFloat(10, ScreenWidth-10), -20))
+    game.Powerups = append(game.Powerups, MakePowerupWeapon(randomFloat(10, ScreenWidth-10), -20))
 
     err = game.PreloadAssets()
     if err != nil {
