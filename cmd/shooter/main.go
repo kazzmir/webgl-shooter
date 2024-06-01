@@ -919,6 +919,8 @@ type Game struct {
     FadeIn int
     FadeOut int
 
+    ShakeTime uint64
+
     PlayerDied sync.Once
 
     BossMode bool
@@ -1041,11 +1043,28 @@ func (game *Game) UpdateCounters() {
     }
 }
 
+func (game *Game) Shake() {
+    game.ShakeTime = 10
+}
+
+func (game *Game) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
+    if game.ShakeTime > 0 {
+        geoM.Translate(randomFloat(-4, 4), randomFloat(-4, 4))
+    }
+
+    screen.DrawImage(offscreen, &ebiten.DrawImageOptions{
+        GeoM: geoM,
+    })
+}
+
 func (game *Game) Update(run *Run) error {
 
     game.UpdateCounters()
 
     game.Counter += 1
+    if game.ShakeTime > 0 {
+        game.ShakeTime -= 1
+    }
 
     playerDied := func(){
         game.SoundManager.Play(audioFiles.AudioExplosion3)
@@ -1101,6 +1120,8 @@ func (game *Game) Update(run *Run) error {
             }
 
             if !asteroid.IsAlive() {
+                game.Shake()
+
                 game.SoundManager.Play(audioFiles.AudioExplosion3)
                 animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
                 if err == nil {
@@ -1196,6 +1217,7 @@ func (game *Game) Update(run *Run) error {
                     }
 
                     if ! asteroid.IsAlive() {
+                        game.Shake()
                         game.SoundManager.Play(audioFiles.AudioExplosion3)
                         animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
                         if err == nil {
@@ -1213,6 +1235,7 @@ func (game *Game) Update(run *Run) error {
                         enemy.Hit(bullet)
                         bullet.Damage(1)
                         if ! enemy.IsAlive() {
+                            game.Shake()
                             game.Player.Kills += 1
                             game.SoundManager.Play(audioFiles.AudioExplosion3)
 
@@ -1431,6 +1454,16 @@ type Run struct {
     Quit context.Context
     Cancel context.CancelFunc
     Volume float64
+}
+
+func (run *Run) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
+    if run.Game != nil {
+        run.Game.DrawFinalScreen(screen, offscreen, geoM)
+    } else {
+        screen.DrawImage(offscreen, &ebiten.DrawImageOptions{
+            GeoM: geoM,
+        })
+    }
 }
 
 func (run *Run) GetVolume() float64 {
