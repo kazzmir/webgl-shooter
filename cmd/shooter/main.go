@@ -1036,6 +1036,9 @@ func (game *Game) MakeEnemies(count int) error {
 var LevelEnd error = errors.New("end of level")
 
 func (game *Game) UpdateCounters() {
+    for _, counter := range game.Counters {
+        counter.Update()
+    }
 }
 
 func (game *Game) Update(run *Run) error {
