@@ -1128,8 +1128,8 @@ func (game *Game) Update(run *Run) error {
     for _, asteroid := range game.Asteroids {
         asteroid.Move()
         if asteroid.Collide(game.Player, game.ImageManager) {
-            game.Player.Damage(1)
-            asteroid.Damage(1)
+            game.Player.Damage(2)
+            asteroid.Damage(2)
 
             if ! game.Player.IsAlive() {
                 game.PlayerDied.Do(playerDied)
@@ -1179,8 +1179,8 @@ func (game *Game) Update(run *Run) error {
                     game.Explosions = append(game.Explosions, MakeAnimatedExplosion(collideX, collideY, animation))
                 }
 
-                enemy.Damage(1)
-                game.Player.Damage(1)
+                enemy.Damage(2)
+                game.Player.Damage(2)
                 if ! game.Player.IsAlive() {
                     game.PlayerDied.Do(playerDied)
                 }
