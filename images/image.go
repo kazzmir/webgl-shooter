@@ -26,6 +26,7 @@ const ImageHealthBar = Image("health")
 const ImageBoss1 = Image("boss1")
 const ImageExplosion1 = Image("explosion1")
 const ImageExplosion2 = Image("explosion2")
+const ImageExplosion3 = Image("explosion3")
 const ImageHit = Image("hit")
 const ImageHit2 = Image("hit2")
 const ImageBeam1 = Image("beam1")
@@ -84,6 +85,9 @@ var explosion1Image []byte
 //go:embed misc/explosion2-anim.png
 var explosion2Animation []byte
 
+//go:embed misc/explosion3-anim.png
+var explosion3Animation []byte
+
 //go:embed bullet/fire1-anim.png
 var fire1Animation []byte
 
@@ -140,6 +144,7 @@ func LoadImage(name Image) (image.Image, error) {
         case ImageBoss1: return loadPng(boss1Image)
         case ImageExplosion1: return loadPng(explosion1Image)
         case ImageExplosion2: return loadPng(explosion2Animation)
+        case ImageExplosion3: return loadPng(explosion3Animation)
         case ImageHit: return loadPng(hitImage)
         case ImageBeam1: return loadPng(beam1Image)
         case ImageWave1: return loadPng(wave1Image)

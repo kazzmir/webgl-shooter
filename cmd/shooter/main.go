@@ -761,6 +761,7 @@ func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, e
 
     switch name {
         case gameImages.ImageExplosion2: return NewAnimation(loaded, 5, 6, 1.5, false), nil
+        case gameImages.ImageExplosion3: return NewAnimation(loaded, 4, 5, 0.9, false), nil
         case gameImages.ImageHit: return NewAnimation(loaded, 5, 6, 1.5, false), nil
         case gameImages.ImageHit2: return NewAnimation(loaded, 5, 6, 1.5, false), nil
         case gameImages.ImageBeam1:
@@ -1138,7 +1139,7 @@ func (game *Game) Update(run *Run) error {
                 game.Shake()
 
                 game.SoundManager.Play(audioFiles.AudioExplosion3)
-                animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
+                animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion3)
                 if err == nil {
                     game.Explosions = append(game.Explosions, MakeAnimatedExplosion(asteroid.x, asteroid.y, animation))
                 }
@@ -1234,7 +1235,7 @@ func (game *Game) Update(run *Run) error {
                     if ! asteroid.IsAlive() {
                         game.Shake()
                         game.SoundManager.Play(audioFiles.AudioExplosion3)
-                        animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
+                        animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion3)
                         if err == nil {
                             game.Explosions = append(game.Explosions, MakeAnimatedExplosion(asteroid.x, asteroid.y, animation))
                         }
