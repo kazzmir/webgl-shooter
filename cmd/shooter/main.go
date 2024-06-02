@@ -768,6 +768,7 @@ func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, e
         case gameImages.ImageWave1:
             return NewAnimationCoordinates(loaded, 1, 3, 0.10, []SheetCoordinate{{0, 0}, {1, 0}, {2, 0}, {1, 0}}, true), nil
         case gameImages.ImageRotate1: return NewAnimation(loaded, 2, 2, 0.14, true), nil
+        case gameImages.ImageFire1: return NewAnimation(loaded, 5, 6, 0.7, true), nil
     }
 
     return nil, fmt.Errorf("No such animation %v", name)
@@ -1425,13 +1426,6 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
     // vector.StrokeRect(screen, 0, 0, 100, 100, 3, &color.RGBA{R: 255, G: 0, B: 0, A: 128}, true)
     // vector.DrawFilledRect(screen, 0, 0, 100, 100, &color.RGBA{R: 255, G: 0, B: 0, A: 64}, true)
-
-    /*
-    op := &text.DrawOptions{}
-    op.GeoM.Translate(1, 1)
-    op.ColorScale.ScaleWithColor(color.White)
-    text.Draw(screen, "Hello, World!", &text.GoTextFace{Source: game.Font, Size: 15}, op)
-    */
 }
 
 func (game *Game) PreloadAssets() error {
