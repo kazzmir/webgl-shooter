@@ -6,7 +6,9 @@ import (
 
     _ "log"
 
+    "image"
     "image/color"
+    "image/draw"
 
     "github.com/hajimehoshi/ebiten/v2"
     "github.com/hajimehoshi/ebiten/v2/vector"
@@ -50,9 +52,26 @@ func (basic *BasicGun) Rate() float64 {
     return 10
 }
 
-func drawGunBox(screen *ebiten.Image, x float64, y float64, color_ color.Color) {
+func drawGunBox(screen *ebiten.Image, x float64, y float64, color_ color.Color, icon *ebiten.Image) {
     size := 20
     vector.StrokeRect(screen, float32(x), float32(y), float32(size), float32(size), 2, color_, true)
+
+    padding := 4
+
+    if icon != nil {
+        bounds := icon.Bounds()
+
+        scaleX := float64(size-padding) / float64(bounds.Dx())
+        scaleY := float64(size-padding) / float64(bounds.Dy())
+
+        where := screen.SubImage(image.Rect(int(x), int(y), int(x)+size, int(y)+size)).(*ebiten.Image)
+
+        var options ebiten.DrawImageOptions
+        options.GeoM.Scale(scaleX, scaleY)
+        options.GeoM.Translate(x+float64(padding)/2, y+float64(padding)/2)
+
+        where.DrawImage(icon, &options)
+    }
 }
 
 func iconColor(enabled bool) color.Color {
@@ -64,7 +83,12 @@ func iconColor(enabled bool) color.Color {
 }
 
 func (basic *BasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64) {
-    drawGunBox(screen, x, y, iconColor(basic.enabled))
+    pic, _, err := imageManager.LoadImage(gameImages.ImageBullet)
+    if err != nil {
+        pic = nil
+    }
+
+    drawGunBox(screen, x, y, iconColor(basic.enabled), pic)
 }
 
 func (basic *BasicGun) DoSound(soundManager *SoundManager) {
@@ -100,6 +124,7 @@ func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) (
 type DualBasicGun struct {
     enabled bool
     counter int
+    icon *ebiten.Image
 }
 
 func (dual *DualBasicGun) Update() {
@@ -125,7 +150,36 @@ func (dual *DualBasicGun) Rate() float64 {
 }
 
 func (dual *DualBasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64) {
-    drawGunBox(screen, x, y, iconColor(dual.enabled))
+    if dual.icon == nil {
+        _, bullet, err := imageManager.LoadImage(gameImages.ImageBullet)
+        if err == nil {
+            icon := image.NewRGBA(image.Rect(0, 0, bullet.Bounds().Dx() * 2 + 5, bullet.Bounds().Dy()))
+            /*
+            for x := 0; x < icon.Bounds().Dx(); x++ {
+                icon.Set(x, 0, color.RGBA{R: 0, G: 255, B: 0, A: 255})
+                icon.Set(x, icon.Bounds().Dy()-1, color.RGBA{R: 0, G: 255, B: 0, A: 255})
+            }
+
+            for y := 0; y < icon.Bounds().Dy(); y++ {
+                icon.Set(0, y, color.RGBA{R: 0, G: 255, B: 0, A: 255})
+                icon.Set(icon.Bounds().Dx()-1, y, color.RGBA{R: 0, G: 255, B: 0, A: 255})
+            }
+            */
+
+            // draw.Draw(icon, icon.Bounds(), bullet, image.Point{X: 0, Y: 0}, draw.Src)
+            draw.Draw(icon, icon.Bounds(), bullet, image.Point{X: 0, Y: 0}, draw.Src)
+            draw.Draw(icon, icon.Bounds().Add(image.Point{X: bullet.Bounds().Dx() + 2, Y: 0}), bullet, image.Point{X: 0, Y: 0}, draw.Src)
+            dual.icon = ebiten.NewImageFromImage(icon)
+        }
+    }
+
+    /*
+    var options ebiten.DrawImageOptions
+    options.GeoM.Translate(100, 100)
+    screen.DrawImage(dual.icon, &options)
+    */
+
+    drawGunBox(screen, x, y, iconColor(dual.enabled), dual.icon)
 }
 
 func (dual *DualBasicGun) DoSound(soundManager *SoundManager) {
@@ -193,7 +247,13 @@ func (beam *BeamGun) DoSound(soundManager *SoundManager) {
 }
 
 func (beam *BeamGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64) {
-    drawGunBox(screen, x, y, iconColor(beam.enabled))
+    var pic *ebiten.Image
+    animation, err := imageManager.LoadAnimation(gameImages.ImageBeam1)
+    if err == nil {
+        pic = animation.GetFrame(0)
+    }
+
+    drawGunBox(screen, x, y, iconColor(beam.enabled), pic)
 }
 
 func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
@@ -255,7 +315,11 @@ func (missle *MissleGun) DoSound(soundManager *SoundManager) {
 }
 
 func (missle *MissleGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64) {
-    drawGunBox(screen, x, y, iconColor(missle.enabled))
+    pic, _, err := imageManager.LoadImage(gameImages.ImageMissle1)
+    if err != nil {
+        pic = nil
+    }
+    drawGunBox(screen, x, y, iconColor(missle.enabled), pic)
 }
 
 func (missle *MissleGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {

@@ -303,11 +303,27 @@ func (player *Player) Collide(x float64, y float64) bool {
     return false
 }
 
+func sameType(a interface{}, b interface{}) bool {
+    return fmt.Sprintf("%T", a) == fmt.Sprintf("%T", b)
+}
+
+func haveGun(guns []Gun, gun Gun) bool {
+    for _, g := range guns {
+        if sameType(g, gun){
+            return true
+        }
+    }
+
+    return false
+}
+
 func (player *Player) EnableNextGun(){
-    switch len(player.Guns) {
-        case 1: player.Guns = append(player.Guns, &DualBasicGun{enabled: true})
-        case 2: player.Guns = append(player.Guns, &BeamGun{enabled: true})
-        case 3: player.Guns = append(player.Guns, &MissleGun{enabled: true})
+    guns := []Gun{&DualBasicGun{enabled: true}, &BeamGun{enabled: true}, &MissleGun{enabled: true}}
+    for _, gun := range guns {
+        if !haveGun(player.Guns, gun) {
+            player.Guns = append(player.Guns, gun)
+            return
+        }
     }
 }
 
@@ -500,7 +516,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         gun.DrawIcon(screen, imageManager, iconX, iconY)
 
         op := &text.DrawOptions{}
-        op.GeoM.Translate(iconX + 5, iconY + 8)
+        op.GeoM.Translate(iconX + 2, iconY + 22)
         var color_ color.RGBA = color.RGBA{0xff, 0xff, 0xff, 0xff}
         if !gun.IsEnabled() {
             color_ = color.RGBA{0xff, 0, 0, 0xff}
@@ -548,12 +564,10 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
     }
 }
 
-func enableGun[T Gun] (guns []Gun) {
-    for _, gun := range guns {
-        switch gun.(type) {
-            case T:
-                gun.SetEnabled(!gun.IsEnabled())
-        }
+func enableGun(guns []Gun, index int) {
+    if index < len(guns) {
+        gun := guns[index]
+        gun.SetEnabled(!gun.IsEnabled())
     }
 }
 
@@ -597,13 +611,13 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
             // return ebiten.Termination
             run.Mode = RunMenu
         } else if key == ebiten.KeyDigit1 {
-            enableGun[*BasicGun](player.Guns)
+            enableGun(player.Guns, 0)
         } else if key == ebiten.KeyDigit2 {
-            enableGun[*DualBasicGun](player.Guns)
+            enableGun(player.Guns, 1)
         } else if key == ebiten.KeyDigit3 {
-            enableGun[*BeamGun](player.Guns)
+            enableGun(player.Guns, 2)
         } else if key == ebiten.KeyDigit4 {
-            enableGun[*MissleGun](player.Guns)
+            enableGun(player.Guns, 3)
         }
     }
 

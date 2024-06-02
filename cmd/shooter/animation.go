@@ -72,6 +72,13 @@ func (animation *Animation) IsAlive() bool {
     return animation.CurrentFrame < len(animation.Frames)
 }
 
+func (animation *Animation) GetFrame(n int) *ebiten.Image {
+    if n >= len(animation.Frames) {
+        return nil
+    }
+    return animation.Frames[n]
+}
+
 func (animation *Animation) Update() {
     animation.fpsCounter += 1.0
     if animation.fpsCounter < animation.FPS {
