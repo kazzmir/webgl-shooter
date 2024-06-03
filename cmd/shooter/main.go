@@ -761,7 +761,7 @@ func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, e
 
     switch name {
         case gameImages.ImageExplosion2: return NewAnimation(loaded, 5, 6, 1.5, false), nil
-        case gameImages.ImageExplosion3: return NewAnimation(loaded, 4, 5, 0.9, false), nil
+        case gameImages.ImageExplosion3: return NewAnimation(loaded, 4, 5, 0.7, false), nil
         case gameImages.ImageHit: return NewAnimation(loaded, 5, 6, 1.5, false), nil
         case gameImages.ImageHit2: return NewAnimation(loaded, 5, 6, 1.5, false), nil
         case gameImages.ImageBeam1:
