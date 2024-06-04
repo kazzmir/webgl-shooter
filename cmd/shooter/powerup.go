@@ -47,6 +47,7 @@ func isColliding(from image.Rectangle, collidable Collidable) bool {
         x := randomFloat(float64(overlap.Min.X), float64(overlap.Max.X))
         y := randomFloat(float64(overlap.Min.Y), float64(overlap.Max.Y))
 
+        // FIXME: this needs to take into account the 'from' image to see if there is a non-alpha pixel at x,y
         if collidable.Collide(x, y) {
             return true
         }
