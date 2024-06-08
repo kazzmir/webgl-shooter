@@ -618,6 +618,8 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
             enableGun(player.Guns, 2)
         } else if key == ebiten.KeyDigit4 {
             enableGun(player.Guns, 3)
+        } else if key == ebiten.KeyB {
+            game.Bombs = append(game.Bombs, MakeBomb(player.x, player.y - 20, 0, -1.8))
         }
     }
 
@@ -929,6 +931,7 @@ type Game struct {
     Enemies []Enemy
     Powerups []Powerup
     Explosions []Explosion
+    Bombs []*Bomb
     ShaderManager *ShaderManager
     ImageManager *ImageManager
     SoundManager *SoundManager
@@ -1317,6 +1320,15 @@ func (game *Game) Update(run *Run) error {
         game.EnemyBullets = outEnemyBullets
     }
 
+    bombOut := make([]*Bomb, 0)
+    for _, bomb := range game.Bombs {
+        bomb.Update()
+        if bomb.IsAlive() {
+            bombOut = append(bombOut, bomb)
+        }
+    }
+    game.Bombs = bombOut
+
     enemyOut := make([]Enemy, 0)
     for _, enemy := range game.Enemies {
         if enemy.IsAlive() {
@@ -1415,6 +1427,10 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
     for _, bullet := range game.EnemyBullets {
         bullet.Draw(screen)
+    }
+
+    for _, bomb := range game.Bombs {
+        bomb.Draw(screen, game.ImageManager, game.ShaderManager)
     }
 
     if game.FadeIn < GameFadeIn {
