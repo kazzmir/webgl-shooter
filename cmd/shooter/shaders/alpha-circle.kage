@@ -1,0 +1,21 @@
+//kage:unit pixels
+
+package main
+
+var Center vec2
+var Radius float
+var CenterAlpha float
+var EdgeAlpha float
+var Color vec3
+
+func Fragment(destPosition vec4, srcPosition vec2, color_in vec4) vec4 {
+
+    dist := distance(Center, destPosition.xy)
+
+    v1 := smoothstep(0, Radius, Radius - dist)
+    alpha := mix(EdgeAlpha, CenterAlpha, v1) * step(0, Radius - dist)
+
+    color := vec4(Color.r * alpha, Color.g * alpha, Color.b * alpha, alpha)
+
+    return color
+}
