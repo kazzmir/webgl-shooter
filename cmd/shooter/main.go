@@ -908,6 +908,7 @@ func (manager *SoundManager) PlayLoop(name audioFiles.AudioName) {
 
 const GameFadeIn = 20
 const GameFadeOut = 40
+const GameWhiteFlash = 50
 
 type GameCounter struct {
     Limit int
@@ -944,6 +945,7 @@ type Game struct {
     SoundManager *SoundManager
     FadeIn int
     FadeOut int
+    WhiteFlash int
 
     ShakeTime uint64
 
@@ -1073,6 +1075,10 @@ func (game *Game) Shake() {
     game.ShakeTime = 10
 }
 
+func (game *Game) BigShake() {
+    game.ShakeTime = 20
+}
+
 func (game *Game) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
     if game.ShakeTime > 0 {
         geoM.Translate(randomFloat(-4, 4), randomFloat(-4, 4))
@@ -1118,6 +1124,10 @@ func (game *Game) Update(run *Run) error {
 
     if game.FadeIn < GameFadeIn {
         game.FadeIn += 1
+    }
+
+    if game.WhiteFlash > 0 {
+        game.WhiteFlash -= 1
     }
 
     game.MusicPlayer.Do(func(){
@@ -1327,9 +1337,13 @@ func (game *Game) Update(run *Run) error {
         game.EnemyBullets = outEnemyBullets
     }
 
+    bombExplode := func(){
+        game.WhiteFlash = GameWhiteFlash
+        game.BigShake()
+    }
     bombOut := make([]*Bomb, 0)
     for _, bomb := range game.Bombs {
-        bomb.Update()
+        bomb.Update(bombExplode)
         if bomb.IsAlive() {
             bombOut = append(bombOut, bomb)
         }
@@ -1462,6 +1476,11 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
     for _, bomb := range game.Bombs {
         bomb.Draw(screen, game.ImageManager, game.ShaderManager)
+    }
+
+    if game.WhiteFlash > 0 {
+        flash := premultiplyAlpha(color.RGBA{R: 255, G: 255, B: 255, A: uint8(game.WhiteFlash * 255 / GameWhiteFlash)})
+        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &flash, true)
     }
 
     if game.FadeIn < GameFadeIn {
