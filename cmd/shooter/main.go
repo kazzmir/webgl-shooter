@@ -252,6 +252,8 @@ func MakeShaderManager() (*ShaderManager, error) {
     }, nil
 }
 
+const BombDelay = 60
+
 type Player struct {
     x, y float64
     Jump int
@@ -269,6 +271,8 @@ type Player struct {
     ShadowShader *ebiten.Shader
     Counter int
     SoundShoot chan bool
+    Bombs int
+    BombCounter int
 
     PowerupEnergy int
 }
@@ -379,6 +383,10 @@ func (player *Player) Move() {
         gun.Update()
     }
 
+    if player.BombCounter > 0 {
+        player.BombCounter -= 1
+    }
+
     if player.PowerupEnergy > 0 {
         player.PowerupEnergy -= 1
     }
@@ -416,26 +424,6 @@ func (player *Player) Shoot(imageManager *ImageManager, soundManager *SoundManag
     }
 
     return bullets
-
-    /*
-    velocityY := player.velocityY-2
-    if velocityY > -1 {
-        velocityY = -1
-    }
-    */
-
-    /*
-    velocityY := -2.5
-
-    return &Bullet{
-        x: player.x,
-        y: player.y - float64(player.pic.Bounds().Dy()) / 2,
-        alive: true,
-        velocityX: 0,
-        velocityY: velocityY,
-        pic: player.bullet,
-    }
-    */
 }
 
 var AlphaBlender ebiten.Blend = ebiten.Blend{
@@ -602,7 +590,10 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
             player.velocityX += playerAccel
         } else if key == ebiten.KeyShift && player.Jump <= -50 {
             player.Jump = JumpDuration
-        // FIXME: make ebiten understand key mapping
+        } else if key == ebiten.KeyB && player.BombCounter == 0 && player.Bombs > 0 {
+            game.Bombs = append(game.Bombs, MakeBomb(player.x, player.y - 20, 0, -1.8))
+            player.Bombs -= 1
+            player.BombCounter = BombDelay
         } else if key == ebiten.KeySpace {
             game.Bullets = append(game.Bullets, game.Player.Shoot(game.ImageManager, game.SoundManager)...)
         }
@@ -614,6 +605,7 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
     moreKeys := make([]ebiten.Key, 0)
     moreKeys = inpututil.AppendJustPressedKeys(moreKeys)
     for _, key := range moreKeys {
+        // FIXME: make ebiten understand key mapping
         if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
             // return ebiten.Termination
             run.Mode = RunMenu
@@ -625,8 +617,6 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
             enableGun(player.Guns, 2)
         } else if key == ebiten.KeyDigit4 {
             enableGun(player.Guns, 3)
-        } else if key == ebiten.KeyB {
-            game.Bombs = append(game.Bombs, MakeBomb(player.x, player.y - 20, 0, -1.8))
         }
     }
 
@@ -661,6 +651,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         MaxEnergy: 100.0,
         Health: 100.0,
         MaxHealth: 100.0,
+        Bombs: 0,
         Guns: []Gun{
             &BasicGun{enabled: true},
             // &DualBasicGun{enabled: false},
