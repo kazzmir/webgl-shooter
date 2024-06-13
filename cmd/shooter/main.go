@@ -1098,14 +1098,31 @@ func (game *Game) Update(run *Run) error {
         game.ShakeTime -= 1
     }
 
+    makeAnimatedExplosion := func(x float64, y float64, name gameImages.Image) {
+        animation, err := game.ImageManager.LoadAnimation(name)
+        if err == nil {
+            game.Explosions = append(game.Explosions, MakeAnimatedExplosion(x, y, animation))
+        } else {
+            log.Printf("Could not load explosion sheet %v: %v", name, err)
+        }
+    }
+
+    explodeEnemy := func(enemy Enemy){
+        x, y := enemy.Coords()
+        makeAnimatedExplosion(x, y, gameImages.ImageExplosion2)
+    }
+
     playerDied := func(){
         game.SoundManager.Play(audioFiles.AudioExplosion3)
         game.End.Store(true)
 
+        makeAnimatedExplosion(game.Player.x, game.Player.y, gameImages.ImageExplosion2)
+        /*
         animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
         if err == nil {
             game.Explosions = append(game.Explosions, MakeAnimatedExplosion(game.Player.x, game.Player.y, animation))
         }
+        */
     }
 
     if game.End.Load() {
@@ -1159,10 +1176,13 @@ func (game *Game) Update(run *Run) error {
                 game.Shake()
 
                 game.SoundManager.Play(audioFiles.AudioExplosion3)
+                makeAnimatedExplosion(asteroid.x, asteroid.y, gameImages.ImageExplosion3)
+                /*
                 animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion3)
                 if err == nil {
                     game.Explosions = append(game.Explosions, MakeAnimatedExplosion(asteroid.x, asteroid.y, animation))
                 }
+                */
             }
         }
     }
@@ -1192,12 +1212,15 @@ func (game *Game) Update(run *Run) error {
                     game.SoundManager.Play(audioFiles.AudioHit1)
                 })
 
+                makeAnimatedExplosion(collideX, collideY, gameImages.ImageHit2)
+                /*
                 animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit)
                 if err != nil {
                     log.Printf("Could not load hit animation: %v", err)
                 } else {
                     game.Explosions = append(game.Explosions, MakeAnimatedExplosion(collideX, collideY, animation))
                 }
+                */
 
                 enemy.Damage(2)
                 game.Player.Damage(2)
@@ -1210,6 +1233,9 @@ func (game *Game) Update(run *Run) error {
                     game.Player.Kills += 1
                     game.SoundManager.Play(audioFiles.AudioExplosion3)
 
+                    explodeEnemy(enemy)
+
+                    /*
                     animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
                     if err == nil {
                         x, y := enemy.Coords()
@@ -1217,6 +1243,7 @@ func (game *Game) Update(run *Run) error {
                     } else {
                         log.Printf("Could not load explosion sheet: %v", err)
                     }
+                    */
                 }
             }
         }
@@ -1268,8 +1295,8 @@ func (game *Game) Update(run *Run) error {
                 for _, enemy := range game.Enemies {
                     if enemy.IsAlive() && enemy.Collision(bullet.x, bullet.y) {
                         game.Player.Score += 1
-                        enemy.Hit(bullet)
                         bullet.Damage(1)
+                        enemy.Damage(bullet.Strength)
                         if ! enemy.IsAlive() {
                             game.Shake()
                             game.Player.Kills += 1
@@ -1280,6 +1307,9 @@ func (game *Game) Update(run *Run) error {
                                 game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, ScreenWidth-10), -20))
                             }
 
+                            explodeEnemy(enemy)
+
+                            /*
                             animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
                             if err == nil {
                                 x, y := enemy.Coords()
@@ -1287,6 +1317,7 @@ func (game *Game) Update(run *Run) error {
                             } else {
                                 log.Printf("Could not load explosion sheet: %v", err)
                             }
+                            */
                         }
 
                         game.SoundManager.Play(audioFiles.AudioHit1)
@@ -1337,9 +1368,23 @@ func (game *Game) Update(run *Run) error {
         game.EnemyBullets = outEnemyBullets
     }
 
-    bombExplode := func(){
+    bombExplode := func(bomb *Bomb){
         game.WhiteFlash = GameWhiteFlash
         game.BigShake()
+        game.SoundManager.Play(audioFiles.AudioExplosion3)
+
+        var bombDamage float64 = 50
+
+        for _, enemy := range game.Enemies {
+            x, y := enemy.Coords()
+            if enemy.IsAlive() && bomb.Touch(x, y) {
+                enemy.Damage(bombDamage)
+                if ! enemy.IsAlive() {
+                    explodeEnemy(enemy)
+                }
+            }
+        }
+
     }
     bombOut := make([]*Bomb, 0)
     for _, bomb := range game.Bombs {

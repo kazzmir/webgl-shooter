@@ -36,14 +36,21 @@ func (bomb *Bomb) IsAlive() bool {
     return bomb.alpha > 0
 }
 
-func (bomb *Bomb) Update(onExplode func()) {
+// true if the point x,y is inside the bomb explosion
+func (bomb *Bomb) Touch(x float64, y float64) bool {
+    radius := MaxRadius
+    // don't need square roots for comparison
+    return (x - bomb.x) * (x - bomb.x) + (y - bomb.y) * (y - bomb.y) < radius * radius
+}
+
+func (bomb *Bomb) Update(onExplode func(*Bomb)) {
 
     if bomb.destructTime > 0 {
         bomb.destructTime -= 1
         bomb.x += bomb.velocityX
         bomb.y += bomb.velocityY
         if bomb.destructTime == 0 {
-            onExplode()
+            onExplode(bomb)
         }
     } else {
         if bomb.radius < MaxRadius {
