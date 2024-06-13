@@ -1,9 +1,11 @@
 package main
 
 import (
-    "image/color"
+    // "image/color"
     "github.com/hajimehoshi/ebiten/v2"
-    "github.com/hajimehoshi/ebiten/v2/vector"
+    // "github.com/hajimehoshi/ebiten/v2/vector"
+
+    gameImages "github.com/kazzmir/webgl-shooter/images"
 )
 
 const MaxRadius float64 = 150
@@ -100,6 +102,9 @@ func (bomb *Bomb) Draw(screen *ebiten.Image, imageManager *ImageManager, shaderM
         options.Uniforms["Color"] = []float32{1, 1, 1}
         screen.DrawRectShader(int(bomb.radius/2), int(bomb.radius/2), shaderManager.AlphaCircleShader, options)
     } else {
-        vector.DrawFilledCircle(screen, float32(bomb.x), float32(bomb.y), 15.0, color.RGBA{R: 255, G: 0, B: 0, A: 0}, true)
+        pic, _, err := imageManager.LoadImage(gameImages.ImageBomb)
+        if err == nil {
+            drawCenteredImage(screen, pic, bomb.x, bomb.y)
+        }
     }
 }

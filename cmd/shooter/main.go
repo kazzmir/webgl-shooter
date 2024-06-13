@@ -1113,6 +1113,10 @@ func (game *Game) Update(run *Run) error {
         makeAnimatedExplosion(x, y, gameImages.ImageExplosion2)
     }
 
+    explodeAsteroid := func(asteroid *Asteroid){
+        makeAnimatedExplosion(asteroid.x, asteroid.y, gameImages.ImageExplosion3)
+    }
+
     playerDied := func(){
         game.SoundManager.Play(audioFiles.AudioExplosion3)
         game.End.Store(true)
@@ -1171,7 +1175,7 @@ func (game *Game) Update(run *Run) error {
                 game.Shake()
 
                 game.SoundManager.Play(audioFiles.AudioExplosion3)
-                makeAnimatedExplosion(asteroid.x, asteroid.y, gameImages.ImageExplosion3)
+                explodeAsteroid(asteroid)
             }
         }
     }
@@ -1342,6 +1346,16 @@ func (game *Game) Update(run *Run) error {
                 enemy.Damage(bombDamage)
                 if ! enemy.IsAlive() {
                     explodeEnemy(enemy)
+                }
+            }
+        }
+
+        for _, asteroid := range game.Asteroids {
+            if asteroid.IsAlive() && bomb.Touch(asteroid.x, asteroid.y) {
+                asteroid.Damage(bombDamage)
+                if ! asteroid.IsAlive() {
+                    game.Shake()
+                    explodeAsteroid(asteroid)
                 }
             }
         }
