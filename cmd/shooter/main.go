@@ -1277,6 +1277,7 @@ func (game *Game) Update(run *Run) error {
 
                             explodeEnemy(enemy)
 
+                            // create a powerup where the enemy died every once in a while
                             if rand.Intn(20) == 0 {
                                 x, y := enemy.Coords()
                                 game.Powerups = append(game.Powerups, MakeRandomPowerup(x, y))
