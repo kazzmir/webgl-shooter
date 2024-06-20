@@ -40,7 +40,7 @@ func (bomb *Bomb) IsAlive() bool {
 
 // true if the point x,y is inside the bomb explosion
 func (bomb *Bomb) Touch(x float64, y float64) bool {
-    radius := MaxRadius
+    radius := MaxRadius * 1.5
     // don't need square roots for comparison
     return (x - bomb.x) * (x - bomb.x) + (y - bomb.y) * (y - bomb.y) < radius * radius
 }
