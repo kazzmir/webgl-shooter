@@ -522,6 +522,8 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         iconX += 30
     }
 
+    ShowBombsHud(screen, imageManager, iconX, iconY, player.Bombs)
+
     energy, _, err := imageManager.LoadImage(gameImages.ImageEnergyBar)
     if err != nil {
         log.Printf("Could not load energy image: %v", err)
@@ -1543,7 +1545,7 @@ type Run struct {
 }
 
 func (run *Run) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
-    if run.Game != nil {
+    if run.Game != nil && run.Mode == RunGame {
         run.Game.DrawFinalScreen(screen, offscreen, geoM)
     } else {
         screen.DrawImage(offscreen, &ebiten.DrawImageOptions{

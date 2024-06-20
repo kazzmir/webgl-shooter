@@ -108,3 +108,17 @@ func (bomb *Bomb) Draw(screen *ebiten.Image, imageManager *ImageManager, shaderM
         }
     }
 }
+
+func ShowBombsHud(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, count int){
+    pic, _, err := imageManager.LoadImage(gameImages.ImageBomb)
+    if err != nil {
+        return
+    }
+
+    for i := 0; i < count; i++ {
+        var options ebiten.DrawImageOptions
+        options.GeoM.Scale(0.5, 0.5)
+        options.GeoM.Translate(x + float64(i * pic.Bounds().Dx()) + 5, y)
+        screen.DrawImage(pic, &options)
+    }
+}
