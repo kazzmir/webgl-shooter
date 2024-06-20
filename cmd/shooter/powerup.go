@@ -25,6 +25,32 @@ func drawCenter(screen *ebiten.Image, img *ebiten.Image, x float64, y float64) {
     screen.DrawImage(img, options)
 }
 
+func drawGlow(screen *ebiten.Image, img *ebiten.Image, shaders *ShaderManager, x float64, y float64, counter uint64) {
+
+    width := float64(img.Bounds().Dx())
+    height := float64(img.Bounds().Dy())
+
+    // x1 := powerup.x - width / 2
+    // y1 := powerup.y - height / 2
+    options := &ebiten.DrawImageOptions{}
+
+    // translate such that center is at origin
+    options.GeoM.Translate(-width/2, -height/2)
+    options.GeoM.Translate(x, y)
+    screen.DrawImage(img, options)
+
+    shaderOptions := &ebiten.DrawRectShaderOptions{}
+    shaderOptions.GeoM.Translate(-width/2, -height/2)
+    shaderOptions.GeoM.Translate(x, y)
+    shaderOptions.Uniforms = make(map[string]interface{})
+    v := uint8(math.Abs(math.Sin(float64(counter) * 4 * math.Pi / 180.0) / 3) * 255)
+    shaderOptions.Uniforms["Red"] = toFloatArray(color.RGBA{R: v, G: v, B: v, A: 0})
+    shaderOptions.Blend = AlphaBlender
+    shaderOptions.Images[0] = img
+    bounds := img.Bounds()
+    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.RedShader, shaderOptions)
+}
+
 type Collidable interface {
     Bounds() image.Rectangle
     Collide(x float64, y float64) bool
@@ -209,28 +235,7 @@ func (powerup *PowerupHealth) Draw(screen *ebiten.Image, imageManager *ImageMana
         return
     }
 
-    width := float64(pic.Bounds().Dx())
-    height := float64(pic.Bounds().Dy())
-
-    // x1 := powerup.x - width / 2
-    // y1 := powerup.y - height / 2
-    options := &ebiten.DrawImageOptions{}
-
-    // translate such that center is at origin
-    options.GeoM.Translate(-width/2, -height/2)
-    options.GeoM.Translate(powerup.x, powerup.y)
-    screen.DrawImage(pic, options)
-
-    shaderOptions := &ebiten.DrawRectShaderOptions{}
-    shaderOptions.GeoM.Translate(-width/2, -height/2)
-    shaderOptions.GeoM.Translate(powerup.x, powerup.y)
-    shaderOptions.Uniforms = make(map[string]interface{})
-    v := uint8(math.Abs(math.Sin(float64(powerup.counter) * 4 * math.Pi / 180.0) / 3) * 255)
-    shaderOptions.Uniforms["Red"] = toFloatArray(color.RGBA{R: v, G: v, B: v, A: 0})
-    shaderOptions.Blend = AlphaBlender
-    shaderOptions.Images[0] = pic
-    bounds := pic.Bounds()
-    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.RedShader, shaderOptions)
+    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter)
 }
 
 func MakePowerupHealth(x float64, y float64) Powerup {
@@ -299,29 +304,56 @@ func (powerup *PowerupWeapon) Draw(screen *ebiten.Image, imageManager *ImageMana
     }
 
     drawCenter(screen, blurred, powerup.x, powerup.y)
+    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter)
+}
 
-    width := float64(pic.Bounds().Dx())
-    height := float64(pic.Bounds().Dy())
+type PowerupBomb struct {
+    x, y float64
+    velocityX float64
+    velocityY float64
+    activated bool
+    counter uint64
+}
 
-    // x1 := powerup.x - width / 2
-    // y1 := powerup.y - height / 2
-    options := &ebiten.DrawImageOptions{}
+func (powerup *PowerupBomb) IsAlive() bool {
+    return !powerup.activated && powerup.y < ScreenHeight + 20
+}
 
-    // translate such that center is at origin
-    options.GeoM.Translate(-width/2, -height/2)
-    options.GeoM.Translate(powerup.x, powerup.y)
-    screen.DrawImage(pic, options)
+func (powerup *PowerupBomb) Move() {
+    powerup.x += powerup.velocityX
+    powerup.y += powerup.velocityY
+    powerup.counter += 1
+}
 
-    shaderOptions := &ebiten.DrawRectShaderOptions{}
-    shaderOptions.GeoM.Translate(-width/2, -height/2)
-    shaderOptions.GeoM.Translate(powerup.x, powerup.y)
-    shaderOptions.Uniforms = make(map[string]interface{})
-    v := uint8(math.Abs(math.Sin(float64(powerup.counter) * 4 * math.Pi / 180.0) / 3) * 255)
-    shaderOptions.Uniforms["Red"] = toFloatArray(color.RGBA{R: v, G: v, B: v, A: 0})
-    shaderOptions.Blend = AlphaBlender
-    shaderOptions.Images[0] = pic
-    bounds := pic.Bounds()
-    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.RedShader, shaderOptions)
+func (powerup *PowerupBomb) Activate(player *Player, soundManager *SoundManager){
+    if !powerup.activated {
+        player.IncreaseBombs()
+        powerup.activated = true
+        // FIXME: find a new sound
+        soundManager.Play(audioFiles.AudioHealth)
+    }
+}
+
+func (powerup *PowerupBomb) Collide(player *Player, imageManager *ImageManager) bool {
+    pic, _, err := imageManager.LoadImage(gameImages.ImagePowerupBomb)
+    if err != nil {
+        return false
+    }
+
+    translate := image.Point{
+        X: int(powerup.x - float64(pic.Bounds().Dx())/2),
+        Y: int(powerup.y - float64(pic.Bounds().Dy())/2),
+    }
+    bounds := pic.Bounds().Add(translate)
+    return isColliding(bounds, player)
+}
+
+func (powerup *PowerupBomb) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager){
+    pic, _, err := imageManager.LoadImage(gameImages.ImagePowerupBomb)
+    if err != nil {
+        return
+    }
+    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter)
 }
 
 func MakePowerupWeapon(x float64, y float64) Powerup {
@@ -334,11 +366,22 @@ func MakePowerupWeapon(x float64, y float64) Powerup {
     }
 }
 
+func MakePowerupBomb(x float64, y float64) Powerup {
+    return &PowerupBomb{
+        x: x,
+        y: y,
+        velocityX: 0,
+        velocityY: 1.8,
+        activated: false,
+    }
+}
+
 func MakeRandomPowerup(x float64, y float64) Powerup {
-    switch rand.Intn(3) {
+    switch rand.Intn(4) {
         case 0: return MakePowerupEnergy(x, y)
         case 1: return MakePowerupHealth(x, y)
         case 2: return MakePowerupWeapon(x, y)
+        case 3: return MakePowerupBomb(x, y)
     }
 
     return nil

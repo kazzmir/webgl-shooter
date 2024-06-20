@@ -214,6 +214,7 @@ type ShaderManager struct {
     ShadowShader *ebiten.Shader
     EdgeShader *ebiten.Shader
     ExplosionShader *ebiten.Shader
+    AlphaCircleShader *ebiten.Shader
 }
 
 func MakeShaderManager() (*ShaderManager, error) {
@@ -237,13 +238,21 @@ func MakeShaderManager() (*ShaderManager, error) {
         return nil, err
     }
 
+    alphaCircleShader, err := LoadAlphaCircleShader()
+    if err != nil {
+        return nil, err
+    }
+
     return &ShaderManager{
         RedShader: redShader,
         ShadowShader: shadowShader,
         EdgeShader: edgeShader,
         ExplosionShader: explosionShader,
+        AlphaCircleShader: alphaCircleShader,
     }, nil
 }
+
+const BombDelay = 60
 
 type Player struct {
     x, y float64
@@ -262,8 +271,16 @@ type Player struct {
     ShadowShader *ebiten.Shader
     Counter int
     SoundShoot chan bool
+    Bombs int
+    BombCounter int
 
     PowerupEnergy int
+}
+
+func (player *Player) IncreaseBombs() {
+    if player.Bombs < 5 {
+        player.Bombs += 1
+    }
 }
 
 func (player *Player) Damage(amount float64) {
@@ -372,6 +389,10 @@ func (player *Player) Move() {
         gun.Update()
     }
 
+    if player.BombCounter > 0 {
+        player.BombCounter -= 1
+    }
+
     if player.PowerupEnergy > 0 {
         player.PowerupEnergy -= 1
     }
@@ -409,26 +430,6 @@ func (player *Player) Shoot(imageManager *ImageManager, soundManager *SoundManag
     }
 
     return bullets
-
-    /*
-    velocityY := player.velocityY-2
-    if velocityY > -1 {
-        velocityY = -1
-    }
-    */
-
-    /*
-    velocityY := -2.5
-
-    return &Bullet{
-        x: player.x,
-        y: player.y - float64(player.pic.Bounds().Dy()) / 2,
-        alive: true,
-        velocityX: 0,
-        velocityY: velocityY,
-        pic: player.bullet,
-    }
-    */
 }
 
 var AlphaBlender ebiten.Blend = ebiten.Blend{
@@ -527,6 +528,8 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         iconX += 30
     }
 
+    ShowBombsHud(screen, imageManager, iconX, iconY, player.Bombs)
+
     energy, _, err := imageManager.LoadImage(gameImages.ImageEnergyBar)
     if err != nil {
         log.Printf("Could not load energy image: %v", err)
@@ -595,7 +598,10 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
             player.velocityX += playerAccel
         } else if key == ebiten.KeyShift && player.Jump <= -50 {
             player.Jump = JumpDuration
-        // FIXME: make ebiten understand key mapping
+        } else if key == ebiten.KeyB && player.BombCounter == 0 && player.Bombs > 0 {
+            game.Bombs = append(game.Bombs, MakeBomb(player.x, player.y - 20, 0, -1.8))
+            player.Bombs -= 1
+            player.BombCounter = BombDelay
         } else if key == ebiten.KeySpace {
             game.Bullets = append(game.Bullets, game.Player.Shoot(game.ImageManager, game.SoundManager)...)
         }
@@ -607,6 +613,7 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
     moreKeys := make([]ebiten.Key, 0)
     moreKeys = inpututil.AppendJustPressedKeys(moreKeys)
     for _, key := range moreKeys {
+        // FIXME: make ebiten understand key mapping
         if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
             // return ebiten.Termination
             run.Mode = RunMenu
@@ -652,6 +659,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         MaxEnergy: 100.0,
         Health: 100.0,
         MaxHealth: 100.0,
+        Bombs: 0,
         Guns: []Gun{
             &BasicGun{enabled: true},
             // &DualBasicGun{enabled: false},
@@ -899,6 +907,7 @@ func (manager *SoundManager) PlayLoop(name audioFiles.AudioName) {
 
 const GameFadeIn = 20
 const GameFadeOut = 40
+const GameWhiteFlash = 50
 
 type GameCounter struct {
     Limit int
@@ -929,11 +938,13 @@ type Game struct {
     Enemies []Enemy
     Powerups []Powerup
     Explosions []Explosion
+    Bombs []*Bomb
     ShaderManager *ShaderManager
     ImageManager *ImageManager
     SoundManager *SoundManager
     FadeIn int
     FadeOut int
+    WhiteFlash int
 
     ShakeTime uint64
 
@@ -1063,6 +1074,10 @@ func (game *Game) Shake() {
     game.ShakeTime = 10
 }
 
+func (game *Game) BigShake() {
+    game.ShakeTime = 20
+}
+
 func (game *Game) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
     if game.ShakeTime > 0 {
         geoM.Translate(randomFloat(-4, 4), randomFloat(-4, 4))
@@ -1082,14 +1097,30 @@ func (game *Game) Update(run *Run) error {
         game.ShakeTime -= 1
     }
 
+    makeAnimatedExplosion := func(x float64, y float64, name gameImages.Image) {
+        animation, err := game.ImageManager.LoadAnimation(name)
+        if err == nil {
+            game.Explosions = append(game.Explosions, MakeAnimatedExplosion(x, y, animation))
+        } else {
+            log.Printf("Could not load explosion sheet %v: %v", name, err)
+        }
+    }
+
+    // this could be enemy.MakeExplosion() or something to let each enemy create its own explosion type
+    explodeEnemy := func(enemy Enemy){
+        x, y := enemy.Coords()
+        makeAnimatedExplosion(x, y, gameImages.ImageExplosion2)
+    }
+
+    explodeAsteroid := func(asteroid *Asteroid){
+        makeAnimatedExplosion(asteroid.x, asteroid.y, gameImages.ImageExplosion3)
+    }
+
     playerDied := func(){
         game.SoundManager.Play(audioFiles.AudioExplosion3)
         game.End.Store(true)
 
-        animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
-        if err == nil {
-            game.Explosions = append(game.Explosions, MakeAnimatedExplosion(game.Player.x, game.Player.y, animation))
-        }
+        makeAnimatedExplosion(game.Player.x, game.Player.y, gameImages.ImageExplosion2)
     }
 
     if game.End.Load() {
@@ -1108,6 +1139,10 @@ func (game *Game) Update(run *Run) error {
 
     if game.FadeIn < GameFadeIn {
         game.FadeIn += 1
+    }
+
+    if game.WhiteFlash > 0 {
+        game.WhiteFlash -= 1
     }
 
     game.MusicPlayer.Do(func(){
@@ -1139,10 +1174,7 @@ func (game *Game) Update(run *Run) error {
                 game.Shake()
 
                 game.SoundManager.Play(audioFiles.AudioExplosion3)
-                animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion3)
-                if err == nil {
-                    game.Explosions = append(game.Explosions, MakeAnimatedExplosion(asteroid.x, asteroid.y, animation))
-                }
+                explodeAsteroid(asteroid)
             }
         }
     }
@@ -1172,12 +1204,7 @@ func (game *Game) Update(run *Run) error {
                     game.SoundManager.Play(audioFiles.AudioHit1)
                 })
 
-                animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit)
-                if err != nil {
-                    log.Printf("Could not load hit animation: %v", err)
-                } else {
-                    game.Explosions = append(game.Explosions, MakeAnimatedExplosion(collideX, collideY, animation))
-                }
+                makeAnimatedExplosion(collideX, collideY, gameImages.ImageHit2)
 
                 enemy.Damage(2)
                 game.Player.Damage(2)
@@ -1190,13 +1217,7 @@ func (game *Game) Update(run *Run) error {
                     game.Player.Kills += 1
                     game.SoundManager.Play(audioFiles.AudioExplosion3)
 
-                    animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
-                    if err == nil {
-                        x, y := enemy.Coords()
-                        game.Explosions = append(game.Explosions, MakeAnimatedExplosion(x, y, animation))
-                    } else {
-                        log.Printf("Could not load explosion sheet: %v", err)
-                    }
+                    explodeEnemy(enemy)
                 }
             }
         }
@@ -1248,8 +1269,8 @@ func (game *Game) Update(run *Run) error {
                 for _, enemy := range game.Enemies {
                     if enemy.IsAlive() && enemy.Collision(bullet.x, bullet.y) {
                         game.Player.Score += 1
-                        enemy.Hit(bullet)
                         bullet.Damage(1)
+                        enemy.Damage(bullet.Strength)
                         if ! enemy.IsAlive() {
                             game.Shake()
                             game.Player.Kills += 1
@@ -1260,12 +1281,12 @@ func (game *Game) Update(run *Run) error {
                                 game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, ScreenWidth-10), -20))
                             }
 
-                            animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion2)
-                            if err == nil {
+                            explodeEnemy(enemy)
+
+                            // create a powerup where the enemy died every once in a while
+                            if rand.Intn(20) == 0 {
                                 x, y := enemy.Coords()
-                                game.Explosions = append(game.Explosions, MakeAnimatedExplosion(x, y, animation))
-                            } else {
-                                log.Printf("Could not load explosion sheet: %v", err)
+                                game.Powerups = append(game.Powerups, MakeRandomPowerup(x, y))
                             }
                         }
 
@@ -1316,6 +1337,43 @@ func (game *Game) Update(run *Run) error {
         }
         game.EnemyBullets = outEnemyBullets
     }
+
+    bombExplode := func(bomb *Bomb){
+        game.WhiteFlash = GameWhiteFlash
+        game.BigShake()
+        game.SoundManager.Play(audioFiles.AudioExplosion3)
+
+        var bombDamage float64 = 50
+
+        for _, enemy := range game.Enemies {
+            x, y := enemy.Coords()
+            if enemy.IsAlive() && bomb.Touch(x, y) {
+                enemy.Damage(bombDamage)
+                if ! enemy.IsAlive() {
+                    explodeEnemy(enemy)
+                }
+            }
+        }
+
+        for _, asteroid := range game.Asteroids {
+            if asteroid.IsAlive() && bomb.Touch(asteroid.x, asteroid.y) {
+                asteroid.Damage(bombDamage)
+                if ! asteroid.IsAlive() {
+                    game.Shake()
+                    explodeAsteroid(asteroid)
+                }
+            }
+        }
+
+    }
+    bombOut := make([]*Bomb, 0)
+    for _, bomb := range game.Bombs {
+        bomb.Update(bombExplode)
+        if bomb.IsAlive() {
+            bombOut = append(bombOut, bomb)
+        }
+    }
+    game.Bombs = bombOut
 
     enemyOut := make([]Enemy, 0)
     for _, enemy := range game.Enemies {
@@ -1385,6 +1443,30 @@ func (game *Game) Update(run *Run) error {
     return nil
 }
 
+// draw a big orange circle that fades out towards the edge of the circle
+func (game *Game) TestAlphaCircle(screen *ebiten.Image){
+    {
+        options := &ebiten.DrawRectShaderOptions{}
+        cx := 300
+        cy := 300
+        radius := 100
+        options.GeoM.Translate(float64(cx - radius), float64(cy - radius))
+        // options.Blend = AlphaBlender
+        // options.Images[0] = player.pic
+        options.Uniforms = make(map[string]interface{})
+        // radians = math.Pi * 90 / 180
+        // log.Printf("Red: %v", radians)
+        // red := vec4(abs(sin(Red) / 3), 0, 0, 0)
+        options.Uniforms["Center"] = []float32{float32(cx), float32(cy)}
+        options.Uniforms["Radius"] = float32(radius)
+        options.Uniforms["CenterAlpha"] = float32(0.9)
+        options.Uniforms["EdgeAlpha"] = float32(0.2)
+        options.Uniforms["Color"] = []float32{1, 0.5, 0}
+
+        screen.DrawRectShader(radius * 2, radius * 2, game.ShaderManager.AlphaCircleShader, options)
+    }
+}
+
 func (game *Game) Draw(screen *ebiten.Image) {
     game.Background.Draw(screen)
 
@@ -1415,6 +1497,15 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
     for _, bullet := range game.EnemyBullets {
         bullet.Draw(screen)
+    }
+
+    for _, bomb := range game.Bombs {
+        bomb.Draw(screen, game.ImageManager, game.ShaderManager)
+    }
+
+    if game.WhiteFlash > 0 {
+        flash := premultiplyAlpha(color.RGBA{R: 255, G: 255, B: 255, A: uint8(game.WhiteFlash * 255 / GameWhiteFlash)})
+        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &flash, true)
     }
 
     if game.FadeIn < GameFadeIn {
@@ -1466,7 +1557,7 @@ type Run struct {
 }
 
 func (run *Run) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
-    if run.Game != nil {
+    if run.Game != nil && run.Mode == RunGame {
         run.Game.DrawFinalScreen(screen, offscreen, geoM)
     } else {
         screen.DrawImage(offscreen, &ebiten.DrawImageOptions{
