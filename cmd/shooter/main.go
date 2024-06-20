@@ -277,6 +277,12 @@ type Player struct {
     PowerupEnergy int
 }
 
+func (player *Player) IncreaseBombs() {
+    if player.Bombs < 5 {
+        player.Bombs += 1
+    }
+}
+
 func (player *Player) Damage(amount float64) {
     player.Health -= amount
     if player.Health < 0 {
