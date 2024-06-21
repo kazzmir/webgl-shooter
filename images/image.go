@@ -40,6 +40,7 @@ const ImagePowerup1 = Image("powerup1")
 const ImagePowerup2 = Image("powerup2")
 const ImagePowerup3 = Image("powerup3")
 const ImagePowerup4 = Image("powerup4")
+const ImagePowerup5 = Image("powerup5")
 const ImagePowerupBomb = Image("powerup-bomb")
 
 //go:embed player/player.png
@@ -108,6 +109,9 @@ var powerup3Image []byte
 //go:embed misc/powerup4.png
 var powerup4Image []byte
 
+//go:embed misc/powerup5.png
+var powerup5Image []byte
+
 //go:embed misc/powerup-bomb.png
 var powerupBombImage []byte
 
@@ -164,6 +168,7 @@ func LoadImage(name Image) (image.Image, error) {
         case ImagePowerup2: return loadPng(powerup2Image)
         case ImagePowerup3: return loadPng(powerup3Image)
         case ImagePowerup4: return loadPng(powerup4Image)
+        case ImagePowerup5: return loadPng(powerup5Image)
         case ImageAsteroid1: return loadPng(asteroid1Image)
         case ImageFire1: return loadPng(fire1Animation)
         case ImageBomb: return loadPng(bombImage)
