@@ -356,6 +356,66 @@ func (powerup *PowerupBomb) Draw(screen *ebiten.Image, imageManager *ImageManage
     drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter)
 }
 
+type PowerupEnergyIncrease struct {
+    x, y float64
+    velocityX, velocityY float64
+    activated bool
+    counter uint64
+    increase uint64
+}
+
+func (powerup *PowerupEnergyIncrease) IsAlive() bool {
+    return !powerup.activated && powerup.y < ScreenHeight + 20
+}
+
+func (powerup *PowerupEnergyIncrease) Move() {
+    powerup.x += powerup.velocityX
+    powerup.y += powerup.velocityY
+    powerup.counter += 1
+}
+
+func (powerup *PowerupEnergyIncrease) Activate(player *Player, soundManager *SoundManager){
+    if !powerup.activated {
+        player.IncreaseMaxEnergy(float64(powerup.increase))
+        powerup.activated = true
+        soundManager.Play(audioFiles.AudioHealth)
+    }
+}
+
+func (powerup *PowerupEnergyIncrease) Collide(player *Player, imageManager *ImageManager) bool {
+    pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup5)
+    if err != nil {
+        return false
+    }
+
+    translate := image.Point{
+        X: int(powerup.x - float64(pic.Bounds().Dx())/2),
+        Y: int(powerup.y - float64(pic.Bounds().Dy())/2),
+    }
+    bounds := pic.Bounds().Add(translate)
+    return isColliding(bounds, player)
+}
+
+func (powerup *PowerupEnergyIncrease) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager){
+    pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup5)
+    if err != nil {
+        return
+    }
+    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter)
+}
+
+func MakePowerupEnergyIncrease(x float64, y float64) Powerup {
+    return &PowerupEnergyIncrease{
+        x: x,
+        y: y,
+        velocityX: 0,
+        velocityY: 1.5,
+        activated: false,
+        counter: 0,
+        increase: 25,
+    }
+}
+
 func MakePowerupWeapon(x float64, y float64) Powerup {
     return &PowerupWeapon{
         x: x,
@@ -377,11 +437,12 @@ func MakePowerupBomb(x float64, y float64) Powerup {
 }
 
 func MakeRandomPowerup(x float64, y float64) Powerup {
-    switch rand.Intn(4) {
+    switch rand.Intn(5) {
         case 0: return MakePowerupEnergy(x, y)
         case 1: return MakePowerupHealth(x, y)
         case 2: return MakePowerupWeapon(x, y)
         case 3: return MakePowerupBomb(x, y)
+        case 4: return MakePowerupEnergyIncrease(x, y)
     }
 
     return nil

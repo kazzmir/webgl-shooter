@@ -38,8 +38,6 @@ const debugForceBoss = false
 const ScreenWidth = 1024
 const ScreenHeight = 768
 
-const EnergyIncreasePerFrame = 0.4
-
 func onScreen(x float64, y float64, margin float64) bool {
     return x > -margin && x < ScreenWidth + margin && y > -margin && y < ScreenHeight + margin
 }
@@ -261,6 +259,7 @@ type Player struct {
     rawImage image.Image
     pic *ebiten.Image
     Guns []Gun
+    EnergyIncreasePerFrame float64
     GunEnergy float64
     MaxEnergy float64
     Health float64
@@ -281,6 +280,11 @@ func (player *Player) IncreaseBombs() {
     if player.Bombs < 5 {
         player.Bombs += 1
     }
+}
+
+func (player *Player) IncreaseMaxEnergy(amount float64) {
+    player.MaxEnergy += amount
+    player.EnergyIncreasePerFrame += 0.03
 }
 
 func (player *Player) Damage(amount float64) {
@@ -380,7 +384,7 @@ func (player *Player) Move() {
         player.y = ScreenHeight
     }
 
-    player.GunEnergy += EnergyIncreasePerFrame
+    player.GunEnergy += player.EnergyIncreasePerFrame
     if player.GunEnergy > player.MaxEnergy {
         player.GunEnergy = player.MaxEnergy
     }
@@ -655,6 +659,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         pic: ebiten.NewImageFromImage(playerImage),
         // Gun: &BasicGun{},
         // Gun: &DualBasicGun{},
+        EnergyIncreasePerFrame: 0.4,
         GunEnergy: 100.0,
         MaxEnergy: 100.0,
         Health: 100.0,
@@ -1687,7 +1692,8 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
     }
 
     // for debugging
-    game.Powerups = append(game.Powerups, MakePowerupWeapon(randomFloat(10, ScreenWidth-10), -20))
+    // game.Powerups = append(game.Powerups, MakePowerupWeapon(randomFloat(10, ScreenWidth-10), -20))
+    // game.Powerups = append(game.Powerups, MakePowerupEnergyIncrease(randomFloat(10, ScreenWidth-10), -20))
 
     err = game.PreloadAssets()
     if err != nil {
