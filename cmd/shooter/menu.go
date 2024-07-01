@@ -253,6 +253,7 @@ func makeHintKeys() *Hint {
                 "Arrow right: move ship right",
                 "Spacebar: shoot",
                 "Left Shift: increase speed",
+                "B: release bomb",
             }
             for _, s := range all {
                 op.GeoM.Translate(0, fontSize+1)
