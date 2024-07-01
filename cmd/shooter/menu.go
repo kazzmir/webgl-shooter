@@ -21,6 +21,13 @@ import (
     "github.com/hajimehoshi/ebiten/v2/vector"
 )
 
+func drawText(screen *ebiten.Image, face text.GoTextFace, x, y float64, str string, color color.Color) {
+    op := &text.DrawOptions{}
+    op.GeoM.Translate(x, y)
+    op.ColorScale.ScaleWithColor(color)
+    text.Draw(screen, str, &face, op)
+}
+
 type MenuAction func(self *MenuOption, run *Run, key ebiten.Key) error
 
 type MenuOption struct {
@@ -219,6 +226,8 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
             log.Printf("Warning: error rendering hint %v: %v", menu.ActiveHint, err)
         }
     }
+
+    drawText(screen, text.GoTextFace{Source: menu.Font, Size: 15}, ScreenWidth - 170, ScreenHeight - 20, "Made by Jon Rafkind", color.RGBA{R: 255, G: 255, B: 255, A: 255})
 }
 
 func makeHintKeys() *Hint {
