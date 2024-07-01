@@ -953,6 +953,8 @@ type Game struct {
 
     ShakeTime uint64
 
+    Difficulty float64
+
     PlayerDied sync.Once
 
     BossMode bool
@@ -1001,31 +1003,31 @@ func (game *Game) MakeEnemy(x float64, y float64, kind int, move Movement) error
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy1(x, y, raw, pic, move)
+            enemy, err = MakeEnemy1(x, y, raw, pic, move, game.Difficulty)
         case 1:
             pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy2)
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy2(x, y, raw, pic, move)
+            enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
         case 2:
             pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy3)
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy2(x, y, raw, pic, move)
+            enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
         case 3:
             pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy4)
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy2(x, y, raw, pic, move)
+            enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
         case 4:
             pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy5)
             if err != nil {
                 return err
             }
-            enemy, err = MakeEnemy2(x, y, raw, pic, move)
+            enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
 
     }
 
@@ -1068,6 +1070,7 @@ func (game *Game) MakeEnemies(count int) error {
 }
 
 var LevelEnd error = errors.New("end of level")
+var PlayerDied error = errors.New("player died")
 
 func (game *Game) UpdateCounters() {
     for _, counter := range game.Counters {
@@ -1420,7 +1423,7 @@ func (game *Game) Update(run *Run) error {
                 if err != nil {
                     log.Printf("Unable to load boss: %v", err)
                 } else {
-                    boss, err := MakeBoss1(ScreenWidth / 2, -150, rawImage, boss1Pic)
+                    boss, err := MakeBoss1(ScreenWidth / 2, -150, rawImage, boss1Pic, game.Difficulty)
                     if err != nil {
                         log.Printf("Unable to make boss: %v", err)
                     } else {
@@ -1443,6 +1446,10 @@ func (game *Game) Update(run *Run) error {
             })
         }
 
+    }
+
+    if !game.Player.IsAlive() {
+        return PlayerDied
     }
 
     return nil
@@ -1553,12 +1560,14 @@ const (
 )
 
 type Run struct {
+    Player *Player
     Game *Game
     Menu *Menu
     Mode RunMode
     Quit context.Context
     Cancel context.CancelFunc
     Volume float64
+    AudioContext *audio.Context
 }
 
 func (run *Run) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
@@ -1607,6 +1616,17 @@ func (run *Run) Update() error {
         case RunGame:
             err := run.Game.Update(run)
             if errors.Is(err, LevelEnd) {
+                newGame, err := MakeGame(run.AudioContext, run, run.Game.Difficulty * 1.5)
+                if err != nil {
+                    return err
+                }
+
+                run.Game.Close()
+                run.Game = newGame
+                // run.Mode = RunMenu
+                return nil
+            } else if errors.Is(err, PlayerDied) {
+                run.Player = nil
                 run.Game.Close()
                 run.Game = nil
                 run.Mode = RunMenu
@@ -1642,11 +1662,20 @@ func (run *Run) Draw(screen *ebiten.Image) {
     */
 }
 
-func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
+func MakeGame(audioContext *audio.Context, run *Run, difficulty float64) (*Game, error) {
+    if run.Player == nil {
+        return nil, fmt.Errorf("game: no player created")
+    }
+
+    run.Player.x = ScreenWidth / 2
+    run.Player.y = ScreenHeight - 100
+
+    /*
     player, err := MakePlayer(ScreenWidth / 2, ScreenHeight - 100)
     if err != nil {
         return nil, err
     }
+    */
 
     background, err := MakeBackground()
     if err != nil {
@@ -1674,7 +1703,7 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
     game := Game{
         Counters: make(map[string]*GameCounter),
         Background: background,
-        Player: player,
+        Player: run.Player,
         Font: font,
         ShaderManager: shaderManager,
         ImageManager: MakeImageManager(),
@@ -1683,6 +1712,7 @@ func MakeGame(audioContext *audio.Context, run *Run) (*Game, error) {
         BossMode: false,
         Quit: quitContext,
         Cancel: cancel,
+        Difficulty: difficulty,
     }
 
     err = game.MakeEnemies(2)
@@ -1754,6 +1784,7 @@ func main() {
         Cancel: cancel,
         Menu: menu,
         Volume: initialVolume,
+        AudioContext: audioContext,
     }
 
     log.Printf("Running")

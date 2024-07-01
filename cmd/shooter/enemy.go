@@ -377,12 +377,12 @@ func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
         */
 }
 
-func MakeEnemy1(x float64, y float64, rawImage image.Image, image *ebiten.Image, move Movement) (Enemy, error) {
+func MakeEnemy1(x float64, y float64, rawImage image.Image, image *ebiten.Image, move Movement, difficulty float64) (Enemy, error) {
     return &NormalEnemy{
         x: x,
         y: y,
         move: move,
-        Life: 5,
+        Life: 5 * difficulty,
         rawImage: rawImage,
         pic: image,
         gun: &EnemyGun2{},
@@ -392,12 +392,12 @@ func MakeEnemy1(x float64, y float64, rawImage image.Image, image *ebiten.Image,
     }, nil
 }
 
-func MakeEnemy2(x float64, y float64, rawImage image.Image, pic *ebiten.Image, move Movement) (Enemy, error) {
+func MakeEnemy2(x float64, y float64, rawImage image.Image, pic *ebiten.Image, move Movement, difficulty float64) (Enemy, error) {
     return &NormalEnemy{
         x: x,
         y: y,
         move: move,
-        Life: 5,
+        Life: 5 * difficulty,
         rawImage: rawImage,
         pic: pic,
         gun: &EnemyGun1{},
@@ -564,7 +564,7 @@ func (boss *Boss1Movement) Move(x float64, y float64) (float64, float64) {
     }
 }
 
-func MakeBoss1(x float64, y float64, rawImage image.Image, pic *ebiten.Image) (Enemy, error) {
+func MakeBoss1(x float64, y float64, rawImage image.Image, pic *ebiten.Image, difficulty float64) (Enemy, error) {
     return &NormalEnemy{
         x: x,
         y: y,
@@ -573,7 +573,7 @@ func MakeBoss1(x float64, y float64, rawImage image.Image, pic *ebiten.Image) (E
             moveY: 100,
             counter: 100,
         },
-        Life: 500,
+        Life: 500 * difficulty,
         rawImage: rawImage,
         pic: pic,
         gun: MakeBossGun1(),

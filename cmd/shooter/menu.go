@@ -415,7 +415,13 @@ func createMenu(quit context.Context, audioContext *audio.Context, initialVolume
                 run.Game.Cancel()
             }
 
-            game, err := MakeGame(audioContext, run)
+            player, err := MakePlayer(0, 0)
+            if err != nil {
+                return err
+            }
+            run.Player = player
+
+            game, err := MakeGame(audioContext, run, 1)
             if err != nil {
                 return err
             }
@@ -484,7 +490,15 @@ func createMenu(quit context.Context, audioContext *audio.Context, initialVolume
             run.Mode = RunGame
 
             if run.Game == nil {
-                game, err := MakeGame(audioContext, run)
+                if run.Player == nil {
+                    player, err := MakePlayer(0, 0)
+                    if err != nil {
+                        return err
+                    }
+                    run.Player = player
+                }
+
+                game, err := MakeGame(audioContext, run, 1)
                 if err != nil {
                     return err
                 }
