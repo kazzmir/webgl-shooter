@@ -13,19 +13,20 @@ import (
     "github.com/hajimehoshi/ebiten/v2"
 )
 
-func drawCenter(screen *ebiten.Image, img *ebiten.Image, x float64, y float64) {
+func drawCenter(screen *ebiten.Image, img *ebiten.Image, x float64, y float64, extra ebiten.GeoM) {
     width := float64(img.Bounds().Dx())
     height := float64(img.Bounds().Dy())
 
     options := &ebiten.DrawImageOptions{}
 
+    options.GeoM.Concat(extra)
     // translate such that center is at origin
     options.GeoM.Translate(-width/2, -height/2)
     options.GeoM.Translate(x, y)
     screen.DrawImage(img, options)
 }
 
-func drawGlow(screen *ebiten.Image, img *ebiten.Image, shaders *ShaderManager, x float64, y float64, counter uint64) {
+func drawGlow(screen *ebiten.Image, img *ebiten.Image, shaders *ShaderManager, x float64, y float64, counter uint64, extra ebiten.GeoM) {
 
     width := float64(img.Bounds().Dx())
     height := float64(img.Bounds().Dy())
@@ -33,6 +34,7 @@ func drawGlow(screen *ebiten.Image, img *ebiten.Image, shaders *ShaderManager, x
     // x1 := powerup.x - width / 2
     // y1 := powerup.y - height / 2
     options := &ebiten.DrawImageOptions{}
+    options.GeoM.Concat(extra)
 
     // translate such that center is at origin
     options.GeoM.Translate(-width/2, -height/2)
@@ -40,6 +42,7 @@ func drawGlow(screen *ebiten.Image, img *ebiten.Image, shaders *ShaderManager, x
     screen.DrawImage(img, options)
 
     shaderOptions := &ebiten.DrawRectShaderOptions{}
+    shaderOptions.GeoM.Concat(extra)
     shaderOptions.GeoM.Translate(-width/2, -height/2)
     shaderOptions.GeoM.Translate(x, y)
     shaderOptions.Uniforms = make(map[string]interface{})
@@ -88,7 +91,7 @@ type Powerup interface {
     Collide(player *Player, imageManager *ImageManager) bool
     Activate(player *Player, soundManager *SoundManager)
     IsAlive() bool
-    Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager)
+    Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager, extra ebiten.GeoM)
 }
 
 type PowerupEnergy struct {
@@ -130,7 +133,7 @@ func (powerup *PowerupEnergy) Activate(player *Player, soundManager *SoundManage
 
 var PowerupColor color.Color = color.RGBA{R: 0x7e, G: 0x29, B: 0xd6, A: 0xff}
 
-func (powerup *PowerupEnergy) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager){
+func (powerup *PowerupEnergy) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager, extra ebiten.GeoM){
 
     pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup2)
     if err != nil {
@@ -145,6 +148,8 @@ func (powerup *PowerupEnergy) Draw(screen *ebiten.Image, imageManager *ImageMana
     // y1 := powerup.y - height / 2
     options := &ebiten.DrawImageOptions{}
 
+    options.GeoM.Concat(extra)
+
     // translate such that center is at origin
     options.GeoM.Translate(-width/2, -height/2)
     // rotate
@@ -154,6 +159,7 @@ func (powerup *PowerupEnergy) Draw(screen *ebiten.Image, imageManager *ImageMana
     screen.DrawImage(pic, options)
 
     shaderOptions := &ebiten.DrawRectShaderOptions{}
+    shaderOptions.GeoM.Concat(extra)
     shaderOptions.GeoM.Translate(-width/2, -height/2)
     shaderOptions.GeoM.Rotate(float64(powerup.angle) * math.Pi / 180.0)
     shaderOptions.GeoM.Translate(powerup.x, powerup.y)
@@ -227,7 +233,7 @@ func (powerup *PowerupHealth) Activate(player *Player, soundManager *SoundManage
     }
 }
 
-func (powerup *PowerupHealth) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager){
+func (powerup *PowerupHealth) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager, extra ebiten.GeoM){
 
     pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup3)
     if err != nil {
@@ -235,7 +241,7 @@ func (powerup *PowerupHealth) Draw(screen *ebiten.Image, imageManager *ImageMana
         return
     }
 
-    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter)
+    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter, extra)
 }
 
 func MakePowerupHealth(x float64, y float64) Powerup {
@@ -289,7 +295,7 @@ func (powerup *PowerupWeapon) Activate(player *Player, soundManager *SoundManage
     }
 }
 
-func (powerup *PowerupWeapon) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager){
+func (powerup *PowerupWeapon) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager, extra ebiten.GeoM){
 
     pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup4)
     if err != nil {
@@ -303,8 +309,8 @@ func (powerup *PowerupWeapon) Draw(screen *ebiten.Image, imageManager *ImageMana
         return
     }
 
-    drawCenter(screen, blurred, powerup.x, powerup.y)
-    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter)
+    drawCenter(screen, blurred, powerup.x, powerup.y, extra)
+    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter, extra)
 }
 
 type PowerupBomb struct {
@@ -348,12 +354,12 @@ func (powerup *PowerupBomb) Collide(player *Player, imageManager *ImageManager) 
     return isColliding(bounds, player)
 }
 
-func (powerup *PowerupBomb) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager){
+func (powerup *PowerupBomb) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager, extra ebiten.GeoM){
     pic, _, err := imageManager.LoadImage(gameImages.ImagePowerupBomb)
     if err != nil {
         return
     }
-    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter)
+    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter, extra)
 }
 
 type PowerupEnergyIncrease struct {
@@ -396,12 +402,12 @@ func (powerup *PowerupEnergyIncrease) Collide(player *Player, imageManager *Imag
     return isColliding(bounds, player)
 }
 
-func (powerup *PowerupEnergyIncrease) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager){
+func (powerup *PowerupEnergyIncrease) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager, extra ebiten.GeoM){
     pic, _, err := imageManager.LoadImage(gameImages.ImagePowerup5)
     if err != nil {
         return
     }
-    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter)
+    drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter, extra)
 }
 
 func MakePowerupEnergyIncrease(x float64, y float64) Powerup {

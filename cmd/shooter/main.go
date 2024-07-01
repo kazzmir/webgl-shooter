@@ -1480,7 +1480,7 @@ func (game *Game) Draw(screen *ebiten.Image) {
     }
 
     for _, powerup := range game.Powerups {
-        powerup.Draw(screen, game.ImageManager, game.ShaderManager)
+        powerup.Draw(screen, game.ImageManager, game.ShaderManager, ebiten.GeoM{})
     }
 
     for _, explosion := range game.Explosions {

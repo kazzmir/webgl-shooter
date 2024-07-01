@@ -212,7 +212,7 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
     hintX := 300
     hintY := 500
     hintWidth := 500
-    hintHeight := 200
+    hintHeight := 240
     hintArea := screen.SubImage(image.Rect(hintX, hintY, hintX + hintWidth, hintY + hintHeight)).(*ebiten.Image)
     hintArea.Fill(color.RGBA{0x11, 0x21, 0x32, 0xff})
     vector.StrokeRect(hintArea, float32(hintX), float32(hintY), float32(hintWidth), float32(hintHeight), 1, color.RGBA{0xff, 0xff, 0xff, 0xff}, true)
@@ -357,7 +357,7 @@ func makeHintPowerups() *Hint {
         Time: 0,
         Show: func(self *Hint, screen *ebiten.Image, imageManager *ImageManager, shaderManager *ShaderManager, font *text.GoTextFaceSource, geometry ebiten.GeoM) error {
 
-            face := text.GoTextFace{Source: font, Size: 16}
+            face := text.GoTextFace{Source: font, Size: 14}
 
             op := &text.DrawOptions{}
             op.GeoM = geometry
@@ -367,22 +367,35 @@ func makeHintPowerups() *Hint {
 
             x, y := geometry.Apply(0, 0)
 
-            powerup := MakePowerupEnergy(x + 30, y + 50)
-            powerup.Draw(screen, imageManager, shaderManager)
+            var scaler ebiten.GeoM
+            scaler.Scale(0.7, 0.7)
 
-            op.GeoM.Translate(60, 40)
+            powerup := MakePowerupEnergy(x + 30, y + 40)
+            powerup.Draw(screen, imageManager, shaderManager, scaler)
+
+            op.GeoM.Translate(60, 27)
             text.Draw(screen, "Energy stays at the maximum for a few seconds", &face, op)
 
-            powerup = MakePowerupHealth(x + 30, y + 100)
-            powerup.Draw(screen, imageManager, shaderManager)
+            powerup = MakePowerupHealth(x + 30, y + 80)
+            powerup.Draw(screen, imageManager, shaderManager, scaler)
 
-            op.GeoM.Translate(0, 50)
+            op.GeoM.Translate(0, 40)
             text.Draw(screen, "Increase health by some amount", &face, op)
 
-            powerup = MakePowerupWeapon(x + 30, y + 150)
-            powerup.Draw(screen, imageManager, shaderManager)
-            op.GeoM.Translate(0, 50)
+            powerup = MakePowerupWeapon(x + 30, y + 120)
+            powerup.Draw(screen, imageManager, shaderManager, scaler)
+            op.GeoM.Translate(0, 40)
             text.Draw(screen, "Enable the next weapon slot", &face, op)
+
+            powerup = MakePowerupBomb(x + 30, y + 160)
+            powerup.Draw(screen, imageManager, shaderManager, scaler)
+            op.GeoM.Translate(0, 40)
+            text.Draw(screen, "Add a bomb to your arsenal", &face, op)
+
+            powerup = MakePowerupEnergyIncrease(x + 30, y + 200)
+            powerup.Draw(screen, imageManager, shaderManager, scaler)
+            op.GeoM.Translate(0, 40)
+            text.Draw(screen, "Increase maximum energy and fill rate", &face, op)
 
             return nil
         },
