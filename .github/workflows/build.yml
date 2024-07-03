@@ -13,7 +13,12 @@ jobs:
       - name: Set up go
         uses: actions/setup-go@v5
 
-      - name: Install dependencies
+      - name: Install ubuntu dependencies
+        run: |
+          sudo apt update
+          sudo apt install libasound2-dev libxrandr-dev
+
+      - name: Install go dependencies
         run: |
           go get ./...
           go mod tidy
