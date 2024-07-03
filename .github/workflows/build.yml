@@ -16,7 +16,7 @@ jobs:
       - name: Install ubuntu dependencies
         run: |
           sudo apt update
-          sudo apt install libasound2-dev libxrandr-dev libgl-dev libxcursor-dev
+          sudo apt install libasound2-dev libxrandr-dev libgl-dev libxcursor-dev libxinerama-dev
 
       - name: Install go dependencies
         run: |
