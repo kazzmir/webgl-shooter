@@ -1,11 +1,16 @@
 name: Wasm Build
 
-on: push
+on:
+  push:
+    tags:
+      - '*'
 
 jobs:
   build:
     name: Build code
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -25,3 +30,8 @@ jobs:
 
       - name: Build
         run: make build-web
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: shooter.wasm
