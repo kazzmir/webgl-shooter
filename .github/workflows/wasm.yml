@@ -1,0 +1,37 @@
+name: Wasm Build
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    name: Build code
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up go
+        uses: actions/setup-go@v5
+
+      - name: Install ubuntu dependencies
+        run: |
+          sudo apt update
+          sudo apt install make
+
+      - name: Install go dependencies
+        run: |
+          go get ./...
+          go mod tidy
+
+      - name: Build
+        run: make build-web
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: shooter.wasm
