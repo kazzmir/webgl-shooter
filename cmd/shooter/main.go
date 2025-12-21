@@ -108,6 +108,7 @@ type Bullet struct {
 
     // optional func that returns true if we should keep the bullet, and false if we should remove it
     Update func(bullet *Bullet) bool
+    CustomDraw func(bullet *Bullet, screen *ebiten.Image)
 }
 
 func (bullet *Bullet) Damage(amount int) {
@@ -116,10 +117,14 @@ func (bullet *Bullet) Damage(amount int) {
 
 func (bullet *Bullet) Draw(screen *ebiten.Image) {
 
-    if bullet.animation != nil {
-        bullet.animation.Draw(screen, bullet.x, bullet.y)
-    } else if bullet.pic != nil {
-        drawCenteredImage(screen, bullet.pic, bullet.x, bullet.y)
+    if bullet.CustomDraw != nil {
+        bullet.CustomDraw(bullet, screen)
+    } else {
+        if bullet.animation != nil {
+            bullet.animation.Draw(screen, bullet.x, bullet.y)
+        } else if bullet.pic != nil {
+            drawCenteredImage(screen, bullet.pic, bullet.x, bullet.y)
+        }
     }
 }
 

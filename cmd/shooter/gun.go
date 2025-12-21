@@ -517,7 +517,7 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
 
         for range 40 {
             nextY := y - 18
-            nextX := x + (rand.Float64() - 0.5) * 4
+            nextX := x + (rand.Float64() - 0.5) * 6
 
             for yn := y; yn >= nextY; yn -= 1 {
                 life := 40
@@ -536,6 +536,18 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
                             return false
                         }
                         return true
+                    },
+                    CustomDraw: func(self *Bullet, screen *ebiten.Image) {
+                        var options ebiten.DrawImageOptions
+                        alpha := 1.0
+                        if life < 20 {
+                            alpha = float64(life) / 20.0
+                        }
+
+                        options.ColorScale.ScaleAlpha(float32(alpha))
+                        options.GeoM.Translate(self.x, self.y)
+                        options.GeoM.Translate(float64(-pic.Bounds().Dx()/2), float64(-pic.Bounds().Dy()/2))
+                        screen.DrawImage(self.pic, &options)
                     },
                 })
             }
