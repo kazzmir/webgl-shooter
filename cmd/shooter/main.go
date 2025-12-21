@@ -104,6 +104,7 @@ type Bullet struct {
     pic *ebiten.Image
     animation *Animation
     health int
+    Gun Gun
 }
 
 func (bullet *Bullet) Damage(amount int) {
@@ -339,6 +340,7 @@ func haveGun(guns []Gun, gun Gun) bool {
 }
 
 func (player *Player) EnableNextGun(){
+    /*
     guns := []Gun{&DualBasicGun{enabled: true}, &BeamGun{enabled: true}, &MissleGun{enabled: true}}
     for _, gun := range guns {
         if !haveGun(player.Guns, gun) {
@@ -346,6 +348,7 @@ func (player *Player) EnableNextGun(){
             return
         }
     }
+    */
 }
 
 func (player *Player) Move() {
@@ -1277,6 +1280,9 @@ func (game *Game) Update(run *Run) error {
                 for _, enemy := range game.Enemies {
                     if enemy.IsAlive() && enemy.Collision(bullet.x, bullet.y) {
                         game.Player.Score += 1
+                        if bullet.Gun != nil {
+                            bullet.Gun.IncreaseExperience(bullet.Strength)
+                        }
                         bullet.Damage(1)
                         enemy.Damage(bullet.Strength)
                         if ! enemy.IsAlive() {

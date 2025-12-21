@@ -6,6 +6,8 @@ import (
 
     _ "log"
 
+    "math"
+
     "image"
     "image/color"
     "image/draw"
@@ -21,17 +23,46 @@ type Gun interface {
     DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64)
     IsEnabled() bool
     SetEnabled(bool)
+    IncreaseExperience(float64)
     Update()
     EnergyUsed() float64
+
+    // a value from 0.0 to 1.0 indicating how close the gun is to leveling up
+    LevelPercent() float64
 }
 
 type BasicGun struct {
     enabled bool
+    level int
+    experience float64
+
+    // for tracking fire rate
     counter int
+}
+
+func experienceForLevel(level int) float64 {
+    return 100 * math.Pow(1.6, float64(level))
 }
 
 func (basic *BasicGun) EnergyUsed() float64 {
     return 1
+}
+
+func (basic *BasicGun) IncreaseExperience(amount float64) {
+    basic.experience += amount
+    // log.Printf("BasicGun gained %f experience, total %f", amount, basic.experience)
+    if basic.experience >= experienceForLevel(basic.level) {
+        basic.experience -= experienceForLevel(basic.level)
+        basic.level += 1
+    }
+}
+
+func (basic *BasicGun) LevelPercent() float64 {
+    required := experienceForLevel(basic.level)
+    if required == 0 {
+        return 0.0
+    }
+    return basic.experience / required
 }
 
 func (basic *BasicGun) Update() {
@@ -49,7 +80,7 @@ func (basic *BasicGun) SetEnabled(enabled bool) {
 }
 
 func (basic *BasicGun) Rate() float64 {
-    return 10
+    return 10 + float64(basic.level) * 2
 }
 
 func drawGunBox(screen *ebiten.Image, x float64, y float64, color_ color.Color, icon *ebiten.Image) {
@@ -89,6 +120,13 @@ func (basic *BasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager
     }
 
     drawGunBox(screen, x, y, iconColor(basic.enabled), pic)
+
+    levelGaugeX := x + 20 + 5
+    gaugeWidth := float32(10)
+    gaugeHeight := float32(20)
+
+    vector.StrokeRect(screen, float32(levelGaugeX), float32(y), gaugeWidth, gaugeHeight, 1, color.RGBA{R: 255, G: 255, B: 255, A: 255}, false)
+    vector.FillRect(screen, float32(levelGaugeX)+1, float32(y)+gaugeHeight-float32(basic.LevelPercent()*float64(gaugeHeight-2)), gaugeWidth-2, float32(basic.LevelPercent()*float64(gaugeHeight-2)), color.RGBA{R: 0, G: 255, B: 0, A: 255}, false)
 }
 
 func (basic *BasicGun) DoSound(soundManager *SoundManager) {
@@ -113,6 +151,7 @@ func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) (
             velocityX: 0,
             velocityY: velocityY,
             pic: pic,
+            Gun: basic,
         }
 
         return []*Bullet{&bullet}, nil
@@ -125,6 +164,19 @@ type DualBasicGun struct {
     enabled bool
     counter int
     icon *ebiten.Image
+    level int
+    experience float64
+}
+
+func (dual *DualBasicGun) LevelPercent() float64 {
+    required := experienceForLevel(dual.level)
+    if required == 0 {
+        return 0.0
+    }
+    return dual.experience / required
+}
+
+func (dual *DualBasicGun) IncreaseExperience(experience float64) {
 }
 
 func (dual *DualBasicGun) Update() {
@@ -204,6 +256,7 @@ func (dual *DualBasicGun) Shoot(imageManager *ImageManager, x float64, y float64
             velocityX: 0,
             velocityY: velocityY,
             pic: pic,
+            Gun: dual,
         }
 
         bullet2 := bullet1
@@ -218,12 +271,26 @@ func (dual *DualBasicGun) Shoot(imageManager *ImageManager, x float64, y float64
 type BeamGun struct {
     enabled bool
     counter int
+    level int
+    experience float64
+}
+
+func (beam *BeamGun) LevelPercent() float64 {
+    required := experienceForLevel(beam.level)
+    if required == 0 {
+        return 0.0
+    }
+    return beam.experience / required
 }
 
 func (beam *BeamGun) Update() {
     if beam.counter > 0 {
         beam.counter -= 1
     }
+}
+
+func (beam *BeamGun) IncreaseExperience(experience float64) {
+    // TODO
 }
 
 func (beam *BeamGun) EnergyUsed() float64 {
@@ -274,6 +341,7 @@ func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]
             velocityX: 0,
             velocityY: velocityY,
             animation: animation,
+            Gun: beam,
             // pic: pic,
         }
 
@@ -286,6 +354,20 @@ func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]
 type MissleGun struct {
     enabled bool
     counter int
+    level int
+    experience float64
+}
+
+func (missle *MissleGun) LevelPercent() float64 {
+    required := experienceForLevel(missle.level)
+    if required == 0 {
+        return 0.0
+    }
+    return missle.experience / required
+}
+
+func (missle *MissleGun) IncreaseExperience(experience float64) {
+    // TODO
 }
 
 func (missle *MissleGun) Update() {
@@ -340,6 +422,7 @@ func (missle *MissleGun) Shoot(imageManager *ImageManager, x float64, y float64)
             velocityX: 0,
             velocityY: velocityY,
             pic: pic,
+            Gun: missle,
         }
 
         return []*Bullet{&bullet}, nil
