@@ -6,6 +6,7 @@ import (
 
     _ "log"
 
+    "strconv"
     "math"
 
     "image"
@@ -14,13 +15,14 @@ import (
 
     "github.com/hajimehoshi/ebiten/v2"
     "github.com/hajimehoshi/ebiten/v2/vector"
+    "github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 type Gun interface {
     Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error)
     Rate() float64
     DoSound(soundManager *SoundManager)
-    DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64)
+    DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace)
     IsEnabled() bool
     SetEnabled(bool)
     IncreaseExperience(float64)
@@ -113,7 +115,7 @@ func iconColor(enabled bool) color.Color {
     }
 }
 
-func (basic *BasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64) {
+func (basic *BasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace) {
     pic, _, err := imageManager.LoadImage(gameImages.ImageBullet)
     if err != nil {
         pic = nil
@@ -127,6 +129,12 @@ func (basic *BasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager
 
     vector.StrokeRect(screen, float32(levelGaugeX), float32(y), gaugeWidth, gaugeHeight, 1, color.RGBA{R: 255, G: 255, B: 255, A: 255}, false)
     vector.FillRect(screen, float32(levelGaugeX)+1, float32(y)+gaugeHeight-float32(basic.LevelPercent()*float64(gaugeHeight-2)), gaugeWidth-2, float32(basic.LevelPercent()*float64(gaugeHeight-2)), color.RGBA{R: 0, G: 255, B: 0, A: 255}, false)
+
+    op := &text.DrawOptions{}
+    op.GeoM.Translate(levelGaugeX, y + float64(gaugeHeight) + 1)
+    var color_ color.RGBA = color.RGBA{0xff, 0xff, 0xff, 0xff}
+    op.ColorScale.ScaleWithColor(color_)
+    text.Draw(screen, strconv.Itoa(basic.level + 1), textFace, op)
 }
 
 func (basic *BasicGun) DoSound(soundManager *SoundManager) {
@@ -201,7 +209,7 @@ func (dual *DualBasicGun) Rate() float64 {
     return 7
 }
 
-func (dual *DualBasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64) {
+func (dual *DualBasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace) {
     if dual.icon == nil {
         _, bullet, err := imageManager.LoadImage(gameImages.ImageBullet)
         if err == nil {
@@ -313,7 +321,7 @@ func (beam *BeamGun) DoSound(soundManager *SoundManager) {
     soundManager.Play(audioFiles.AudioShoot1)
 }
 
-func (beam *BeamGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64) {
+func (beam *BeamGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace) {
     var pic *ebiten.Image
     animation, err := imageManager.LoadAnimation(gameImages.ImageBeam1)
     if err == nil {
@@ -396,7 +404,7 @@ func (missle *MissleGun) DoSound(soundManager *SoundManager) {
     soundManager.Play(audioFiles.AudioShoot1)
 }
 
-func (missle *MissleGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64) {
+func (missle *MissleGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace) {
     pic, _, err := imageManager.LoadImage(gameImages.ImageMissle1)
     if err != nil {
         pic = nil

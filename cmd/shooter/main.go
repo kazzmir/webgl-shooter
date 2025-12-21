@@ -521,7 +521,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
     var iconX float64 = 150
     var iconY float64 = 3
     for i, gun := range player.Guns {
-        gun.DrawIcon(screen, imageManager, iconX, iconY)
+        gun.DrawIcon(screen, imageManager, iconX, iconY, gunFace)
 
         op := &text.DrawOptions{}
         op.GeoM.Translate(iconX + 2, iconY + 22)
@@ -532,7 +532,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         op.ColorScale.ScaleWithColor(color_)
         text.Draw(screen, strconv.Itoa(i+1), gunFace, op)
 
-        iconX += 30
+        iconX += 40
     }
 
     ShowBombsHud(screen, imageManager, iconX, iconY, player.Bombs)
