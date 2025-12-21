@@ -515,16 +515,16 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
 
         var bullets []*Bullet
 
-        var makeBullets func(count int, startX float64, startY float64, angle float64, branching float64)
+        var makeBullets func(count int, life int, startX float64, startY float64, angle float64, branching float64)
 
-        makeBullets = func(count int, startX float64, startY float64, angle float64, branching float64) {
+        makeBullets = func(count int, life int, startX float64, startY float64, angle float64, branching float64) {
 
             for i := range count {
                 for range 10 {
-                    startY = startY - math.Sin(angle) * 3
-                    startX = startX + math.Cos(angle) * 3
+                    startY = startY - math.Sin(angle) * 2.5
+                    startX = startX + math.Cos(angle) * 2.5
 
-                    life := 400
+                    life := life
                     bullets = append(bullets, &Bullet{
                         x: startX,
                         y: startY,
@@ -542,21 +542,51 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
                             return true
                         },
                         CustomDraw: func(self *Bullet, screen *ebiten.Image) {
-                            var options ebiten.DrawImageOptions
-                            alpha := 1.0
+                            // var options ebiten.DrawImageOptions
+                            alpha := uint8(255)
                             if life < 20 {
-                                alpha = float64(life) / 20.0
+                                alpha = uint8(255.0 * float64(life) / 20.0)
                             }
 
+                            size := float32(3.0)
+
+                            col := color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+
+                            // lowColor := color.RGBA{R: 0x6f, G: 0xbf, B: 0xf3, A: 0xff}
+                            lowColor := color.RGBA{R: 0xb2, G: 0x3b, B: 0x33, A: 0xff}
+
+                            mix := func(v1 uint8) uint8 {
+                                return v1 + uint8(float64(0xff - v1) * float64(life) / 50)
+                            }
+
+                            if life < 50 {
+                                size = 3 * float32(life) / 50.0
+                                col.R = mix(lowColor.R)
+                                col.G = mix(lowColor.G)
+                                col.B = mix(lowColor.B)
+                            }
+
+                            col.A = alpha
+
+                            vector.FillCircle(screen, float32(self.x), float32(self.y), size, col, false)
+
+                            /*
                             options.ColorScale.ScaleAlpha(float32(alpha))
                             options.GeoM.Translate(self.x, self.y)
                             options.GeoM.Translate(float64(-pic.Bounds().Dx()/2), float64(-pic.Bounds().Dy()/2))
                             screen.DrawImage(self.pic, &options)
+                            */
                         },
                     })
                 }
 
                 angle += (rand.Float64() - 0.5) / 11
+                if i % 3 == 0 {
+                    life -= 1
+                    if life <= 0 {
+                        return
+                    }
+                }
 
                 if rand.Float64() < branching {
                     // branch at a perpendicular angle
@@ -566,12 +596,12 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
                     } else {
                         newAngle = angle - math.Pi / 6
                     }
-                    makeBullets((count - i) / 2, startX, startY, newAngle, branching / 2)
+                    makeBullets((count - i) / 2, life * 4 / 5, startX, startY, newAngle, branching / 1.5)
                 }
             }
         }
 
-        makeBullets(20, x, y, math.Pi/2, 0.2)
+        makeBullets(30, 100, x, y, math.Pi/2, 0.25)
 
         return bullets, nil
     }
