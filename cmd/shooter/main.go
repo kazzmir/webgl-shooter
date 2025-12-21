@@ -105,6 +105,9 @@ type Bullet struct {
     animation *Animation
     health int
     Gun Gun
+
+    // optional func that returns true if we should keep the bullet, and false if we should remove it
+    Update func(bullet *Bullet) bool
 }
 
 func (bullet *Bullet) Damage(amount int) {
@@ -670,6 +673,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         Bombs: 0,
         Guns: []Gun{
             &BasicGun{enabled: true, level: 0},
+            &LightningGun{enabled: true, level: 0},
             // &DualBasicGun{enabled: false},
             // &BeamGun{enabled: false},
             // &MissleGun{enabled: false},
@@ -1317,7 +1321,12 @@ func (game *Game) Update(run *Run) error {
                 }
             }
 
-            if bullet.IsAlive() {
+            alive := bullet.IsAlive()
+            if alive && bullet.Update != nil {
+                alive = bullet.Update(bullet)
+            }
+
+            if alive {
                 outBullets = append(outBullets, bullet)
             }
         }

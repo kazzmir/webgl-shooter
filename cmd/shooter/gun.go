@@ -8,6 +8,7 @@ import (
 
     "strconv"
     "math"
+    "math/rand/v2"
 
     "image"
     "image/color"
@@ -481,3 +482,106 @@ func (missle *MissleGun) Shoot(imageManager *ImageManager, x float64, y float64)
         return nil, nil
     }
 }
+
+type LightningGun struct {
+    enabled bool
+    level int
+    counter int
+
+    bulletImage *ebiten.Image
+}
+
+func (lightning *LightningGun) GetBulletImage(imageManager *ImageManager) (*ebiten.Image, error) {
+    if lightning.bulletImage == nil {
+        lightning.bulletImage = ebiten.NewImage(3, 3)
+        lightning.bulletImage.Fill(color.RGBA{R: 0x6f, G: 0xbf, B: 0xf3, A: 255})
+    }
+
+    return lightning.bulletImage, nil
+}
+
+func randRange(min float64, max float64) float64 {
+    return (rand.Float64() - 0.5) * (max - min)
+}
+
+func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
+    if lightning.enabled && lightning.counter == 0 {
+        pic, err := lightning.GetBulletImage(imageManager)
+        if err != nil {
+            return nil, err
+        }
+
+        lightning.counter = int(60.0 / lightning.Rate())
+
+        var bullets []*Bullet
+
+        for range 40 {
+            nextY := y - 18
+            nextX := x + (rand.Float64() - 0.5) * 4
+
+            for yn := y; yn >= nextY; yn -= 1 {
+                life := 40
+                bullets = append(bullets, &Bullet{
+                    x: nextX,
+                    y: yn,
+                    Strength: 0.2,
+                    health: 1,
+                    velocityX: 0,
+                    velocityY: 0,
+                    pic: pic,
+                    Gun: lightning,
+                    Update: func(self *Bullet) bool {
+                        life -= 1
+                        if life <= 0 {
+                            return false
+                        }
+                        return true
+                    },
+                })
+            }
+
+            y = nextY
+            x = nextX
+        }
+
+        return bullets, nil
+    }
+
+    return nil, nil
+}
+
+func (lightning *LightningGun) Rate() float64 {
+    return 1
+}
+
+func (lightning *LightningGun) DoSound(soundManager *SoundManager) {
+}
+
+func (lightning *LightningGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace) {
+}
+
+func (lightning *LightningGun) IsEnabled() bool {
+    return lightning.enabled
+}
+
+func (lightning *LightningGun) SetEnabled(enabled bool) {
+    lightning.enabled = enabled
+}
+
+func (lightning *LightningGun) IncreaseExperience(value float64) {
+}
+
+func (lightning *LightningGun) Update() {
+    if lightning.counter > 0 {
+        lightning.counter -= 1
+    }
+}
+
+func (lightning *LightningGun) EnergyUsed() float64 {
+    return 10
+}
+
+func (lightning *LightningGun) LevelPercent() float64 {
+    return 0
+}
+
