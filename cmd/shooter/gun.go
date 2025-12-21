@@ -47,7 +47,13 @@ func experienceForLevel(level int) float64 {
 }
 
 func (basic *BasicGun) EnergyUsed() float64 {
-    return 1
+    if basic.level <= 2 {
+        return 1
+    } else if basic.level <= 5 {
+        return 2
+    }
+
+    return 3
 }
 
 func (basic *BasicGun) IncreaseExperience(amount float64) {
@@ -82,7 +88,7 @@ func (basic *BasicGun) SetEnabled(enabled bool) {
 }
 
 func (basic *BasicGun) Rate() float64 {
-    return 10 + float64(basic.level) * 2
+    return 10 + float64(basic.level)
 }
 
 func drawGunBox(screen *ebiten.Image, x float64, y float64, color_ color.Color, icon *ebiten.Image) {
@@ -143,26 +149,63 @@ func (basic *BasicGun) DoSound(soundManager *SoundManager) {
 
 func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
     if basic.enabled && basic.counter == 0 {
-        basic.counter = int(60.0 / basic.Rate())
-        velocityY := -2.5
-
         pic, _, err := imageManager.LoadImage(gameImages.ImageBullet)
         if err != nil {
             return nil, err
         }
 
-        bullet := Bullet{
-            x: x,
-            y: y,
-            Strength: 1,
-            health: 1,
-            velocityX: 0,
-            velocityY: velocityY,
-            pic: pic,
-            Gun: basic,
-        }
+        basic.counter = int(60.0 / basic.Rate())
 
-        return []*Bullet{&bullet}, nil
+        if basic.level <= 2 {
+            velocityY := -2.5
+
+            bullet := Bullet{
+                x: x,
+                y: y,
+                Strength: 1,
+                health: 1,
+                velocityX: 0,
+                velocityY: velocityY,
+                pic: pic,
+                Gun: basic,
+            }
+
+            return []*Bullet{&bullet}, nil
+        } else if basic.level <= 5 {
+            velocityY := -2.5
+
+            makeBullet := func(offsetX float64) *Bullet {
+                return &Bullet{
+                    x: x + offsetX,
+                    y: y,
+                    Strength: 1.1,
+                    health: 1,
+                    velocityX: 0,
+                    velocityY: velocityY,
+                    pic: pic,
+                    Gun: basic,
+                }
+            }
+
+            return []*Bullet{makeBullet(-6), makeBullet(6)}, nil
+        } else {
+            velocityY := -2.5
+
+            makeBullet := func(offsetX float64, offsetY float64) *Bullet {
+                return &Bullet{
+                    x: x + offsetX,
+                    y: y + offsetY,
+                    Strength: 1.1,
+                    health: 1,
+                    velocityX: 0,
+                    velocityY: velocityY,
+                    pic: pic,
+                    Gun: basic,
+                }
+            }
+
+            return []*Bullet{makeBullet(-10, 3), makeBullet(10, 3), makeBullet(0, 0)}, nil
+        }
     } else {
         return nil, nil
     }
