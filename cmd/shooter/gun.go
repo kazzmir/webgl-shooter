@@ -45,7 +45,7 @@ type BasicGun struct {
 }
 
 func experienceForLevel(level int) float64 {
-    return 100 * math.Pow(1.6, float64(level))
+    return 100 * math.Pow(1.7, float64(level))
 }
 
 func (basic *BasicGun) GetLevel() int {
