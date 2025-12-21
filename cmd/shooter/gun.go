@@ -26,6 +26,7 @@ type Gun interface {
     DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace)
     IsEnabled() bool
     SetEnabled(bool)
+    GetLevel() int
     IncreaseExperience(float64)
     Update()
     EnergyUsed() float64
@@ -45,6 +46,10 @@ type BasicGun struct {
 
 func experienceForLevel(level int) float64 {
     return 100 * math.Pow(1.6, float64(level))
+}
+
+func (basic *BasicGun) GetLevel() int {
+    return basic.level
 }
 
 func (basic *BasicGun) EnergyUsed() float64 {
@@ -114,6 +119,21 @@ func drawGunBox(screen *ebiten.Image, x float64, y float64, color_ color.Color, 
     }
 }
 
+func drawGunLevel(screen *ebiten.Image, gun Gun, x float64, y float64, textFace *text.GoTextFace) {
+    levelGaugeX := x + 20 + 5
+    gaugeWidth := float32(10)
+    gaugeHeight := float32(20)
+
+    vector.FillRect(screen, float32(levelGaugeX), float32(y)+gaugeHeight-float32(gun.LevelPercent()*float64(gaugeHeight-2)), gaugeWidth, float32(gun.LevelPercent()*float64(gaugeHeight-2)), color.RGBA{R: 0, G: 255, B: 0, A: 255}, false)
+    vector.StrokeRect(screen, float32(levelGaugeX), float32(y), gaugeWidth, gaugeHeight, 1, color.RGBA{R: 255, G: 255, B: 255, A: 255}, false)
+
+    op := &text.DrawOptions{}
+    op.GeoM.Translate(levelGaugeX, y + float64(gaugeHeight) + 1)
+    var color_ color.RGBA = color.RGBA{0xff, 0xff, 0xff, 0xff}
+    op.ColorScale.ScaleWithColor(color_)
+    text.Draw(screen, strconv.Itoa(gun.GetLevel() + 1), textFace, op)
+}
+
 func iconColor(enabled bool) color.Color {
     if enabled {
         return color.White
@@ -129,19 +149,7 @@ func (basic *BasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager
     }
 
     drawGunBox(screen, x, y, iconColor(basic.enabled), pic)
-
-    levelGaugeX := x + 20 + 5
-    gaugeWidth := float32(10)
-    gaugeHeight := float32(20)
-
-    vector.StrokeRect(screen, float32(levelGaugeX), float32(y), gaugeWidth, gaugeHeight, 1, color.RGBA{R: 255, G: 255, B: 255, A: 255}, false)
-    vector.FillRect(screen, float32(levelGaugeX)+1, float32(y)+gaugeHeight-float32(basic.LevelPercent()*float64(gaugeHeight-2)), gaugeWidth-2, float32(basic.LevelPercent()*float64(gaugeHeight-2)), color.RGBA{R: 0, G: 255, B: 0, A: 255}, false)
-
-    op := &text.DrawOptions{}
-    op.GeoM.Translate(levelGaugeX, y + float64(gaugeHeight) + 1)
-    var color_ color.RGBA = color.RGBA{0xff, 0xff, 0xff, 0xff}
-    op.ColorScale.ScaleWithColor(color_)
-    text.Draw(screen, strconv.Itoa(basic.level + 1), textFace, op)
+    drawGunLevel(screen, basic, x, y, textFace)
 }
 
 func (basic *BasicGun) DoSound(soundManager *SoundManager) {
@@ -218,6 +226,10 @@ type DualBasicGun struct {
     icon *ebiten.Image
     level int
     experience float64
+}
+
+func (dual *DualBasicGun) GetLevel() int {
+    return dual.level
 }
 
 func (dual *DualBasicGun) LevelPercent() float64 {
@@ -341,6 +353,10 @@ func (beam *BeamGun) Update() {
     }
 }
 
+func (beam *BeamGun) GetLevel() int {
+    return beam.level
+}
+
 func (beam *BeamGun) IncreaseExperience(experience float64) {
     // TODO
 }
@@ -408,6 +424,10 @@ type MissleGun struct {
     counter int
     level int
     experience float64
+}
+
+func (missle *MissleGun) GetLevel() int {
+    return missle.level
 }
 
 func (missle *MissleGun) LevelPercent() float64 {
@@ -487,8 +507,13 @@ type LightningGun struct {
     enabled bool
     level int
     counter int
+    experience float64
 
     bulletImage *ebiten.Image
+}
+
+func (lightning *LightningGun) GetLevel() int {
+    return lightning.level
 }
 
 func (lightning *LightningGun) GetBulletImage(imageManager *ImageManager) (*ebiten.Image, error) {
@@ -513,6 +538,19 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
 
         lightning.counter = int(60.0 / lightning.Rate())
 
+        var lowColor color.RGBA
+        switch {
+            case lightning.level <= 2:
+                // bluish
+                lowColor = color.RGBA{R: 0x6f, G: 0xbf, B: 0xf3, A: 0xff}
+            case lightning.level <= 5:
+                // reddish
+                lowColor = color.RGBA{R: 0xb2, G: 0x3b, B: 0x33, A: 0xff}
+            default:
+                // yellowish
+                lowColor = color.RGBA{R: 0xc1, G: 0xbf, B: 0x2c, A: 0xff}
+        }
+
         var bullets []*Bullet
 
         var makeBullets func(count int, life int, startX float64, startY float64, angle float64, branching float64)
@@ -528,7 +566,7 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
                     bullets = append(bullets, &Bullet{
                         x: startX,
                         y: startY,
-                        Strength: 0.2,
+                        Strength: 0.1 + float64(lightning.level) / 10,
                         health: 1,
                         velocityX: 0,
                         velocityY: 0,
@@ -552,8 +590,6 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
 
                             col := color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
 
-                            // lowColor := color.RGBA{R: 0x6f, G: 0xbf, B: 0xf3, A: 0xff}
-                            lowColor := color.RGBA{R: 0xb2, G: 0x3b, B: 0x33, A: 0xff}
 
                             mix := func(v1 uint8) uint8 {
                                 return v1 + uint8(float64(0xff - v1) * float64(life) / 50)
@@ -610,13 +646,14 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
 }
 
 func (lightning *LightningGun) Rate() float64 {
-    return 1
+    return 1 + float64(lightning.level) / 10
 }
 
 func (lightning *LightningGun) DoSound(soundManager *SoundManager) {
 }
 
 func (lightning *LightningGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace) {
+    drawGunLevel(screen, lightning, x, y, textFace)
 }
 
 func (lightning *LightningGun) IsEnabled() bool {
@@ -628,6 +665,12 @@ func (lightning *LightningGun) SetEnabled(enabled bool) {
 }
 
 func (lightning *LightningGun) IncreaseExperience(value float64) {
+    lightning.experience += value
+
+    if lightning.experience >= experienceForLevel(lightning.level) {
+        lightning.experience -= experienceForLevel(lightning.level)
+        lightning.level += 1
+    }
 }
 
 func (lightning *LightningGun) Update() {
@@ -637,10 +680,14 @@ func (lightning *LightningGun) Update() {
 }
 
 func (lightning *LightningGun) EnergyUsed() float64 {
-    return 10
+    return 10 * (1 + float64(lightning.level))
 }
 
 func (lightning *LightningGun) LevelPercent() float64 {
-    return 0
+    required := experienceForLevel(lightning.level)
+    if required == 0 {
+        return 0.0
+    }
+    return lightning.experience / required
 }
 
