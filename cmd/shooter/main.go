@@ -639,6 +639,8 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
             enableGun(player.Guns, 2)
         } else if key == ebiten.KeyDigit4 {
             enableGun(player.Guns, 3)
+        } else if key == ebiten.KeyDigit5 {
+            enableGun(player.Guns, 4)
         }
     }
 
