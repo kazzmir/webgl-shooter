@@ -35,8 +35,8 @@ import (
 
 const debugForceBoss = false
 
-const ScreenWidth = 1024
-const ScreenHeight = 768
+const ScreenWidth = 1200
+const ScreenHeight = 800
 
 func onScreen(x float64, y float64, margin float64) bool {
     return x > -margin && x < ScreenWidth + margin && y > -margin && y < ScreenHeight + margin
