@@ -42,6 +42,7 @@ const ImagePowerup3 = Image("powerup3")
 const ImagePowerup4 = Image("powerup4")
 const ImagePowerup5 = Image("powerup5")
 const ImagePowerupBomb = Image("powerup-bomb")
+const ImageLightningIcon = Image("lightning")
 
 //go:embed player/player.png
 var playerImage []byte
@@ -133,6 +134,9 @@ var hit2Image []byte
 //go:embed bullet/rotate1.png
 var rotate1Image []byte
 
+//go:embed player/bolt1.png
+var lightningImage []byte
+
 func loadPng(data []byte) (image.Image, error) {
     img, _, err := image.Decode(bytes.NewReader(data))
     if err != nil {
@@ -173,6 +177,7 @@ func LoadImage(name Image) (image.Image, error) {
         case ImageFire1: return loadPng(fire1Animation)
         case ImageBomb: return loadPng(bombImage)
         case ImagePowerupBomb: return loadPng(powerupBombImage)
+        case ImageLightningIcon: return loadPng(lightningImage)
     }
 
     return nil, fmt.Errorf("no such image: %s", name)

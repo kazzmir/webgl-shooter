@@ -8,7 +8,7 @@ import (
     "os"
     "bytes"
     "errors"
-    "math/rand"
+    "math/rand/v2"
     "math"
     "strconv"
     "sync"
@@ -35,8 +35,8 @@ import (
 
 const debugForceBoss = false
 
-const ScreenWidth = 1024
-const ScreenHeight = 768
+const ScreenWidth = 1200
+const ScreenHeight = 800
 
 func onScreen(x float64, y float64, margin float64) bool {
     return x > -margin && x < ScreenWidth + margin && y > -margin && y < ScreenHeight + margin
@@ -104,6 +104,11 @@ type Bullet struct {
     pic *ebiten.Image
     animation *Animation
     health int
+    Gun Gun
+
+    // optional func that returns true if we should keep the bullet, and false if we should remove it
+    Update func(bullet *Bullet) bool
+    CustomDraw func(bullet *Bullet, screen *ebiten.Image)
 }
 
 func (bullet *Bullet) Damage(amount int) {
@@ -112,10 +117,14 @@ func (bullet *Bullet) Damage(amount int) {
 
 func (bullet *Bullet) Draw(screen *ebiten.Image) {
 
-    if bullet.animation != nil {
-        bullet.animation.Draw(screen, bullet.x, bullet.y)
-    } else if bullet.pic != nil {
-        drawCenteredImage(screen, bullet.pic, bullet.x, bullet.y)
+    if bullet.CustomDraw != nil {
+        bullet.CustomDraw(bullet, screen)
+    } else {
+        if bullet.animation != nil {
+            bullet.animation.Draw(screen, bullet.x, bullet.y)
+        } else if bullet.pic != nil {
+            drawCenteredImage(screen, bullet.pic, bullet.x, bullet.y)
+        }
     }
 }
 
@@ -177,7 +186,7 @@ func MakeBackground() (*Background, error) {
         dx := 0.0
         dy := randomFloat(0.6, 1.1)
 
-        image := images[rand.Intn(len(images))]
+        image := images[rand.N(len(images))]
 
         stars = append(stars, &StarPosition{x: x, y: y, dx: dx, dy: dy, Image: image})
     }
@@ -339,7 +348,8 @@ func haveGun(guns []Gun, gun Gun) bool {
 }
 
 func (player *Player) EnableNextGun(){
-    guns := []Gun{&DualBasicGun{enabled: true}, &BeamGun{enabled: true}, &MissleGun{enabled: true}}
+    // guns := []Gun{&DualBasicGun{enabled: true}, &BeamGun{enabled: true}, &MissleGun{enabled: true}}
+    guns := []Gun{&BeamGun{enabled: true}, &LightningGun{enabled: true}, &MissleGun{enabled: true}}
     for _, gun := range guns {
         if !haveGun(player.Guns, gun) {
             player.Guns = append(player.Guns, gun)
@@ -518,7 +528,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
     var iconX float64 = 150
     var iconY float64 = 3
     for i, gun := range player.Guns {
-        gun.DrawIcon(screen, imageManager, iconX, iconY)
+        gun.DrawIcon(screen, imageManager, iconX, iconY, gunFace)
 
         op := &text.DrawOptions{}
         op.GeoM.Translate(iconX + 2, iconY + 22)
@@ -529,7 +539,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         op.ColorScale.ScaleWithColor(color_)
         text.Draw(screen, strconv.Itoa(i+1), gunFace, op)
 
-        iconX += 30
+        iconX += 40
     }
 
     ShowBombsHud(screen, imageManager, iconX, iconY, player.Bombs)
@@ -539,7 +549,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         log.Printf("Could not load energy image: %v", err)
     } else {
         if player.PowerupEnergy > 0 {
-            vector.DrawFilledRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), PowerupColor, true)
+            vector.FillRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), PowerupColor, true)
         } else {
             options := &ebiten.DrawImageOptions{}
             useHeight := int(player.GunEnergy / player.MaxEnergy * float64(energy.Bounds().Dy()))
@@ -629,6 +639,8 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
             enableGun(player.Guns, 2)
         } else if key == ebiten.KeyDigit4 {
             enableGun(player.Guns, 3)
+        } else if key == ebiten.KeyDigit5 {
+            enableGun(player.Guns, 4)
         }
     }
 
@@ -666,10 +678,11 @@ func MakePlayer(x, y float64) (*Player, error) {
         MaxHealth: 100.0,
         Bombs: 0,
         Guns: []Gun{
-            &BasicGun{enabled: true},
+            &BasicGun{enabled: true, level: 0},
+            // &LightningGun{enabled: true, level: 0},
             // &DualBasicGun{enabled: false},
-            // &BeamGun{enabled: false},
-            // &MissleGun{enabled: false},
+            // &BeamGun{enabled: true, level: 0},
+            // &MissleGun{enabled: true, level: 8},
         },
         // Gun: &BeamGun{},
         Jump: -50,
@@ -1044,9 +1057,9 @@ func (game *Game) MakeEnemies(count int) error {
 
     for i := 0; i < count; i++ {
         var generator chan Coordinate
-        switch rand.Intn(5) {
+        switch rand.N(5) {
             case 0: generator = MakeGroupGeneratorX()
-            case 1: generator = MakeGroupGeneratorVertical(rand.Intn(3) + 3)
+            case 1: generator = MakeGroupGeneratorVertical(rand.N(3) + 3)
             case 2: generator = MakeGroupGeneratorCircle(100, 6)
             case 3: generator = MakeGroupGenerator1x2()
             case 4: generator = MakeGroupGenerator2x2()
@@ -1054,7 +1067,7 @@ func (game *Game) MakeEnemies(count int) error {
 
         x := randomFloat(50, ScreenWidth - 50)
         y := float64(-200)
-        kind := rand.Intn(5)
+        kind := rand.N(5)
 
         move := makeMovement()
 
@@ -1277,6 +1290,9 @@ func (game *Game) Update(run *Run) error {
                 for _, enemy := range game.Enemies {
                     if enemy.IsAlive() && enemy.Collision(bullet.x, bullet.y) {
                         game.Player.Score += 1
+                        if bullet.Gun != nil {
+                            bullet.Gun.IncreaseExperience(bullet.Strength)
+                        }
                         bullet.Damage(1)
                         enemy.Damage(bullet.Strength)
                         if ! enemy.IsAlive() {
@@ -1292,7 +1308,7 @@ func (game *Game) Update(run *Run) error {
                             explodeEnemy(enemy)
 
                             // create a powerup where the enemy died every once in a while
-                            if rand.Intn(20) == 0 {
+                            if rand.N(20) == 0 {
                                 x, y := enemy.Coords()
                                 game.Powerups = append(game.Powerups, MakeRandomPowerup(x, y))
                             }
@@ -1311,7 +1327,12 @@ func (game *Game) Update(run *Run) error {
                 }
             }
 
-            if bullet.IsAlive() {
+            alive := bullet.IsAlive()
+            if alive && bullet.Update != nil {
+                alive = bullet.Update(bullet)
+            }
+
+            if alive {
                 outBullets = append(outBullets, bullet)
             }
         }
@@ -1399,23 +1420,23 @@ func (game *Game) Update(run *Run) error {
     }
     game.Asteroids = asteroidOut
 
-    if rand.Intn(6000) == 0 {
+    if rand.N(6000) == 0 {
         game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, ScreenWidth-10), -20))
     }
 
     if !game.BossMode && !game.End.Load(){
-        if len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.Intn(100) == 0) {
+        if len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.N(100) == 0) {
             game.MakeEnemies(1)
         }
 
-        if len(game.Asteroids) < 15 && rand.Intn(200) == 0 {
+        if len(game.Asteroids) < 15 && rand.N(200) == 0 {
             game.Asteroids = append(game.Asteroids, MakeAsteroid(randomFloat(-50, ScreenWidth + 50), -50))
         }
 
         // create the boss after 2 minutes
         const bossTime = 60 * 120
         // const bossTime = 60 * 1
-        if debugForceBoss || (game.Counter > bossTime && rand.Intn(1000) == 0) {
+        if debugForceBoss || (game.Counter > bossTime && rand.N(1000) == 0) {
             game.BossMode = true
             game.DoBoss.Do(func(){
                 log.Printf("Created boss!")
@@ -1517,19 +1538,19 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
     if game.WhiteFlash > 0 {
         flash := premultiplyAlpha(color.RGBA{R: 255, G: 255, B: 255, A: uint8(game.WhiteFlash * 255 / GameWhiteFlash)})
-        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &flash, true)
+        vector.FillRect(screen, 0, 0, ScreenWidth, ScreenHeight, &flash, true)
     }
 
     if game.FadeIn < GameFadeIn {
-        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: uint8(255 - game.FadeIn * 255 / GameFadeIn)}, true)
+        vector.FillRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: uint8(255 - game.FadeIn * 255 / GameFadeIn)}, true)
     }
 
     if game.FadeOut > 0 && game.FadeOut <= GameFadeOut {
-        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: uint8(255 - game.FadeOut * 255 / GameFadeOut)}, true)
+        vector.FillRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: uint8(255 - game.FadeOut * 255 / GameFadeOut)}, true)
     }
 
     // vector.StrokeRect(screen, 0, 0, 100, 100, 3, &color.RGBA{R: 255, G: 0, B: 0, A: 128}, true)
-    // vector.DrawFilledRect(screen, 0, 0, 100, 100, &color.RGBA{R: 255, G: 0, B: 0, A: 64}, true)
+    // vector.FillRect(screen, 0, 0, 100, 100, &color.RGBA{R: 255, G: 0, B: 0, A: 64}, true)
 }
 
 func (game *Game) PreloadAssets() error {
@@ -1650,7 +1671,7 @@ func (run *Run) Draw(screen *ebiten.Image) {
     }
 
     if run.Mode == RunMenu {
-        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{R: 0, G: 0, B: 0, A: 92}, true)
+        vector.FillRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{R: 0, G: 0, B: 0, A: 92}, true)
         run.Menu.Draw(screen)
     }
 

@@ -4,7 +4,7 @@ import (
     "fmt"
     "log"
     "math"
-    "math/rand"
+    "math/rand/v2"
     "image"
     "image/color"
     "context"

@@ -5,7 +5,7 @@ import (
     gameImages "github.com/kazzmir/webgl-shooter/images"
 
     "math"
-    "math/rand"
+    "math/rand/v2"
     "log"
     "image"
     "image/color"
@@ -443,7 +443,7 @@ func MakePowerupBomb(x float64, y float64) Powerup {
 }
 
 func MakeRandomPowerup(x float64, y float64) Powerup {
-    switch rand.Intn(5) {
+    switch rand.N(5) {
         case 0: return MakePowerupEnergy(x, y)
         case 1: return MakePowerupHealth(x, y)
         case 2: return MakePowerupWeapon(x, y)
