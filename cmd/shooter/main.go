@@ -15,6 +15,9 @@ import (
     "sync/atomic"
     "context"
     "runtime/pprof"
+    "runtime/debug"
+    "net/http"
+    _ "net/http/pprof"
 
     "image"
     "image/color"
@@ -627,6 +630,21 @@ func enableGun(guns []Gun, index int) {
     }
 }
 
+var lastHeapDump time.Time
+func saveHeapDump() {
+    if time.Since(lastHeapDump) > 5 * time.Second {
+        memProfile, err := os.Create("profile.mem")
+        if err != nil {
+            log.Printf("Unable to create profile.mem: %v", err)
+        } else {
+            defer memProfile.Close()
+            pprof.WriteHeapProfile(memProfile)
+            log.Printf("Wrote heapdump to profile.mem")
+        }
+        lastHeapDump = time.Now()
+    }
+}
+
 func (player *Player) HandleKeys(game *Game, run *Run) error {
     keys := make([]ebiten.Key, 0)
 
@@ -658,6 +676,13 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
         } else if key == ebiten.KeySpace {
             game.Bullets = append(game.Bullets, game.Player.Shoot(game.ImageManager, game.SoundManager)...)
         }
+
+        // for debugging
+        /*
+        else if key == ebiten.KeyM {
+            saveHeapDump()
+        }
+        */
     }
 
     player.velocityX = math.Min(maxVelocity, math.Max(-maxVelocity, player.velocityX))
@@ -1797,9 +1822,13 @@ func MakeGame(audioContext *audio.Context, run *Run, difficulty float64) (*Game,
 func main() {
     log.SetFlags(log.Ldate | log.Lshortfile | log.Lmicroseconds)
 
+    // 512mb is enough for now
+    debug.SetMemoryLimit(512 * 1024 * 1024)
+
     profile := false
 
     if profile {
+        /*
         cpuProfile, err := os.Create("profile.cpu")
         if err != nil {
             log.Printf("Unable to create profile.cpu: %v", err)
@@ -1808,6 +1837,11 @@ func main() {
             pprof.StartCPUProfile(cpuProfile)
             defer pprof.StopCPUProfile()
         }
+        */
+
+        go func() {
+            log.Println(http.ListenAndServe("localhost:6060", nil))
+        }()
     }
 
     ebiten.SetWindowSize(ScreenWidth, ScreenHeight)
