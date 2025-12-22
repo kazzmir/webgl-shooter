@@ -714,7 +714,7 @@ func MakePlayer(x, y float64) (*Player, error) {
         Health: 100.0,
         MaxHealth: 100.0,
         Bombs: 0,
-        Level: 4,
+        Level: 0,
         Guns: []Gun{
             &BasicGun{enabled: true, level: 0},
             // &DualBasicGun{enabled: false},
