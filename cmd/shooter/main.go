@@ -549,7 +549,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         log.Printf("Could not load energy image: %v", err)
     } else {
         if player.PowerupEnergy > 0 {
-            vector.DrawFilledRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), PowerupColor, true)
+            vector.FillRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), PowerupColor, true)
         } else {
             options := &ebiten.DrawImageOptions{}
             useHeight := int(player.GunEnergy / player.MaxEnergy * float64(energy.Bounds().Dy()))
@@ -1536,19 +1536,19 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
     if game.WhiteFlash > 0 {
         flash := premultiplyAlpha(color.RGBA{R: 255, G: 255, B: 255, A: uint8(game.WhiteFlash * 255 / GameWhiteFlash)})
-        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &flash, true)
+        vector.FillRect(screen, 0, 0, ScreenWidth, ScreenHeight, &flash, true)
     }
 
     if game.FadeIn < GameFadeIn {
-        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: uint8(255 - game.FadeIn * 255 / GameFadeIn)}, true)
+        vector.FillRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: uint8(255 - game.FadeIn * 255 / GameFadeIn)}, true)
     }
 
     if game.FadeOut > 0 && game.FadeOut <= GameFadeOut {
-        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: uint8(255 - game.FadeOut * 255 / GameFadeOut)}, true)
+        vector.FillRect(screen, 0, 0, ScreenWidth, ScreenHeight, &color.RGBA{R: 0, G: 0, B: 0, A: uint8(255 - game.FadeOut * 255 / GameFadeOut)}, true)
     }
 
     // vector.StrokeRect(screen, 0, 0, 100, 100, 3, &color.RGBA{R: 255, G: 0, B: 0, A: 128}, true)
-    // vector.DrawFilledRect(screen, 0, 0, 100, 100, &color.RGBA{R: 255, G: 0, B: 0, A: 64}, true)
+    // vector.FillRect(screen, 0, 0, 100, 100, &color.RGBA{R: 255, G: 0, B: 0, A: 64}, true)
 }
 
 func (game *Game) PreloadAssets() error {
@@ -1669,7 +1669,7 @@ func (run *Run) Draw(screen *ebiten.Image) {
     }
 
     if run.Mode == RunMenu {
-        vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{R: 0, G: 0, B: 0, A: 92}, true)
+        vector.FillRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{R: 0, G: 0, B: 0, A: 92}, true)
         run.Menu.Draw(screen)
     }
 
