@@ -15,6 +15,9 @@ import (
     "sync/atomic"
     "context"
     "runtime/pprof"
+    "runtime/debug"
+    "net/http"
+    _ "net/http/pprof"
 
     "image"
     "image/color"
@@ -268,9 +271,9 @@ type Player struct {
     rawImage image.Image
     pic *ebiten.Image
     Guns []Gun
-    EnergyIncreasePerFrame float64
+    // EnergyIncreasePerFrame float64
     GunEnergy float64
-    MaxEnergy float64
+    // MaxEnergy float64
     Health float64
     MaxHealth float64
     Score uint64
@@ -282,6 +285,9 @@ type Player struct {
     Bombs int
     BombCounter int
 
+    Level int
+    Experience float64
+
     PowerupEnergy int
 }
 
@@ -291,10 +297,32 @@ func (player *Player) IncreaseBombs() {
     }
 }
 
+func experienceNeeded(level int) float64 {
+    return 45 * math.Pow(1.4, float64(level))
+}
+
+func (player *Player) AddExperience(amount float64) {
+    player.Experience += amount
+    if player.Experience >= experienceNeeded(player.Level) {
+        player.Experience -= experienceNeeded(player.Level)
+        player.Level += 1
+    }
+}
+
+func (player *Player) GetMaxEnergy() float64 {
+    return 100 * (1 + float64(player.Level) * 0.2)
+}
+
+func (player *Player) GetEnergyIncreasePerFrame() float64 {
+    return 0.4 + float64(player.Level) * 0.25
+}
+
+/*
 func (player *Player) IncreaseMaxEnergy(amount float64) {
     player.MaxEnergy += amount
     player.EnergyIncreasePerFrame += 0.03
 }
+*/
 
 func (player *Player) Damage(amount float64) {
     player.Health -= amount
@@ -394,9 +422,9 @@ func (player *Player) Move() {
         player.y = ScreenHeight
     }
 
-    player.GunEnergy += player.EnergyIncreasePerFrame
-    if player.GunEnergy > player.MaxEnergy {
-        player.GunEnergy = player.MaxEnergy
+    player.GunEnergy += player.GetEnergyIncreasePerFrame()
+    if player.GunEnergy > player.GetMaxEnergy() {
+        player.GunEnergy = player.GetMaxEnergy()
     }
 
     for _, gun := range player.Guns {
@@ -459,19 +487,31 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
     face := &text.GoTextFace{Source: font, Size: 15} 
 
     op := &text.DrawOptions{}
-    op.GeoM.Translate(1, 1)
+    op.GeoM.Translate(2, 1)
     op.ColorScale.ScaleWithColor(color.White)
     text.Draw(screen, fmt.Sprintf("Score: %v", player.Score), face, op)
 
-    op.GeoM.Translate(1, 20)
+    op.GeoM.Translate(0, 20)
     text.Draw(screen, fmt.Sprintf("Kills: %v", player.Kills), face, op)
 
-    op.GeoM.Translate(1, 40)
+    op.GeoM.Translate(0, 20)
+    text.Draw(screen, fmt.Sprintf("Level: %v", player.Level + 1), face, op)
+
+    x, y := op.GeoM.Apply(0, 20)
+    maxWidth := float64(60)
+    levelWidth := player.Experience / experienceNeeded(player.Level) * maxWidth
+    vector.FillRect(screen, float32(x), float32(y), float32(levelWidth), 10, color.RGBA{G: 0xff, A: 0xff}, false)
+    vector.StrokeRect(screen, float32(x), float32(y), float32(maxWidth), 10, 1, color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}, false)
+
+    op.GeoM.Translate(0, 40)
     if player.PowerupEnergy > 0 {
         text.Draw(screen, fmt.Sprintf("Energy: MAX"), face, op)
     } else {
         text.Draw(screen, fmt.Sprintf("Energy: %.2f", player.GunEnergy), face, op)
     }
+
+    op.GeoM.Translate(0, 20)
+    text.Draw(screen, fmt.Sprintf("Energy Regen: %.2f", player.GetEnergyIncreasePerFrame()), face, op)
 
     playerX := player.x - float64(player.pic.Bounds().Dx()) / 2
     playerY := player.y - float64(player.pic.Bounds().Dy()) / 2
@@ -548,15 +588,17 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
     if err != nil {
         log.Printf("Could not load energy image: %v", err)
     } else {
+        energyY := float64(130)
+
         if player.PowerupEnergy > 0 {
-            vector.FillRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), PowerupColor, true)
+            vector.FillRect(screen, 5, float32(energyY), float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), PowerupColor, true)
         } else {
             options := &ebiten.DrawImageOptions{}
-            useHeight := int(player.GunEnergy / player.MaxEnergy * float64(energy.Bounds().Dy()))
+            useHeight := int(player.GunEnergy / player.GetMaxEnergy() * float64(energy.Bounds().Dy()))
 
-            options.GeoM.Translate(5, 100 + float64(energy.Bounds().Dy()) - float64(useHeight))
+            options.GeoM.Translate(5, energyY + float64(energy.Bounds().Dy()) - float64(useHeight))
 
-            vector.StrokeRect(screen, 5, 100, float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), 1, premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 200}), true)
+            vector.StrokeRect(screen, 5, float32(energyY), float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), 1, premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 200}), true)
 
             sub := energy.SubImage(image.Rect(0, energy.Bounds().Dy() - int(useHeight), energy.Bounds().Dx(), energy.Bounds().Dy())).(*ebiten.Image)
             screen.DrawImage(sub, options)
@@ -570,7 +612,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
         options := &ebiten.DrawImageOptions{}
         useHeight := int(player.Health / player.MaxHealth * float64(health.Bounds().Dy()))
 
-        yVal := 400.0
+        yVal := 420.0
 
         options.GeoM.Translate(5, yVal + float64(health.Bounds().Dy()) - float64(useHeight))
 
@@ -585,6 +627,21 @@ func enableGun(guns []Gun, index int) {
     if index < len(guns) {
         gun := guns[index]
         gun.SetEnabled(!gun.IsEnabled())
+    }
+}
+
+var lastHeapDump time.Time
+func saveHeapDump() {
+    if time.Since(lastHeapDump) > 5 * time.Second {
+        memProfile, err := os.Create("profile.mem")
+        if err != nil {
+            log.Printf("Unable to create profile.mem: %v", err)
+        } else {
+            defer memProfile.Close()
+            pprof.WriteHeapProfile(memProfile)
+            log.Printf("Wrote heapdump to profile.mem")
+        }
+        lastHeapDump = time.Now()
     }
 }
 
@@ -619,6 +676,13 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
         } else if key == ebiten.KeySpace {
             game.Bullets = append(game.Bullets, game.Player.Shoot(game.ImageManager, game.SoundManager)...)
         }
+
+        // for debugging
+        /*
+        else if key == ebiten.KeyM {
+            saveHeapDump()
+        }
+        */
     }
 
     player.velocityX = math.Min(maxVelocity, math.Max(-maxVelocity, player.velocityX))
@@ -671,18 +735,17 @@ func MakePlayer(x, y float64) (*Player, error) {
         pic: ebiten.NewImageFromImage(playerImage),
         // Gun: &BasicGun{},
         // Gun: &DualBasicGun{},
-        EnergyIncreasePerFrame: 0.4,
         GunEnergy: 100.0,
-        MaxEnergy: 100.0,
         Health: 100.0,
         MaxHealth: 100.0,
         Bombs: 0,
+        Level: 0,
         Guns: []Gun{
             &BasicGun{enabled: true, level: 0},
-            // &LightningGun{enabled: true, level: 0},
             // &DualBasicGun{enabled: false},
             // &BeamGun{enabled: true, level: 0},
-            // &MissleGun{enabled: true, level: 8},
+            // &MissleGun{enabled: true, level: 0},
+            // &LightningGun{enabled: true, level: 7},
         },
         // Gun: &BeamGun{},
         Jump: -50,
@@ -802,7 +865,7 @@ func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, e
 }
 
 type SoundHandler struct {
-    Make func() *audio.Player
+    Make func() (*audio.Player, func())
     MakeLoop func() (*audio.Player, error)
     // Players chan *audio.Player
 }
@@ -857,10 +920,23 @@ func MakeSoundHandler(name audioFiles.AudioName, context *audio.Context, sampleR
         log.Printf("  loaded %v", name)
     }
 
-    return &SoundHandler{
-        Make: func() *audio.Player {
+    pool := sync.Pool{
+        New: func() any {
             create.Do(load)
             return context.NewPlayerFromBytes(data)
+        },
+    }
+
+    return &SoundHandler{
+        Make: func() (*audio.Player, func()) {
+            player := pool.Get().(*audio.Player)
+
+            finish := func(){
+                player.Rewind()
+                pool.Put(player)
+            }
+
+            return player, finish
         },
         MakeLoop: func() (*audio.Player, error) {
             create.Do(load)
@@ -887,9 +963,20 @@ func (manager *SoundManager) LoadAll() error {
 
 func (manager *SoundManager) Play(name audioFiles.AudioName) {
     if handler, ok := manager.Sounds[name]; ok {
-        player := handler.Make()
+        player, finish := handler.Make()
         player.SetVolume(manager.GetVolume() / 100.0)
         player.Play()
+
+        go func() {
+            for {
+                if player.IsPlaying() {
+                    time.Sleep(100 * time.Millisecond)
+                } else {
+                    finish()
+                    break
+                }
+            }
+        }()
     }
 }
 
@@ -1298,6 +1385,7 @@ func (game *Game) Update(run *Run) error {
                         if ! enemy.IsAlive() {
                             game.Shake()
                             game.Player.Kills += 1
+                            game.Player.AddExperience(enemy.Experience())
                             game.SoundManager.Play(audioFiles.AudioExplosion3)
 
                             // create a powerup every X kills
@@ -1758,9 +1846,13 @@ func MakeGame(audioContext *audio.Context, run *Run, difficulty float64) (*Game,
 func main() {
     log.SetFlags(log.Ldate | log.Lshortfile | log.Lmicroseconds)
 
+    // 1gb is enough for now
+    debug.SetMemoryLimit(1024 * 1024 * 1024)
+
     profile := false
 
     if profile {
+        /*
         cpuProfile, err := os.Create("profile.cpu")
         if err != nil {
             log.Printf("Unable to create profile.cpu: %v", err)
@@ -1769,6 +1861,11 @@ func main() {
             pprof.StartCPUProfile(cpuProfile)
             defer pprof.StopCPUProfile()
         }
+        */
+
+        go func() {
+            log.Println(http.ListenAndServe("localhost:6060", nil))
+        }()
     }
 
     ebiten.SetWindowSize(ScreenWidth, ScreenHeight)
