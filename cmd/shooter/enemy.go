@@ -199,6 +199,7 @@ type Enemy interface {
     Collision(x, y float64) bool
     // returns the x,y coordinate of where the collision occurred, and true/false if a collision occurred
     CollidePlayer(player *Player) (float64, float64, bool)
+    Experience() float64
 
     // a channel to select on to see if this enemy is dead
     Dead() chan struct{}
@@ -215,6 +216,11 @@ type NormalEnemy struct {
     gun EnemyGun
     move Movement
     dead chan struct{}
+}
+
+func (enemy *NormalEnemy) Experience() float64 {
+    // could be based on life
+    return 1
 }
 
 func (enemy *NormalEnemy) Damage(amount float64) {
@@ -562,6 +568,10 @@ func (boss *Boss1Movement) Move(x float64, y float64) (float64, float64) {
         angle := math.Atan2(boss.moveY - y, boss.moveX - x)
         return x + math.Cos(angle) * speed, y + math.Sin(angle) * speed
     }
+}
+
+func (boss *Boss1Movement) Experience() float64 {
+    return 40
 }
 
 func MakeBoss1(x float64, y float64, rawImage image.Image, pic *ebiten.Image, difficulty float64) (Enemy, error) {

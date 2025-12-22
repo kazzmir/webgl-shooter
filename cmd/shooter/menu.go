@@ -392,10 +392,12 @@ func makeHintPowerups() *Hint {
             op.GeoM.Translate(0, 40)
             text.Draw(screen, "Add a bomb to your arsenal", &face, op)
 
+            /*
             powerup = MakePowerupEnergyIncrease(x + 30, y + 200)
             powerup.Draw(screen, imageManager, shaderManager, scaler)
             op.GeoM.Translate(0, 40)
             text.Draw(screen, "Increase maximum energy and fill rate", &face, op)
+            */
 
             return nil
         },

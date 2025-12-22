@@ -362,6 +362,7 @@ func (powerup *PowerupBomb) Draw(screen *ebiten.Image, imageManager *ImageManage
     drawGlow(screen, pic, shaders, powerup.x, powerup.y, powerup.counter, extra)
 }
 
+/*
 type PowerupEnergyIncrease struct {
     x, y float64
     velocityX, velocityY float64
@@ -421,6 +422,7 @@ func MakePowerupEnergyIncrease(x float64, y float64) Powerup {
         increase: 25,
     }
 }
+*/
 
 func MakePowerupWeapon(x float64, y float64) Powerup {
     return &PowerupWeapon{
@@ -443,13 +445,15 @@ func MakePowerupBomb(x float64, y float64) Powerup {
 }
 
 func MakeRandomPowerup(x float64, y float64) Powerup {
-    switch rand.N(5) {
+    switch rand.N(4) {
         case 0: return MakePowerupEnergy(x, y)
         case 1: return MakePowerupHealth(x, y)
         case 2: return MakePowerupWeapon(x, y)
         case 3: return MakePowerupBomb(x, y)
-        case 4: return MakePowerupEnergyIncrease(x, y)
+        // case 4: return MakePowerupEnergyIncrease(x, y)
     }
+
+    panic("should not reach here")
 
     return nil
 }
