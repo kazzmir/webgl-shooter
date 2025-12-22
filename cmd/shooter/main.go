@@ -295,7 +295,7 @@ func (player *Player) IncreaseBombs() {
 }
 
 func experienceNeeded(level int) float64 {
-    return 50 * math.Pow(1.5, float64(level))
+    return 45 * math.Pow(1.4, float64(level))
 }
 
 func (player *Player) AddExperience(amount float64) {
@@ -311,7 +311,7 @@ func (player *Player) GetMaxEnergy() float64 {
 }
 
 func (player *Player) GetEnergyIncreasePerFrame() float64 {
-    return 0.4 + float64(player.Level) * 0.1
+    return 0.4 + float64(player.Level) * 0.15
 }
 
 /*
@@ -484,7 +484,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
     face := &text.GoTextFace{Source: font, Size: 15} 
 
     op := &text.DrawOptions{}
-    op.GeoM.Translate(1, 1)
+    op.GeoM.Translate(2, 1)
     op.ColorScale.ScaleWithColor(color.White)
     text.Draw(screen, fmt.Sprintf("Score: %v", player.Score), face, op)
 
@@ -493,6 +493,12 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
 
     op.GeoM.Translate(0, 20)
     text.Draw(screen, fmt.Sprintf("Level: %v", player.Level), face, op)
+
+    x, y := op.GeoM.Apply(0, 20)
+    maxWidth := float64(60)
+    levelWidth := player.Experience / experienceNeeded(player.Level) * maxWidth
+    vector.FillRect(screen, float32(x), float32(y), float32(levelWidth), 10, color.RGBA{G: 0xff, A: 0xff}, false)
+    vector.StrokeRect(screen, float32(x), float32(y), float32(maxWidth), 10, 1, color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}, false)
 
     op.GeoM.Translate(0, 40)
     if player.PowerupEnergy > 0 {
@@ -708,13 +714,13 @@ func MakePlayer(x, y float64) (*Player, error) {
         Health: 100.0,
         MaxHealth: 100.0,
         Bombs: 0,
-        Level: 0,
+        Level: 4,
         Guns: []Gun{
             &BasicGun{enabled: true, level: 0},
-            // &LightningGun{enabled: true, level: 0},
             // &DualBasicGun{enabled: false},
             // &BeamGun{enabled: true, level: 0},
-            // &MissleGun{enabled: true, level: 8},
+            // &MissleGun{enabled: true, level: 0},
+            // &LightningGun{enabled: true, level: 0},
         },
         // Gun: &BeamGun{},
         Jump: -50,
