@@ -8,3 +8,8 @@ run-web:
 
 build-web:
 	env GOOS=js GOARCH=wasm go build -o shooter.wasm ./cmd/shooter
+
+itch.io: build-web
+	cp shooter.wasm itch.io
+	butler push ./itch.io kazzmir/simple-shooter:html
+
