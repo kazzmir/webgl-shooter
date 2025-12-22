@@ -45,7 +45,7 @@ type BasicGun struct {
 }
 
 func experienceForLevel(level int) float64 {
-    return 100 * math.Pow(1.7, float64(level))
+    return 90 * math.Pow(1.7, float64(level))
 }
 
 func (basic *BasicGun) GetLevel() int {
@@ -53,13 +53,15 @@ func (basic *BasicGun) GetLevel() int {
 }
 
 func (basic *BasicGun) EnergyUsed() float64 {
+    base := float64(3)
+
     if basic.level <= 2 {
-        return 1
+        base = 1
     } else if basic.level <= 5 {
-        return 2
+        base = 2
     }
 
-    return 3
+    return base + float64(basic.level) * 0.1
 }
 
 func (basic *BasicGun) IncreaseExperience(amount float64) {
@@ -171,7 +173,7 @@ func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) (
             bullet := Bullet{
                 x: x,
                 y: y,
-                Strength: 1,
+                Strength: 1 + float64(basic.level) * 0.05,
                 health: 1,
                 velocityX: 0,
                 velocityY: velocityY,
@@ -187,7 +189,7 @@ func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) (
                 return &Bullet{
                     x: x + offsetX,
                     y: y,
-                    Strength: 1.1,
+                    Strength: 1.1 + float64(basic.level) * 0.05,
                     health: 1,
                     velocityX: 0,
                     velocityY: velocityY,
@@ -204,7 +206,7 @@ func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) (
                 return &Bullet{
                     x: x + offsetX,
                     y: y + offsetY,
-                    Strength: 1.1,
+                    Strength: 1.1 + float64(basic.level) * 0.05,
                     health: 1,
                     velocityX: 0,
                     velocityY: velocityY,
