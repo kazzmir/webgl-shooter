@@ -5,7 +5,7 @@ import (
     gameImages "github.com/kazzmir/webgl-shooter/images"
 
     "math"
-    "math/rand"
+    "math/rand/v2"
     "log"
     "image"
     "image/color"

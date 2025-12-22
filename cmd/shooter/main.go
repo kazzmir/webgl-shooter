@@ -8,7 +8,7 @@ import (
     "os"
     "bytes"
     "errors"
-    "math/rand"
+    "math/rand/v2"
     "math"
     "strconv"
     "sync"
