@@ -311,7 +311,7 @@ func (player *Player) GetMaxEnergy() float64 {
 }
 
 func (player *Player) GetEnergyIncreasePerFrame() float64 {
-    return 0.4 + float64(player.Level) * 0.15
+    return 0.4 + float64(player.Level) * 0.25
 }
 
 /*
