@@ -720,7 +720,7 @@ func MakePlayer(x, y float64) (*Player, error) {
             // &DualBasicGun{enabled: false},
             // &BeamGun{enabled: true, level: 0},
             // &MissleGun{enabled: true, level: 0},
-            // &LightningGun{enabled: true, level: 0},
+            // &LightningGun{enabled: true, level: 7},
         },
         // Gun: &BeamGun{},
         Jump: -50,
