@@ -455,5 +455,5 @@ func MakeRandomPowerup(x float64, y float64) Powerup {
 
     panic("should not reach here")
 
-    return nil
+    // return nil
 }

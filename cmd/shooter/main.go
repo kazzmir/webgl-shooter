@@ -865,7 +865,7 @@ func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, e
 }
 
 type SoundHandler struct {
-    Make func() *audio.Player
+    Make func() (*audio.Player, func())
     MakeLoop func() (*audio.Player, error)
     // Players chan *audio.Player
 }
@@ -920,10 +920,23 @@ func MakeSoundHandler(name audioFiles.AudioName, context *audio.Context, sampleR
         log.Printf("  loaded %v", name)
     }
 
-    return &SoundHandler{
-        Make: func() *audio.Player {
+    pool := sync.Pool{
+        New: func() any {
             create.Do(load)
             return context.NewPlayerFromBytes(data)
+        },
+    }
+
+    return &SoundHandler{
+        Make: func() (*audio.Player, func()) {
+            player := pool.Get().(*audio.Player)
+
+            finish := func(){
+                player.Rewind()
+                pool.Put(player)
+            }
+
+            return player, finish
         },
         MakeLoop: func() (*audio.Player, error) {
             create.Do(load)
@@ -950,9 +963,20 @@ func (manager *SoundManager) LoadAll() error {
 
 func (manager *SoundManager) Play(name audioFiles.AudioName) {
     if handler, ok := manager.Sounds[name]; ok {
-        player := handler.Make()
+        player, finish := handler.Make()
         player.SetVolume(manager.GetVolume() / 100.0)
         player.Play()
+
+        go func() {
+            for {
+                if player.IsPlaying() {
+                    time.Sleep(100 * time.Millisecond)
+                } else {
+                    finish()
+                    break
+                }
+            }
+        }()
     }
 }
 
@@ -1822,8 +1846,8 @@ func MakeGame(audioContext *audio.Context, run *Run, difficulty float64) (*Game,
 func main() {
     log.SetFlags(log.Ldate | log.Lshortfile | log.Lmicroseconds)
 
-    // 512mb is enough for now
-    debug.SetMemoryLimit(512 * 1024 * 1024)
+    // 1gb is enough for now
+    debug.SetMemoryLimit(1024 * 1024 * 1024)
 
     profile := false
 
