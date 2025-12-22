@@ -369,7 +369,7 @@ func (beam *BeamGun) IncreaseExperience(experience float64) {
 }
 
 func (beam *BeamGun) EnergyUsed() float64 {
-    return 2.5 * float64(beam.level) / 2
+    return 2.5 * float64(1 + beam.level) / 2
 }
 
 func (beam *BeamGun) IsEnabled() bool {
@@ -460,7 +460,12 @@ func (missle *MissleGun) LevelPercent() float64 {
 }
 
 func (missle *MissleGun) IncreaseExperience(experience float64) {
-    // TODO
+    missle.experience += experience
+
+    if missle.experience >= experienceForLevel(missle.level) {
+        missle.experience -= experienceForLevel(missle.level)
+        missle.level += 1
+    }
 }
 
 func (missle *MissleGun) Update() {
@@ -470,7 +475,7 @@ func (missle *MissleGun) Update() {
 }
 
 func (missle *MissleGun) EnergyUsed() float64 {
-    return 5
+    return 5 * (1 + float64(missle.level) / 2)
 }
 
 func (missle *MissleGun) IsEnabled() bool {
@@ -482,7 +487,7 @@ func (missle *MissleGun) SetEnabled(enabled bool) {
 }
 
 func (missle *MissleGun) Rate() float64 {
-    return 2
+    return 2 + float64(missle.level) / 4
 }
 
 func (missle *MissleGun) DoSound(soundManager *SoundManager) {
@@ -495,12 +500,13 @@ func (missle *MissleGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManag
         pic = nil
     }
     drawGunBox(screen, x, y, iconColor(missle.enabled), pic)
+    drawGunLevel(screen, missle, x, y, textFace)
 }
 
 func (missle *MissleGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
     if missle.enabled && missle.counter == 0 {
         missle.counter = int(60.0 / missle.Rate())
-        velocityY := -2.1
+        velocityY := -2.1 - float64(missle.level) * 0.1
 
         pic, _, err := imageManager.LoadImage(gameImages.ImageMissle1)
         if err != nil {
@@ -510,7 +516,7 @@ func (missle *MissleGun) Shoot(imageManager *ImageManager, x float64, y float64)
         bullet := Bullet{
             x: x,
             y: y,
-            Strength: 10,
+            Strength: 10 + float64(missle.level) * 2,
             health: 1,
             velocityX: 0,
             velocityY: velocityY,

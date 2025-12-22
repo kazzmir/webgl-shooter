@@ -349,7 +349,7 @@ func haveGun(guns []Gun, gun Gun) bool {
 
 func (player *Player) EnableNextGun(){
     // guns := []Gun{&DualBasicGun{enabled: true}, &BeamGun{enabled: true}, &MissleGun{enabled: true}}
-    guns := []Gun{&BeamGun{enabled: true}, &LightningGun{enabled: true}}
+    guns := []Gun{&BeamGun{enabled: true}, &LightningGun{enabled: true}, &MissleGun{enabled: true}}
     for _, gun := range guns {
         if !haveGun(player.Guns, gun) {
             player.Guns = append(player.Guns, gun)
@@ -680,7 +680,7 @@ func MakePlayer(x, y float64) (*Player, error) {
             // &LightningGun{enabled: true, level: 0},
             // &DualBasicGun{enabled: false},
             // &BeamGun{enabled: true, level: 0},
-            // &MissleGun{enabled: false},
+            // &MissleGun{enabled: true, level: 8},
         },
         // Gun: &BeamGun{},
         Jump: -50,
