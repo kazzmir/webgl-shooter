@@ -656,6 +656,10 @@ func (lightning *LightningGun) DoSound(soundManager *SoundManager) {
 }
 
 func (lightning *LightningGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace) {
+    pic, _, err := imageManager.LoadImage(gameImages.ImageLightningIcon)
+    if err == nil {
+        drawGunBox(screen, x, y, iconColor(lightning.enabled), pic)
+    }
     drawGunLevel(screen, lightning, x, y, textFace)
 }
 
