@@ -676,10 +676,10 @@ func MakePlayer(x, y float64) (*Player, error) {
         MaxHealth: 100.0,
         Bombs: 0,
         Guns: []Gun{
-            &BasicGun{enabled: true, level: 0},
+            // &BasicGun{enabled: true, level: 0},
             // &LightningGun{enabled: true, level: 0},
             // &DualBasicGun{enabled: false},
-            // &BeamGun{enabled: false},
+            &BeamGun{enabled: true, level: 0},
             // &MissleGun{enabled: false},
         },
         // Gun: &BeamGun{},

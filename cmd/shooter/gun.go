@@ -360,11 +360,16 @@ func (beam *BeamGun) GetLevel() int {
 }
 
 func (beam *BeamGun) IncreaseExperience(experience float64) {
-    // TODO
+    beam.experience += experience
+
+    if beam.experience >= experienceForLevel(beam.level) {
+        beam.experience -= experienceForLevel(beam.level)
+        beam.level += 1
+    }
 }
 
 func (beam *BeamGun) EnergyUsed() float64 {
-    return 2.5
+    return 2.5 * float64(beam.level) / 2
 }
 
 func (beam *BeamGun) IsEnabled() bool {
@@ -376,7 +381,7 @@ func (beam *BeamGun) SetEnabled(enabled bool) {
 }
 
 func (beam *BeamGun) Rate() float64 {
-    return 3.5
+    return 3.5 + float64(beam.level) / 3
 }
 
 func (beam *BeamGun) DoSound(soundManager *SoundManager) {
@@ -391,6 +396,7 @@ func (beam *BeamGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, 
     }
 
     drawGunBox(screen, x, y, iconColor(beam.enabled), pic)
+    drawGunLevel(screen, beam, x, y, textFace)
 }
 
 func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
@@ -403,19 +409,32 @@ func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]
             return nil, err
         }
 
-        bullet := Bullet{
-            x: x,
-            y: y,
-            Strength: 2,
-            health: 3,
-            velocityX: 0,
-            velocityY: velocityY,
-            animation: animation,
-            Gun: beam,
-            // pic: pic,
+        var bullets []*Bullet
+
+        makeBullet := func(offsetX float64) *Bullet {
+            return &Bullet{
+                x: x + offsetX,
+                y: y,
+                Strength: 2 + float64(beam.level) * 0.1,
+                health: 3,
+                velocityX: 0,
+                velocityY: velocityY,
+                animation: animation,
+                Gun: beam,
+                // pic: pic,
+            }
         }
 
-        return []*Bullet{&bullet}, nil
+        switch {
+            case beam.level <= 2:
+                bullets = append(bullets, makeBullet(0))
+            case beam.level <= 5:
+                bullets = append(bullets, makeBullet(-15), makeBullet(15))
+            default:
+                bullets = append(bullets, makeBullet(-35), makeBullet(35), makeBullet(0))
+        }
+
+        return bullets, nil
     } else {
         return nil, nil
     }
