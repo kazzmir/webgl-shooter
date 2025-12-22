@@ -650,6 +650,7 @@ func (lightning *LightningGun) Rate() float64 {
 }
 
 func (lightning *LightningGun) DoSound(soundManager *SoundManager) {
+    soundManager.Play(audioFiles.AudioLightning)
 }
 
 func (lightning *LightningGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace) {
