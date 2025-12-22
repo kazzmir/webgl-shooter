@@ -712,7 +712,7 @@ func (lightning *LightningGun) Update() {
 }
 
 func (lightning *LightningGun) EnergyUsed() float64 {
-    return 10 * (1 + float64(lightning.level))
+    return 9 * (1 + float64(lightning.level) * 0.8)
 }
 
 func (lightning *LightningGun) LevelPercent() float64 {
