@@ -492,7 +492,7 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
     text.Draw(screen, fmt.Sprintf("Kills: %v", player.Kills), face, op)
 
     op.GeoM.Translate(0, 20)
-    text.Draw(screen, fmt.Sprintf("Level: %v", player.Level), face, op)
+    text.Draw(screen, fmt.Sprintf("Level: %v", player.Level + 1), face, op)
 
     x, y := op.GeoM.Apply(0, 20)
     maxWidth := float64(60)
