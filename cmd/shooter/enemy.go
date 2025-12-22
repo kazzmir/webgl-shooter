@@ -97,7 +97,7 @@ func (circular *CircularMovement) Coords(x float64, y float64) (float64, float64
 }
 
 func makeMovement() Movement {
-    switch rand.Intn(3) {
+    switch rand.N(3) {
         case 0:
             return &LinearMovement{
                 velocityX: randomFloat(-1, 1),
@@ -130,7 +130,7 @@ type EnemyGun1 struct {
 }
 
 func (gun *EnemyGun1) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
-    if rand.Intn(100) == 0 {
+    if rand.N(100) == 0 {
         bulletPic, err := imageManager.LoadAnimation(gameImages.ImageRotate1)
         if err != nil {
             log.Printf("Unable to load bullet: %v", err)
@@ -158,7 +158,7 @@ type EnemyGun2 struct {
 }
 
 func (gun *EnemyGun2) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
-    if rand.Intn(100) == 0 {
+    if rand.N(100) == 0 {
         bulletPic, _, err := imageManager.LoadImage(gameImages.ImageBulletSmallBlue)
         if err != nil {
             log.Printf("Unable to load bullet: %v", err)
@@ -416,7 +416,7 @@ type GunPattern struct {
 }
 
 func (gun *GunPattern) Shoot(x float64, y float64, player *Player, imageManager *ImageManager) []*Bullet {
-    if gun.counter == 0 && rand.Intn(gun.probability) == 0 {
+    if gun.counter == 0 && rand.N(gun.probability) == 0 {
         gun.counter = gun.rate * gun.repeat
     }
 
@@ -552,7 +552,7 @@ func (boss *Boss1Movement) Move(x float64, y float64) (float64, float64) {
         if boss.counter == 0 {
             boss.moveX = randomFloat(100, ScreenWidth - 100)
             boss.moveY = randomFloat(100, ScreenHeight - 100)
-            boss.counter = uint64(rand.Intn(200) + 200)
+            boss.counter = uint64(rand.N(200) + 200)
         } else {
             boss.counter -= 1
         }

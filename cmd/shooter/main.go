@@ -186,7 +186,7 @@ func MakeBackground() (*Background, error) {
         dx := 0.0
         dy := randomFloat(0.6, 1.1)
 
-        image := images[rand.Intn(len(images))]
+        image := images[rand.N(len(images))]
 
         stars = append(stars, &StarPosition{x: x, y: y, dx: dx, dy: dy, Image: image})
     }
@@ -1055,9 +1055,9 @@ func (game *Game) MakeEnemies(count int) error {
 
     for i := 0; i < count; i++ {
         var generator chan Coordinate
-        switch rand.Intn(5) {
+        switch rand.N(5) {
             case 0: generator = MakeGroupGeneratorX()
-            case 1: generator = MakeGroupGeneratorVertical(rand.Intn(3) + 3)
+            case 1: generator = MakeGroupGeneratorVertical(rand.N(3) + 3)
             case 2: generator = MakeGroupGeneratorCircle(100, 6)
             case 3: generator = MakeGroupGenerator1x2()
             case 4: generator = MakeGroupGenerator2x2()
@@ -1065,7 +1065,7 @@ func (game *Game) MakeEnemies(count int) error {
 
         x := randomFloat(50, ScreenWidth - 50)
         y := float64(-200)
-        kind := rand.Intn(5)
+        kind := rand.N(5)
 
         move := makeMovement()
 
@@ -1306,7 +1306,7 @@ func (game *Game) Update(run *Run) error {
                             explodeEnemy(enemy)
 
                             // create a powerup where the enemy died every once in a while
-                            if rand.Intn(20) == 0 {
+                            if rand.N(20) == 0 {
                                 x, y := enemy.Coords()
                                 game.Powerups = append(game.Powerups, MakeRandomPowerup(x, y))
                             }
@@ -1418,23 +1418,23 @@ func (game *Game) Update(run *Run) error {
     }
     game.Asteroids = asteroidOut
 
-    if rand.Intn(6000) == 0 {
+    if rand.N(6000) == 0 {
         game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, ScreenWidth-10), -20))
     }
 
     if !game.BossMode && !game.End.Load(){
-        if len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.Intn(100) == 0) {
+        if len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.N(100) == 0) {
             game.MakeEnemies(1)
         }
 
-        if len(game.Asteroids) < 15 && rand.Intn(200) == 0 {
+        if len(game.Asteroids) < 15 && rand.N(200) == 0 {
             game.Asteroids = append(game.Asteroids, MakeAsteroid(randomFloat(-50, ScreenWidth + 50), -50))
         }
 
         // create the boss after 2 minutes
         const bossTime = 60 * 120
         // const bossTime = 60 * 1
-        if debugForceBoss || (game.Counter > bossTime && rand.Intn(1000) == 0) {
+        if debugForceBoss || (game.Counter > bossTime && rand.N(1000) == 0) {
             game.BossMode = true
             game.DoBoss.Do(func(){
                 log.Printf("Created boss!")
