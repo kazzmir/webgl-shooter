@@ -21,7 +21,7 @@ import (
 
     "image"
     "image/color"
-    _ "image/png"
+    "image/png"
 
     gameImages "github.com/kazzmir/webgl-shooter/images"
     fontLib "github.com/kazzmir/webgl-shooter/font"
@@ -1071,6 +1071,9 @@ type Game struct {
 
     // number of ticks the game has run
     Counter uint64
+
+    // time when the last screenshot was taken
+    LastScreenshot time.Time
 }
 
 func (game *Game) GetCounter(name string, limit int) *GameCounter {
@@ -1196,7 +1199,24 @@ func (game *Game) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.I
     })
 }
 
+func (game *Game) TakeScreenshot() {
+    output := ebiten.NewImage(ScreenWidth, ScreenHeight)
+    game.Draw(output)
+    filename := fmt.Sprintf("shooter-%s.png", time.Now().Format("2006-01-02-150405"))
+    file, err := os.Create(filename)
+    if err == nil {
+        png.Encode(file, output)
+        file.Close()
+        log.Printf("Saved screenshot to %s", filename)
+    }
+}
+
 func (game *Game) Update(run *Run) error {
+
+    if inpututil.IsKeyJustPressed(ebiten.KeyF1) && time.Since(game.LastScreenshot) > 1 * time.Second {
+        game.TakeScreenshot()
+        game.LastScreenshot = time.Now()
+    }
 
     game.UpdateCounters()
 
