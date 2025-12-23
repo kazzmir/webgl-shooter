@@ -584,6 +584,8 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
 
         makeBullets = func(count int, life int, startX float64, startY float64, angle float64, branching float64) {
 
+            var lastBullet *Bullet
+
             for i := range count {
                 for range 10 {
                     startY = startY - math.Sin(angle) * 2.5
@@ -617,7 +619,6 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
 
                             col := color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
 
-
                             mix := func(v1 uint8) uint8 {
                                 return v1 + uint8(float64(0xff - v1) * float64(life) / 50)
                             }
@@ -631,7 +632,43 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
 
                             col.A = alpha
 
-                            vector.FillCircle(screen, float32(self.x), float32(self.y), size, col, false)
+                            if lastBullet == self {
+                                var path vector.Path
+
+                                x0 := self.x
+                                y0 := self.y
+
+                                size1 := float64(size)
+
+                                x1 := x0 + math.Cos(angle - math.Pi/2) * size1
+                                y1 := y0 - math.Sin(angle - math.Pi/2) * size1
+                                x2 := x0 + math.Cos(angle) * size1 * 2
+                                y2 := y0 - math.Sin(angle) * size1 * 2
+                                x3 := x0 + math.Cos(angle + math.Pi/2) * size1
+                                y3 := y0 - math.Sin(angle + math.Pi/2) * size1
+
+                                //   x
+                                //  x x
+                                // xxxxx
+                                //
+                                // x0,y0 = center of triangle
+                                // x1,y1 = bottom right corner
+                                // x2,y2 = top of triangle
+                                // x3,y3 = bottom left corner
+
+                                path.MoveTo(float32(x1), float32(y1))
+                                path.LineTo(float32(x2), float32(y2))
+                                path.LineTo(float32(x3), float32(y3))
+                                path.Close()
+
+                                var colorScale ebiten.ColorScale
+                                colorScale.ScaleWithColor(col)
+                                vector.FillPath(screen, &path, &vector.FillOptions{}, &vector.DrawPathOptions{
+                                    ColorScale: colorScale,
+                                })
+                            } else {
+                                vector.FillCircle(screen, float32(self.x), float32(self.y), size, col, false)
+                            }
 
                             /*
                             options.ColorScale.ScaleAlpha(float32(alpha))
@@ -641,6 +678,7 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
                             */
                         },
                     })
+                    lastBullet = bullets[len(bullets)-1]
                 }
 
                 angle += (rand.Float64() - 0.5) / 11
@@ -673,7 +711,7 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
 }
 
 func (lightning *LightningGun) Rate() float64 {
-    return 1 + float64(lightning.level) / 10
+    return 0.8 + float64(lightning.level) / 10
 }
 
 func (lightning *LightningGun) DoSound(soundManager *SoundManager) {
