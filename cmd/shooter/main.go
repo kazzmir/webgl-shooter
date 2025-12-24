@@ -10,6 +10,7 @@ import (
     "errors"
     "math/rand/v2"
     "math"
+    "flag"
     "strconv"
     "sync"
     "sync/atomic"
@@ -717,7 +718,7 @@ func (player *Player) HandleKeys(game *Game, run *Run) error {
 
 const JumpDuration = 50
 
-func MakePlayer(x, y float64) (*Player, error) {
+func MakePlayer(x, y float64, cheats bool) (*Player, error) {
 
     playerImage, err := gameImages.LoadImage(gameImages.ImagePlayer)
 
@@ -728,7 +729,7 @@ func MakePlayer(x, y float64) (*Player, error) {
     soundChan := make(chan bool, 2)
     soundChan <- true
 
-    return &Player{
+    player := &Player{
         x: x,
         y: y,
         rawImage: playerImage,
@@ -751,7 +752,14 @@ func MakePlayer(x, y float64) (*Player, error) {
         Jump: -50,
         Score: 0,
         SoundShoot: soundChan,
-    }, nil
+    }
+
+    if cheats {
+        player.Level = 9
+        player.Guns = append(player.Guns, &BeamGun{enabled: true, level: 5}, &LightningGun{enabled: true, level: 5}, &MissleGun{enabled: true, level: 5})
+    }
+
+    return player, nil
 }
 
 type ImagePair struct {
@@ -1890,6 +1898,9 @@ func MakeGame(audioContext *audio.Context, run *Run, difficulty float64) (*Game,
 func main() {
     log.SetFlags(log.Ldate | log.Lshortfile | log.Lmicroseconds)
 
+    cheats := flag.Bool("cheats", false, "enable cheats")
+    flag.Parse()
+
     // 1gb is enough for now
     debug.SetMemoryLimit(1024 * 1024 * 1024)
 
@@ -1925,7 +1936,7 @@ func main() {
     quit, cancel := context.WithCancel(context.Background())
     defer cancel()
 
-    menu, err := createMenu(quit, audioContext, initialVolume)
+    menu, err := createMenu(quit, audioContext, initialVolume, *cheats)
     if err != nil {
         log.Printf("Unable to create menu: %v", err)
         return

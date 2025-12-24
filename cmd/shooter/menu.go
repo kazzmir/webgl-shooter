@@ -404,7 +404,7 @@ func makeHintPowerups() *Hint {
     }
 }
 
-func createMenu(quit context.Context, audioContext *audio.Context, initialVolume float64) (*Menu, error) {
+func createMenu(quit context.Context, audioContext *audio.Context, initialVolume float64, cheats bool) (*Menu, error) {
 
     var options []*MenuOption
 
@@ -417,7 +417,7 @@ func createMenu(quit context.Context, audioContext *audio.Context, initialVolume
                 run.Game.Cancel()
             }
 
-            player, err := MakePlayer(0, 0)
+            player, err := MakePlayer(0, 0, cheats)
             if err != nil {
                 return err
             }
@@ -493,7 +493,7 @@ func createMenu(quit context.Context, audioContext *audio.Context, initialVolume
 
             if run.Game == nil {
                 if run.Player == nil {
-                    player, err := MakePlayer(0, 0)
+                    player, err := MakePlayer(0, 0, cheats)
                     if err != nil {
                         return err
                     }
