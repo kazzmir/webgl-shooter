@@ -17,7 +17,6 @@ import (
     "github.com/hajimehoshi/ebiten/v2"
     "github.com/hajimehoshi/ebiten/v2/inpututil"
     "github.com/hajimehoshi/ebiten/v2/text/v2"
-    "github.com/hajimehoshi/ebiten/v2/audio"
     "github.com/hajimehoshi/ebiten/v2/vector"
 )
 
@@ -404,7 +403,7 @@ func makeHintPowerups() *Hint {
     }
 }
 
-func createMenu(quit context.Context, audioContext *audio.Context, initialVolume float64) (*Menu, error) {
+func createMenu(quit context.Context, soundManager *SoundManager, initialVolume float64) (*Menu, error) {
 
     var options []*MenuOption
 
@@ -423,7 +422,7 @@ func createMenu(quit context.Context, audioContext *audio.Context, initialVolume
             }
             run.Player = player
 
-            game, err := MakeGame(audioContext, run, 1)
+            game, err := MakeGame(soundManager, run, 1)
             if err != nil {
                 return err
             }
@@ -500,7 +499,7 @@ func createMenu(quit context.Context, audioContext *audio.Context, initialVolume
                     run.Player = player
                 }
 
-                game, err := MakeGame(audioContext, run, 1)
+                game, err := MakeGame(soundManager, run, 1)
                 if err != nil {
                     return err
                 }
@@ -522,11 +521,6 @@ func createMenu(quit context.Context, audioContext *audio.Context, initialVolume
     })
 
     font, err := fontLib.LoadFont()
-    if err != nil {
-        return nil, err
-    }
-
-    soundManager, err := MakeSoundManager(quit, audioContext, initialVolume)
     if err != nil {
         return nil, err
     }
