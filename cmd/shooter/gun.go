@@ -556,6 +556,58 @@ func randRange(min float64, max float64) float64 {
     return (rand.Float64() - 0.5) * (max - min)
 }
 
+type LineSegment struct {
+    x1 float64
+    y1 float64
+    x2 float64
+    y2 float64
+    life int
+}
+
+func makeLightningSegments(x1 float64, y1 float64, x2 float64, y2 float64, branchFactor float64, minimumLength float64, life int) []LineSegment {
+    var output []LineSegment
+
+    dx := x2 - x1
+    dy := y2 - y1
+    distance := dx * dx + dy * dy
+
+    if distance < minimumLength * minimumLength {
+        output = append(output, LineSegment{x1: x1, y1: y1, x2: x2, y2: y2, life: life})
+        return output
+    }
+
+    // compute center of segment
+    mx := (x1 + x2) / 2
+    my := (y1 + y2) / 2
+
+    // move by a random amount
+    mx += (rand.Float64() - 0.5) * 20
+    my += (rand.Float64() - 0.5) * 20
+
+    // divide each line segment further
+    output = append(output, makeLightningSegments(x1, y1, mx, my, branchFactor * 0.9, minimumLength, life)...)
+    output = append(output, makeLightningSegments(mx, my, x2, y2, branchFactor * 0.9, minimumLength, life)...)
+
+    // maybe make a branch that goes in a direction somewhat towards the end point
+    if rand.Float64() < branchFactor {
+        // create a branch at a perpendicular angle
+        branchLength := math.Sqrt(distance / 2) * (0.3 + rand.Float64() * 0.7)
+        newAngle := math.Atan2(dy, dx)
+
+        if rand.N(2) == 0 {
+            newAngle += math.Pi / 6 + math.Pi / 6 * rand.Float64()
+        } else {
+            newAngle -= math.Pi / 6 + math.Pi / 6 * rand.Float64()
+        }
+
+        bx2 := mx + math.Cos(newAngle) * branchLength
+        by2 := my + math.Sin(newAngle) * branchLength
+        output = append(output, makeLightningSegments(mx, my, bx2, by2, branchFactor * 0.5, minimumLength, life * 4 / 5)...)
+    }
+
+    return output
+}
+
 func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
     if lightning.enabled && lightning.counter == 0 {
         pic, err := lightning.GetBulletImage(imageManager)
@@ -579,7 +631,15 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
         }
 
         var bullets []*Bullet
+        var lastBullet *Bullet
 
+        // create line segment from starting position to ending position + small offset
+        // split line segment in half. move halfway point by a random amount
+        // for each new line segment, repeat until line segments are less than a length N
+        // create bullets along the line segments
+        // spawn a new line segment at a perpendicular angle at random points along the line segment
+
+        /*
         var makeBullets func(count int, life int, startX float64, startY float64, angle float64, branching float64)
 
         makeBullets = func(count int, life int, startX float64, startY float64, angle float64, branching float64) {
@@ -670,12 +730,12 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
                                 vector.FillCircle(screen, float32(self.x), float32(self.y), size, col, false)
                             }
 
-                            /*
+                            / *
                             options.ColorScale.ScaleAlpha(float32(alpha))
                             options.GeoM.Translate(self.x, self.y)
                             options.GeoM.Translate(float64(-pic.Bounds().Dx()/2), float64(-pic.Bounds().Dy()/2))
                             screen.DrawImage(self.pic, &options)
-                            */
+                            * /
                         },
                     })
                     lastBullet = bullets[len(bullets)-1]
@@ -703,6 +763,121 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
         }
 
         makeBullets(30, 100, x, y, math.Pi/2, 0.25)
+        */
+
+        endX := x + (rand.Float64() - 0.5) * 80
+        endY := y - 650 + (rand.Float64() - 0.5) * 20
+        segments := makeLightningSegments(x, y, endX, endY, 0.9, 20.0, 100)
+
+        for _, segment := range segments {
+
+            sx := segment.x1
+            sy := segment.y1
+            ex := segment.x2
+            ey := segment.y2
+
+            angle := math.Atan2(ey - sy, ex - sx)
+
+            startX := sx
+            startY := sy
+            distance := math.Hypot(ex - sx, ey - sy)
+
+            sinAngle := math.Sin(angle)
+            cosAngle := math.Cos(angle)
+
+            for v := float64(0); v < distance; v += 2.5 {
+                startY = sy + sinAngle * v
+                startX = sx + cosAngle * v
+
+                life := segment.life
+                bullets = append(bullets, &Bullet{
+                    x: startX,
+                    y: startY,
+                    Strength: 0.1 + float64(lightning.level) / 10,
+                    health: 1,
+                    velocityX: 0,
+                    velocityY: 0,
+                    pic: pic,
+                    Gun: lightning,
+                    Update: func(self *Bullet) bool {
+                        life -= 1
+                        if life <= 0 {
+                            return false
+                        }
+                        return true
+                    },
+                    CustomDraw: func(self *Bullet, screen *ebiten.Image) {
+                        // var options ebiten.DrawImageOptions
+                        alpha := uint8(255)
+                        if life < 20 {
+                            alpha = uint8(255.0 * float64(life) / 20.0)
+                        }
+
+                        size := float32(3.0)
+
+                        col := color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+
+                        mix := func(v1 uint8) uint8 {
+                            return v1 + uint8(float64(0xff - v1) * float64(life) / 50)
+                        }
+
+                        if life < 50 {
+                            size = 3 * float32(life) / 50.0
+                            col.R = mix(lowColor.R)
+                            col.G = mix(lowColor.G)
+                            col.B = mix(lowColor.B)
+                        }
+
+                        col.A = alpha
+
+                        if lastBullet == self {
+                            var path vector.Path
+
+                            x0 := self.x
+                            y0 := self.y
+
+                            size1 := float64(size)
+
+                            x1 := x0 + math.Cos(angle - math.Pi/2) * size1
+                            y1 := y0 - math.Sin(angle - math.Pi/2) * size1
+                            x2 := x0 + math.Cos(angle) * size1 * 2
+                            y2 := y0 - math.Sin(angle) * size1 * 2
+                            x3 := x0 + math.Cos(angle + math.Pi/2) * size1
+                            y3 := y0 - math.Sin(angle + math.Pi/2) * size1
+
+                            //   x
+                            //  x x
+                            // xxxxx
+                            //
+                            // x0,y0 = center of triangle
+                            // x1,y1 = bottom right corner
+                            // x2,y2 = top of triangle
+                            // x3,y3 = bottom left corner
+
+                            path.MoveTo(float32(x1), float32(y1))
+                            path.LineTo(float32(x2), float32(y2))
+                            path.LineTo(float32(x3), float32(y3))
+                            path.Close()
+
+                            var colorScale ebiten.ColorScale
+                            colorScale.ScaleWithColor(col)
+                            vector.FillPath(screen, &path, &vector.FillOptions{}, &vector.DrawPathOptions{
+                                ColorScale: colorScale,
+                            })
+                        } else {
+                            vector.FillCircle(screen, float32(self.x), float32(self.y), size, col, false)
+                        }
+
+                        /*
+                        options.ColorScale.ScaleAlpha(float32(alpha))
+                        options.GeoM.Translate(self.x, self.y)
+                        options.GeoM.Translate(float64(-pic.Bounds().Dx()/2), float64(-pic.Bounds().Dy()/2))
+                        screen.DrawImage(self.pic, &options)
+                        */
+                    },
+                })
+            }
+        }
 
         return bullets, nil
     }
