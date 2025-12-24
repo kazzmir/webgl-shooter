@@ -610,11 +610,6 @@ func makeLightningSegments(x1 float64, y1 float64, x2 float64, y2 float64, branc
 
 func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
     if lightning.enabled && lightning.counter == 0 {
-        pic, err := lightning.GetBulletImage(imageManager)
-        if err != nil {
-            return nil, err
-        }
-
         lightning.counter = int(60.0 / lightning.Rate())
 
         var lowColor color.RGBA
@@ -631,6 +626,8 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
         }
 
         var bullets []*Bullet
+
+        // FIXME: maybe get lastBullet to work again
         var lastBullet *Bullet
 
         // create line segment from starting position to ending position + small offset
@@ -639,134 +636,9 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
         // create bullets along the line segments
         // spawn a new line segment at a perpendicular angle at random points along the line segment
 
-        /*
-        var makeBullets func(count int, life int, startX float64, startY float64, angle float64, branching float64)
-
-        makeBullets = func(count int, life int, startX float64, startY float64, angle float64, branching float64) {
-
-            var lastBullet *Bullet
-
-            for i := range count {
-                for range 10 {
-                    startY = startY - math.Sin(angle) * 2.5
-                    startX = startX + math.Cos(angle) * 2.5
-
-                    life := life
-                    bullets = append(bullets, &Bullet{
-                        x: startX,
-                        y: startY,
-                        Strength: 0.1 + float64(lightning.level) / 10,
-                        health: 1,
-                        velocityX: 0,
-                        velocityY: 0,
-                        pic: pic,
-                        Gun: lightning,
-                        Update: func(self *Bullet) bool {
-                            life -= 1
-                            if life <= 0 {
-                                return false
-                            }
-                            return true
-                        },
-                        CustomDraw: func(self *Bullet, screen *ebiten.Image) {
-                            // var options ebiten.DrawImageOptions
-                            alpha := uint8(255)
-                            if life < 20 {
-                                alpha = uint8(255.0 * float64(life) / 20.0)
-                            }
-
-                            size := float32(3.0)
-
-                            col := color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
-
-                            mix := func(v1 uint8) uint8 {
-                                return v1 + uint8(float64(0xff - v1) * float64(life) / 50)
-                            }
-
-                            if life < 50 {
-                                size = 3 * float32(life) / 50.0
-                                col.R = mix(lowColor.R)
-                                col.G = mix(lowColor.G)
-                                col.B = mix(lowColor.B)
-                            }
-
-                            col.A = alpha
-
-                            if lastBullet == self {
-                                var path vector.Path
-
-                                x0 := self.x
-                                y0 := self.y
-
-                                size1 := float64(size)
-
-                                x1 := x0 + math.Cos(angle - math.Pi/2) * size1
-                                y1 := y0 - math.Sin(angle - math.Pi/2) * size1
-                                x2 := x0 + math.Cos(angle) * size1 * 2
-                                y2 := y0 - math.Sin(angle) * size1 * 2
-                                x3 := x0 + math.Cos(angle + math.Pi/2) * size1
-                                y3 := y0 - math.Sin(angle + math.Pi/2) * size1
-
-                                //   x
-                                //  x x
-                                // xxxxx
-                                //
-                                // x0,y0 = center of triangle
-                                // x1,y1 = bottom right corner
-                                // x2,y2 = top of triangle
-                                // x3,y3 = bottom left corner
-
-                                path.MoveTo(float32(x1), float32(y1))
-                                path.LineTo(float32(x2), float32(y2))
-                                path.LineTo(float32(x3), float32(y3))
-                                path.Close()
-
-                                var colorScale ebiten.ColorScale
-                                colorScale.ScaleWithColor(col)
-                                vector.FillPath(screen, &path, &vector.FillOptions{}, &vector.DrawPathOptions{
-                                    ColorScale: colorScale,
-                                })
-                            } else {
-                                vector.FillCircle(screen, float32(self.x), float32(self.y), size, col, false)
-                            }
-
-                            / *
-                            options.ColorScale.ScaleAlpha(float32(alpha))
-                            options.GeoM.Translate(self.x, self.y)
-                            options.GeoM.Translate(float64(-pic.Bounds().Dx()/2), float64(-pic.Bounds().Dy()/2))
-                            screen.DrawImage(self.pic, &options)
-                            * /
-                        },
-                    })
-                    lastBullet = bullets[len(bullets)-1]
-                }
-
-                angle += (rand.Float64() - 0.5) / 11
-                if i % 3 == 0 {
-                    life -= 1
-                    if life <= 0 {
-                        return
-                    }
-                }
-
-                if rand.Float64() < branching {
-                    // branch at a perpendicular angle
-                    newAngle := angle
-                    if rand.N(2) == 0 {
-                        newAngle = angle + math.Pi / 6
-                    } else {
-                        newAngle = angle - math.Pi / 6
-                    }
-                    makeBullets((count - i) / 2, life * 4 / 5, startX, startY, newAngle, branching / 1.5)
-                }
-            }
-        }
-
-        makeBullets(30, 100, x, y, math.Pi/2, 0.25)
-        */
-
         endX := x + (rand.Float64() - 0.5) * 80
-        endY := y - 650 + (rand.Float64() - 0.5) * 20
+        length := float64(600 + lightning.level * 15)
+        endY := y - length + (rand.Float64() - 0.5) * 20
         segments := makeLightningSegments(x, y, endX, endY, 0.9, 20.0, 100)
 
         for _, segment := range segments {
@@ -797,7 +669,7 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
                     health: 1,
                     velocityX: 0,
                     velocityY: 0,
-                    pic: pic,
+                    pic: nil,
                     Gun: lightning,
                     Update: func(self *Bullet) bool {
                         life -= 1
