@@ -745,7 +745,7 @@ func MakePlayer(x, y float64) (*Player, error) {
             // &DualBasicGun{enabled: false},
             // &BeamGun{enabled: true, level: 0},
             // &MissleGun{enabled: true, level: 0},
-            // &LightningGun{enabled: true, level: 0},
+            // &LightningGun{enabled: true, level: 7},
         },
         // Gun: &BeamGun{},
         Jump: -50,
@@ -1071,6 +1071,7 @@ type Game struct {
 
     // number of ticks the game has run
     Counter uint64
+    ShowFPS bool
 
     // time when the last screenshot was taken
     LastScreenshot time.Time
@@ -1212,6 +1213,11 @@ func (game *Game) TakeScreenshot() {
 }
 
 func (game *Game) Update(run *Run) error {
+
+    // print fps every two seconds
+    if game.ShowFPS && game.Counter % 120 == 0 {
+        log.Printf("FPS: %.2f", ebiten.ActualFPS())
+    }
 
     if inpututil.IsKeyJustPressed(ebiten.KeyF1) && time.Since(game.LastScreenshot) > 1 * time.Second {
         game.TakeScreenshot()
