@@ -865,7 +865,7 @@ func (manager *ImageManager) LoadAnimation(name gameImages.Image) (*Animation, e
 }
 
 type SoundHandler struct {
-    Make func() (*audio.Player, func())
+    Make func() (*audio.Player, func(), bool)
     MakeLoop func() (*audio.Player, error)
     // Players chan *audio.Player
 }
@@ -898,7 +898,8 @@ func MakeSoundManager(quit context.Context, audioContext *audio.Context, volume 
     return &manager, manager.LoadAll()
 }
 
-func MakeSoundHandler(name audioFiles.AudioName, context *audio.Context, sampleRate int) (*SoundHandler, error) {
+// playLimit is the maximum number of concurrent plays of this sound
+func MakeSoundHandler(name audioFiles.AudioName, context *audio.Context, sampleRate int, playLimit int64) (*SoundHandler, error) {
     var data []byte
 
     var create sync.Once
@@ -927,16 +928,26 @@ func MakeSoundHandler(name audioFiles.AudioName, context *audio.Context, sampleR
         },
     }
 
-    return &SoundHandler{
-        Make: func() (*audio.Player, func()) {
-            player := pool.Get().(*audio.Player)
+    var counter atomic.Int64
 
-            finish := func(){
-                player.Rewind()
-                pool.Put(player)
+    return &SoundHandler{
+        Make: func() (*audio.Player, func(), bool) {
+            // if over the limit then just do not play the sound
+            if counter.Load() < playLimit {
+                counter.Add(1)
+
+                player := pool.Get().(*audio.Player)
+
+                finish := func(){
+                    player.Rewind()
+                    pool.Put(player)
+                    counter.Add(-1)
+                }
+
+                return player, finish, true
             }
 
-            return player, finish
+            return nil, nil, false
         },
         MakeLoop: func() (*audio.Player, error) {
             create.Do(load)
@@ -949,13 +960,18 @@ func (manager *SoundManager) LoadAll() error {
 
     sounds := audioFiles.AllSounds
     for _, sound := range sounds {
-        handler, err := MakeSoundHandler(sound, manager.Context, manager.SampleRate)
+        handler, err := MakeSoundHandler(sound, manager.Context, manager.SampleRate, 10)
         if err != nil {
             return fmt.Errorf("Error loading %v: %v", sound, err)
         }
         manager.Sounds[sound] = handler
 
-        go handler.Make()
+        go func(){
+            _, f, ok := handler.Make()
+            if ok {
+                f()
+            }
+        }()
     }
 
     return nil
@@ -963,20 +979,22 @@ func (manager *SoundManager) LoadAll() error {
 
 func (manager *SoundManager) Play(name audioFiles.AudioName) {
     if handler, ok := manager.Sounds[name]; ok {
-        player, finish := handler.Make()
-        player.SetVolume(manager.GetVolume() / 100.0)
-        player.Play()
+        player, finish, canPlay := handler.Make()
+        if canPlay {
+            player.SetVolume(manager.GetVolume() / 100.0)
+            player.Play()
 
-        go func() {
-            for {
-                if player.IsPlaying() {
-                    time.Sleep(100 * time.Millisecond)
-                } else {
-                    finish()
-                    break
+            go func() {
+                for {
+                    if player.IsPlaying() {
+                        time.Sleep(100 * time.Millisecond)
+                    } else {
+                        finish()
+                        break
+                    }
                 }
-            }
-        }()
+            }()
+        }
     }
 }
 
