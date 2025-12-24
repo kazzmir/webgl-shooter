@@ -586,7 +586,7 @@ func makeLightningSegments(x1 float64, y1 float64, x2 float64, y2 float64, branc
 
     // divide each line segment further
     output = append(output, makeLightningSegments(x1, y1, mx, my, branchFactor * 0.9, minimumLength, life)...)
-    output = append(output, makeLightningSegments(mx, my, x2, y2, branchFactor * 0.9, minimumLength, life)...)
+    output = append(output, makeLightningSegments(mx, my, x2, y2, branchFactor * 1.1, minimumLength, life)...)
 
     // maybe make a branch that goes in a direction somewhat towards the end point
     if rand.Float64() < branchFactor {
@@ -602,7 +602,7 @@ func makeLightningSegments(x1 float64, y1 float64, x2 float64, y2 float64, branc
 
         bx2 := mx + math.Cos(newAngle) * branchLength
         by2 := my + math.Sin(newAngle) * branchLength
-        output = append(output, makeLightningSegments(mx, my, bx2, by2, branchFactor * 0.5, minimumLength, life * 4 / 5)...)
+        output = append(output, makeLightningSegments(mx, my, bx2, by2, branchFactor * 0.9, minimumLength, life * 4 / 5)...)
     }
 
     return output
@@ -639,7 +639,7 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
         endX := x + (rand.Float64() - 0.5) * 80
         length := float64(600 + lightning.level * 15)
         endY := y - length + (rand.Float64() - 0.5) * 20
-        segments := makeLightningSegments(x, y, endX, endY, 0.9, 20.0, 100)
+        segments := makeLightningSegments(x, y, endX, endY, 0.8, 20.0, 100)
 
         for _, segment := range segments {
 
