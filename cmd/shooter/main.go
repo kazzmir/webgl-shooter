@@ -998,7 +998,7 @@ func (manager *SoundManager) Play(name audioFiles.AudioName) {
     }
 }
 
-func (manager *SoundManager) PlayLoop(name audioFiles.AudioName) {
+func (manager *SoundManager) PlayLoop(name audioFiles.AudioName, stop context.Context) {
     if handler, ok := manager.Sounds[name]; ok {
         go func(){
             player, err := handler.MakeLoop()
@@ -1009,7 +1009,7 @@ func (manager *SoundManager) PlayLoop(name audioFiles.AudioName) {
                 go func(){
                     for {
                         select {
-                            case <-manager.Quit.Done():
+                            case <-stop.Done():
                                 player.Close()
                                 return
                             case <-time.After(100 * time.Millisecond):
@@ -1298,7 +1298,7 @@ func (game *Game) Update(run *Run) error {
     }
 
     game.MusicPlayer.Do(func(){
-        game.SoundManager.PlayLoop(audioFiles.AudioStellarPulseSong)
+        game.SoundManager.PlayLoop(audioFiles.AudioStellarPulseSong, game.Quit)
     })
 
     game.Background.Update()
@@ -1720,7 +1720,7 @@ type Run struct {
     Quit context.Context
     Cancel context.CancelFunc
     Volume float64
-    AudioContext *audio.Context
+    SoundManager *SoundManager
 }
 
 func (run *Run) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
@@ -1769,7 +1769,7 @@ func (run *Run) Update() error {
         case RunGame:
             err := run.Game.Update(run)
             if errors.Is(err, LevelEnd) {
-                newGame, err := MakeGame(run.AudioContext, run, run.Game.Difficulty * 1.5)
+                newGame, err := MakeGame(run.SoundManager, run, run.Game.Difficulty * 1.5)
                 if err != nil {
                     return err
                 }
@@ -1815,7 +1815,7 @@ func (run *Run) Draw(screen *ebiten.Image) {
     */
 }
 
-func MakeGame(audioContext *audio.Context, run *Run, difficulty float64) (*Game, error) {
+func MakeGame(soundManager *SoundManager, run *Run, difficulty float64) (*Game, error) {
     if run.Player == nil {
         return nil, fmt.Errorf("game: no player created")
     }
@@ -1845,13 +1845,7 @@ func MakeGame(audioContext *audio.Context, run *Run, difficulty float64) (*Game,
         return nil, err
     }
 
-    quitContext, cancel := context.WithCancel(context.Background())
-
-    soundManager, err := MakeSoundManager(quitContext, audioContext, run.GetVolume())
-    if err != nil {
-        cancel()
-        return nil, err
-    }
+    quitContext, cancel := context.WithCancel(run.Quit)
 
     game := Game{
         Counters: make(map[string]*GameCounter),
@@ -1925,7 +1919,13 @@ func main() {
     quit, cancel := context.WithCancel(context.Background())
     defer cancel()
 
-    menu, err := createMenu(quit, audioContext, initialVolume)
+    soundManager, err := MakeSoundManager(quit, audioContext, initialVolume)
+    if err != nil {
+        log.Printf("Unable to create sound manager: %v", err)
+        return
+    }
+
+    menu, err := createMenu(quit, soundManager, initialVolume)
     if err != nil {
         log.Printf("Unable to create menu: %v", err)
         return
@@ -1946,7 +1946,7 @@ func main() {
         Cancel: cancel,
         Menu: menu,
         Volume: initialVolume,
-        AudioContext: audioContext,
+        SoundManager: soundManager,
     }
 
     log.Printf("Running")
