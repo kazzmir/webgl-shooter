@@ -1197,7 +1197,6 @@ func (game *Game) MakeEnemies(count int) error {
         x := randomFloat(50, ScreenWidth - 50)
         y := float64(-200)
         kind := rand.N(7)
-        kind = 6
 
         move := makeMovement()
 
