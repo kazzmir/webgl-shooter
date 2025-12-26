@@ -1164,6 +1164,12 @@ func (game *Game) MakeEnemy(x float64, y float64, kind int, move Movement) error
                 return err
             }
             enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
+        case 6:
+            pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy7)
+            if err != nil {
+                return err
+            }
+            enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
 
     }
 
@@ -1190,7 +1196,8 @@ func (game *Game) MakeEnemies(count int) error {
 
         x := randomFloat(50, ScreenWidth - 50)
         y := float64(-200)
-        kind := rand.N(6)
+        kind := rand.N(7)
+        kind = 6
 
         move := makeMovement()
 
