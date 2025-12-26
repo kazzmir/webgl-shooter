@@ -2,6 +2,7 @@ package main
 
 import (
     "math"
+    "math/rand/v2"
     "log"
     "image"
 
@@ -16,11 +17,19 @@ type Asteroid struct {
     rotation uint64
     rotationSpeed float64
     health float64
+    pic gameImages.Image
 }
 
 func MakeAsteroid(x float64, y float64) *Asteroid {
     angle := randomFloat(90 - 45, 90 + 45)
     speed := randomFloat(1, 3)
+
+    pic := gameImages.ImageAsteroid1
+    switch rand.N(2) {
+        case 0: pic = gameImages.ImageAsteroid1
+        case 1: pic = gameImages.ImageAsteroid2
+    }
+
     return &Asteroid{
         x: x,
         y: y,
@@ -28,6 +37,7 @@ func MakeAsteroid(x float64, y float64) *Asteroid {
         velocityY: speed * math.Sin(angle * math.Pi / 180),
         rotation: 0,
         rotationSpeed: randomFloat(1, 4),
+        pic: pic,
         health: randomFloat(5, 20),
     }
 }
@@ -47,7 +57,7 @@ func (asteroid *Asteroid) Move() {
 }
 
 func (asteroid *Asteroid) Collision(x float64, y float64, imageManager *ImageManager) bool {
-    _, raw, err := imageManager.LoadImage(gameImages.ImageAsteroid1)
+    _, raw, err := imageManager.LoadImage(asteroid.pic)
     if err != nil {
         return false
     }
@@ -68,7 +78,7 @@ func (asteroid *Asteroid) Collision(x float64, y float64, imageManager *ImageMan
 }
 
 func (asteroid *Asteroid) Collide(player *Player, imageManager *ImageManager) bool {
-    _, raw, err := imageManager.LoadImage(gameImages.ImageAsteroid1)
+    _, raw, err := imageManager.LoadImage(asteroid.pic)
     if err != nil {
         return false
     }
@@ -82,7 +92,7 @@ func (asteroid *Asteroid) Collide(player *Player, imageManager *ImageManager) bo
 }
 
 func (asteroid *Asteroid) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager) {
-    pic, _, err := imageManager.LoadImage(gameImages.ImageAsteroid1)
+    pic, _, err := imageManager.LoadImage(asteroid.pic)
     if err != nil {
         log.Printf("Unable to load asteroid image: %v", err)
     } else {
