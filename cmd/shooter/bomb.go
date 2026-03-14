@@ -69,8 +69,9 @@ func (bomb *Bomb) ShouldExplode() bool {
     return bomb.destructTime == 0
 }
 
-func (bomb *Bomb) Draw(screen *ebiten.Image, imageManager *ImageManager, shaderManager *ShaderManager){
+func (bomb *Bomb) Draw(screen *ebiten.Image, imageManager *ImageManager, shaderManager *ShaderManager, camera *Camera){
     if bomb.ShouldExplode() {
+        centerX, centerY := camera.Apply(bomb.x, bomb.y)
 
         var alpha uint8 = 0
         if bomb.alpha > 0 {
@@ -83,9 +84,9 @@ func (bomb *Bomb) Draw(screen *ebiten.Image, imageManager *ImageManager, shaderM
         */
 
         options := &ebiten.DrawRectShaderOptions{}
-        options.GeoM.Translate(float64(bomb.x - bomb.radius), float64(bomb.y - bomb.radius))
+        options.GeoM.Translate(centerX-bomb.radius, centerY-bomb.radius)
         options.Uniforms = make(map[string]interface{})
-        options.Uniforms["Center"] = []float32{float32(bomb.x), float32(bomb.y)}
+        options.Uniforms["Center"] = []float32{float32(centerX), float32(centerY)}
         options.Uniforms["Radius"] = float32(bomb.radius)
         options.Uniforms["CenterAlpha"] = float32(alpha) / 255.0
         options.Uniforms["EdgeAlpha"] = float32(alpha) / (255.0 * 4)
@@ -104,7 +105,8 @@ func (bomb *Bomb) Draw(screen *ebiten.Image, imageManager *ImageManager, shaderM
     } else {
         pic, _, err := imageManager.LoadImage(gameImages.ImageBomb)
         if err == nil {
-            drawCenteredImage(screen, pic, bomb.x, bomb.y)
+            x, y := camera.Apply(bomb.x, bomb.y)
+            drawCenteredImage(screen, pic, x, y)
         }
     }
 }

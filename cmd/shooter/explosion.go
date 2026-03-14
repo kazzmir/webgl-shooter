@@ -8,7 +8,7 @@ import (
 type Explosion interface {
     Move()
     IsAlive() bool
-    Draw(screen *ebiten.Image, shaderManager *ShaderManager)
+    Draw(screen *ebiten.Image, shaderManager *ShaderManager, camera *Camera)
 }
 
 type SimpleExplosion struct {
@@ -39,10 +39,11 @@ func (explosion *SimpleExplosion) IsAlive() bool {
     return explosion.life > 0
 }
 
-func (explosion *SimpleExplosion) Draw(screen *ebiten.Image, shaderManager *ShaderManager) {
+func (explosion *SimpleExplosion) Draw(screen *ebiten.Image, shaderManager *ShaderManager, camera *Camera) {
     bounds := explosion.pic.Bounds()
-    posX := explosion.x - float64(bounds.Dx()) / 2
-    posY := explosion.y - float64(bounds.Dy()) / 2
+    centerX, centerY := camera.Apply(explosion.x, explosion.y)
+    posX := centerX - float64(bounds.Dx()) / 2
+    posY := centerY - float64(bounds.Dy()) / 2
 
     /*
     options := &ebiten.DrawImageOptions{}
@@ -57,7 +58,7 @@ func (explosion *SimpleExplosion) Draw(screen *ebiten.Image, shaderManager *Shad
     options.Uniforms = make(map[string]interface{})
     // radians = math.Pi * 90 / 180
     // log.Printf("Red: %v", radians)
-    options.Uniforms["Center"] = []float32{float32(explosion.x), float32(explosion.y)}
+    options.Uniforms["Center"] = []float32{float32(centerX), float32(centerY)}
     // options.Uniforms["Center"] = []float32{float32(bounds.Dx()) / 2, float32(bounds.Dy()) / 2}
     options.Uniforms["InnerRadius"] = float32(math.Max(0, float64(5-explosion.life)))
     options.Uniforms["OuterRadius"] = float32(math.Max(0, float64(10-explosion.life)))
@@ -84,8 +85,9 @@ func (explosion *AnimatedExplosion) IsAlive() bool {
     return explosion.animation.IsAlive()
 }
 
-func (explosion *AnimatedExplosion) Draw(screen *ebiten.Image, shaderManager *ShaderManager) {
-    explosion.animation.Draw(screen, explosion.x, explosion.y)
+func (explosion *AnimatedExplosion) Draw(screen *ebiten.Image, shaderManager *ShaderManager, camera *Camera) {
+    x, y := camera.Apply(explosion.x, explosion.y)
+    explosion.animation.Draw(screen, x, y)
 }
 
 
