@@ -43,6 +43,14 @@ const ScreenWidth = 1200
 const ScreenHeight = 800
 const LogicalWidth = 2000
 const CameraEdgeMargin = 100
+const CameraEdgeFadeWidth = 100
+const CameraEdgeFadeAlpha = 0.85
+
+var triangleFillImage = func() *ebiten.Image {
+    img := ebiten.NewImage(1, 1)
+    img.Fill(color.White)
+    return img
+}()
 
 func onLogicalScreen(x float64, y float64, margin float64) bool {
     return x > -margin && x < LogicalWidth + margin && y > -margin && y < ScreenHeight + margin
@@ -94,6 +102,22 @@ func drawCenteredImage(screen *ebiten.Image, pic *ebiten.Image, x float64, y flo
     options := &ebiten.DrawImageOptions{}
     options.GeoM.Translate(x1, y1)
     screen.DrawImage(pic, options)
+}
+
+func drawEdgeFade(screen *ebiten.Image, x1 float32, x2 float32, alpha1 float32, alpha2 float32) {
+    if x2 <= x1 {
+        return
+    }
+
+    vertices := []ebiten.Vertex{
+        {DstX: x1, DstY: 0, SrcX: 0, SrcY: 0, ColorR: 0, ColorG: 0, ColorB: 0, ColorA: alpha1},
+        {DstX: x2, DstY: 0, SrcX: 1, SrcY: 0, ColorR: 0, ColorG: 0, ColorB: 0, ColorA: alpha2},
+        {DstX: x2, DstY: ScreenHeight, SrcX: 1, SrcY: 1, ColorR: 0, ColorG: 0, ColorB: 0, ColorA: alpha2},
+        {DstX: x1, DstY: ScreenHeight, SrcX: 0, SrcY: 1, ColorR: 0, ColorG: 0, ColorB: 0, ColorA: alpha1},
+    }
+
+    indices := []uint16{0, 1, 2, 0, 2, 3}
+    screen.DrawTriangles(vertices, indices, triangleFillImage, nil)
 }
 
 // generates a bunch of colors between start and end, interpolating linerally
@@ -1728,6 +1752,20 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
     for _, bomb := range game.Bombs {
         bomb.Draw(screen, game.ImageManager, game.ShaderManager, game.Camera)
+    }
+
+    if game.Camera.x < CameraEdgeFadeWidth {
+        leftAlpha := float32(CameraEdgeFadeAlpha * (1.0 - game.Camera.x/CameraEdgeFadeWidth))
+        rightX := float32(CameraEdgeFadeWidth - game.Camera.x)
+        drawEdgeFade(screen, 0, rightX, leftAlpha, 0)
+    }
+
+    maxCameraX := float64(LogicalWidth - ScreenWidth)
+    rightDistance := maxCameraX - game.Camera.x
+    if rightDistance < CameraEdgeFadeWidth {
+        leftX := float32(ScreenWidth - (CameraEdgeFadeWidth - rightDistance))
+        rightAlpha := float32(CameraEdgeFadeAlpha * (1.0 - rightDistance/CameraEdgeFadeWidth))
+        drawEdgeFade(screen, leftX, ScreenWidth, 0, rightAlpha)
     }
 
     if game.Player.IsAlive() {
