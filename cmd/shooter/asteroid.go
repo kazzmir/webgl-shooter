@@ -91,16 +91,17 @@ func (asteroid *Asteroid) Collide(player *Player, imageManager *ImageManager) bo
     return isColliding(from, player)
 }
 
-func (asteroid *Asteroid) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager) {
+func (asteroid *Asteroid) Draw(screen *ebiten.Image, imageManager *ImageManager, shaders *ShaderManager, camera *Camera) {
     pic, _, err := imageManager.LoadImage(asteroid.pic)
     if err != nil {
         log.Printf("Unable to load asteroid image: %v", err)
     } else {
+        x, y := camera.Apply(asteroid.x, asteroid.y)
         options := &ebiten.DrawImageOptions{}
         options.GeoM.Translate(-float64(pic.Bounds().Dx()) / 2, -float64(pic.Bounds().Dy()) / 2)
         radians := float64(asteroid.rotation) * asteroid.rotationSpeed * math.Pi / 180
         options.GeoM.Rotate(radians)
-        options.GeoM.Translate(asteroid.x, asteroid.y)
+        options.GeoM.Translate(x, y)
         screen.DrawImage(pic, options)
     }
 }

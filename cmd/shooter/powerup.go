@@ -19,10 +19,10 @@ func drawCenter(screen *ebiten.Image, img *ebiten.Image, x float64, y float64, e
 
     options := &ebiten.DrawImageOptions{}
 
-    options.GeoM.Concat(extra)
     // translate such that center is at origin
     options.GeoM.Translate(-width/2, -height/2)
     options.GeoM.Translate(x, y)
+    options.GeoM.Concat(extra)
     screen.DrawImage(img, options)
 }
 
@@ -34,17 +34,17 @@ func drawGlow(screen *ebiten.Image, img *ebiten.Image, shaders *ShaderManager, x
     // x1 := powerup.x - width / 2
     // y1 := powerup.y - height / 2
     options := &ebiten.DrawImageOptions{}
-    options.GeoM.Concat(extra)
 
     // translate such that center is at origin
     options.GeoM.Translate(-width/2, -height/2)
     options.GeoM.Translate(x, y)
+    options.GeoM.Concat(extra)
     screen.DrawImage(img, options)
 
     shaderOptions := &ebiten.DrawRectShaderOptions{}
-    shaderOptions.GeoM.Concat(extra)
     shaderOptions.GeoM.Translate(-width/2, -height/2)
     shaderOptions.GeoM.Translate(x, y)
+    shaderOptions.GeoM.Concat(extra)
     shaderOptions.Uniforms = make(map[string]interface{})
     v := uint8(math.Abs(math.Sin(float64(counter) * 4 * math.Pi / 180.0) / 3) * 255)
     shaderOptions.Uniforms["Red"] = toFloatArray(color.RGBA{R: v, G: v, B: v, A: 0})
@@ -148,21 +148,20 @@ func (powerup *PowerupEnergy) Draw(screen *ebiten.Image, imageManager *ImageMana
     // y1 := powerup.y - height / 2
     options := &ebiten.DrawImageOptions{}
 
-    options.GeoM.Concat(extra)
-
     // translate such that center is at origin
     options.GeoM.Translate(-width/2, -height/2)
     // rotate
     options.GeoM.Rotate(float64(powerup.angle) * math.Pi / 180.0)
 
     options.GeoM.Translate(powerup.x, powerup.y)
+    options.GeoM.Concat(extra)
     screen.DrawImage(pic, options)
 
     shaderOptions := &ebiten.DrawRectShaderOptions{}
-    shaderOptions.GeoM.Concat(extra)
     shaderOptions.GeoM.Translate(-width/2, -height/2)
     shaderOptions.GeoM.Rotate(float64(powerup.angle) * math.Pi / 180.0)
     shaderOptions.GeoM.Translate(powerup.x, powerup.y)
+    shaderOptions.GeoM.Concat(extra)
     shaderOptions.Blend = AlphaBlender
     shaderOptions.Images[0] = pic
     shaderOptions.Uniforms = make(map[string]interface{})

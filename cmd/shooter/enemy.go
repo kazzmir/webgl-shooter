@@ -194,7 +194,7 @@ type Enemy interface {
     Coords() (float64, float64)
     IsAlive() bool
     Bounds() image.Rectangle
-    Draw(screen *ebiten.Image, shaders *ShaderManager)
+    Draw(screen *ebiten.Image, shaders *ShaderManager, camera *Camera)
     // returns true if this enemy is colliding with the point
     Collision(x, y float64) bool
     // returns the x,y coordinate of where the collision occurred, and true/false if a collision occurred
@@ -276,7 +276,8 @@ func (enemy *NormalEnemy) CollidePlayer(player *Player) (float64, float64, bool)
 }
 
 func (enemy *NormalEnemy) IsAlive() bool {
-    return enemy.Life > 0 && (enemy.y < 0 || onScreen(enemy.x, enemy.y, 100))
+    x, y := enemy.Coords()
+    return enemy.Life > 0 && (y < 0 || onLogicalScreen(x, y, 100))
 }
 
 func (enemy *NormalEnemy) Hit(bullet *Bullet) {
@@ -318,9 +319,10 @@ func (enemy *NormalEnemy) Dead() chan struct{} {
     return enemy.dead
 }
 
-func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager) {
+func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager, camera *Camera) {
 
     useX, useY := enemy.move.Coords(enemy.x, enemy.y)
+    useX, useY = camera.Apply(useX, useY)
 
     enemyX := useX - float64(enemy.pic.Bounds().Dx()) / 2
     enemyY := useY - float64(enemy.pic.Bounds().Dy()) / 2
@@ -556,7 +558,7 @@ func (boss *Boss1Movement) Move(x float64, y float64) (float64, float64) {
 
     if distance(x, y, boss.moveX, boss.moveY) < speed * 2 {
         if boss.counter == 0 {
-            boss.moveX = randomFloat(100, ScreenWidth - 100)
+            boss.moveX = randomFloat(100, LogicalWidth - 100)
             boss.moveY = randomFloat(100, ScreenHeight - 100)
             boss.counter = uint64(rand.N(200) + 200)
         } else {
@@ -579,7 +581,7 @@ func MakeBoss1(x float64, y float64, rawImage image.Image, pic *ebiten.Image, di
         x: x,
         y: y,
         move: &Boss1Movement{
-            moveX: ScreenWidth / 2,
+            moveX: LogicalWidth / 2,
             moveY: 100,
             counter: 100,
         },
@@ -669,4 +671,3 @@ func MakeGroupGeneratorCircle(radius int, many int) chan Coordinate {
 
     return out
 }
-

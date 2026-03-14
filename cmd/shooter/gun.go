@@ -678,7 +678,7 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
                         }
                         return true
                     },
-                    CustomDraw: func(self *Bullet, screen *ebiten.Image) {
+                    CustomDraw: func(self *Bullet, screen *ebiten.Image, camera *Camera) {
                         // var options ebiten.DrawImageOptions
                         alpha := uint8(255)
                         if life < 20 {
@@ -702,11 +702,10 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
 
                         col.A = alpha
 
+                        x0, y0 := camera.Apply(self.x, self.y)
+
                         if lastBullet == self {
                             var path vector.Path
-
-                            x0 := self.x
-                            y0 := self.y
 
                             size1 := float64(size)
 
@@ -737,7 +736,7 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
                                 ColorScale: colorScale,
                             })
                         } else {
-                            vector.FillCircle(screen, float32(self.x), float32(self.y), size, col, false)
+                            vector.FillCircle(screen, float32(x0), float32(y0), size, col, false)
                         }
 
                         /*
@@ -807,4 +806,3 @@ func (lightning *LightningGun) LevelPercent() float64 {
     }
     return lightning.experience / required
 }
-

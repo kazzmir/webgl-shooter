@@ -41,9 +41,45 @@ const debugForceBoss = false
 
 const ScreenWidth = 1200
 const ScreenHeight = 800
+const LogicalWidth = 2000
+const CameraEdgeMargin = 100
 
-func onScreen(x float64, y float64, margin float64) bool {
-    return x > -margin && x < ScreenWidth + margin && y > -margin && y < ScreenHeight + margin
+func onLogicalScreen(x float64, y float64, margin float64) bool {
+    return x > -margin && x < LogicalWidth + margin && y > -margin && y < ScreenHeight + margin
+}
+
+type Camera struct {
+    x float64
+    y float64
+}
+
+func (camera *Camera) Clamp() {
+    maxX := math.Max(0, float64(LogicalWidth-ScreenWidth))
+    camera.x = math.Max(0, math.Min(camera.x, maxX))
+    camera.y = 0
+}
+
+func (camera *Camera) TrackPlayer(player *Player) {
+    leftEdge := camera.x + CameraEdgeMargin
+    rightEdge := camera.x + ScreenWidth - CameraEdgeMargin
+
+    if player.x < leftEdge {
+        camera.x = player.x - CameraEdgeMargin
+    } else if player.x > rightEdge {
+        camera.x = player.x - (ScreenWidth - CameraEdgeMargin)
+    }
+
+    camera.Clamp()
+}
+
+func (camera *Camera) WorldGeoM() ebiten.GeoM {
+    var geoM ebiten.GeoM
+    geoM.Translate(-camera.x, -camera.y)
+    return geoM
+}
+
+func (camera *Camera) Apply(x float64, y float64) (float64, float64) {
+    return x - camera.x, y - camera.y
 }
 
 func toFloatArray(color color.Color) []float32 {
@@ -112,22 +148,23 @@ type Bullet struct {
 
     // optional func that returns true if we should keep the bullet, and false if we should remove it
     Update func(bullet *Bullet) bool
-    CustomDraw func(bullet *Bullet, screen *ebiten.Image)
+    CustomDraw func(bullet *Bullet, screen *ebiten.Image, camera *Camera)
 }
 
 func (bullet *Bullet) Damage(amount int) {
     bullet.health -= amount
 }
 
-func (bullet *Bullet) Draw(screen *ebiten.Image) {
+func (bullet *Bullet) Draw(screen *ebiten.Image, camera *Camera) {
 
     if bullet.CustomDraw != nil {
-        bullet.CustomDraw(bullet, screen)
+        bullet.CustomDraw(bullet, screen, camera)
     } else {
+        x, y := camera.Apply(bullet.x, bullet.y)
         if bullet.animation != nil {
-            bullet.animation.Draw(screen, bullet.x, bullet.y)
+            bullet.animation.Draw(screen, x, y)
         } else if bullet.pic != nil {
-            drawCenteredImage(screen, bullet.pic, bullet.x, bullet.y)
+            drawCenteredImage(screen, bullet.pic, x, y)
         }
     }
 }
@@ -142,7 +179,7 @@ func (bullet *Bullet) Move(){
 }
 
 func (bullet *Bullet) IsAlive() bool {
-    return bullet.health > 0 && onScreen(bullet.x, bullet.y, 10)
+    return bullet.health > 0 && onLogicalScreen(bullet.x, bullet.y, 10)
 }
 
 type StarPosition struct {
@@ -185,7 +222,7 @@ func MakeBackground() (*Background, error) {
 
     stars := make([]*StarPosition, 0)
     for i := 0; i < 50; i++ {
-        x := randomFloat(0, float64(ScreenWidth))
+        x := randomFloat(0, float64(LogicalWidth))
         y := randomFloat(0, float64(ScreenHeight))
         dx := 0.0
         dy := randomFloat(0.6, 1.1)
@@ -210,12 +247,13 @@ func (background *Background) Update(){
     }
 }
 
-func (background *Background) Draw(screen *ebiten.Image) {
+func (background *Background) Draw(screen *ebiten.Image, camera *Camera) {
     screen.Fill(color.RGBA{0x1b, 0x22, 0x24, 0xff})
 
     for _, star := range background.Stars {
+        x, y := camera.Apply(star.x, star.y)
         options := &ebiten.DrawImageOptions{}
-        options.GeoM.Translate(star.x, star.y)
+        options.GeoM.Translate(x, y)
         screen.DrawImage(star.Image, options)
     }
 }
@@ -413,8 +451,8 @@ func (player *Player) Move() {
 
     if player.x < 0 {
         player.x = 0
-    } else if player.x > ScreenWidth {
-        player.x = ScreenWidth
+    } else if player.x > LogicalWidth {
+        player.x = LogicalWidth
     }
 
     if player.y < 0 {
@@ -484,7 +522,7 @@ var AlphaBlender ebiten.Blend = ebiten.Blend{
     BlendOperationAlpha:         ebiten.BlendOperationAdd,
 }
 
-func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageManager *ImageManager, font *text.GoTextFaceSource) {
+func (player *Player) DrawHud(screen *ebiten.Image, imageManager *ImageManager, font *text.GoTextFaceSource) {
     face := &text.GoTextFace{Source: font, Size: 15} 
 
     op := &text.DrawOptions{}
@@ -513,56 +551,6 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
 
     op.GeoM.Translate(0, 20)
     text.Draw(screen, fmt.Sprintf("Energy Regen: %.2f", player.GetEnergyIncreasePerFrame()), face, op)
-
-    playerX := player.x - float64(player.pic.Bounds().Dx()) / 2
-    playerY := player.y - float64(player.pic.Bounds().Dy()) / 2
-
-    options := &ebiten.DrawRectShaderOptions{}
-    options.GeoM.Translate(playerX + player.velocityX * 3, playerY + 10)
-    options.Blend = AlphaBlender
-    options.Images[0] = player.pic
-    bounds := player.pic.Bounds()
-    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.ShadowShader, options)
-
-    /*
-    options := &ebiten.DrawImageOptions{}
-    options.GeoM.Translate(player.x, player.y)
-    screen.DrawImage(player.pic, options)
-    */
-
-    if player.Jump > 0 {
-        options := &ebiten.DrawRectShaderOptions{}
-        options.GeoM.Translate(playerX, playerY)
-        options.Blend = AlphaBlender
-        options.Images[0] = player.pic
-        options.Uniforms = make(map[string]interface{})
-        var radians float64 = math.Pi * float64(player.Jump) * 360 / JumpDuration / 180.0
-        // radians = math.Pi * 90 / 180
-        // log.Printf("Red: %v", radians)
-        // red := vec4(abs(sin(Red) / 3), 0, 0, 0)
-        options.Uniforms["Red"] = toFloatArray(color.RGBA{R: uint8(math.Abs(math.Sin(radians) / 3) * 255), G: 0, B: 0, A: 0})
-        bounds := player.pic.Bounds()
-        screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.RedShader, options)
-    } else {
-        options := &ebiten.DrawImageOptions{}
-        options.GeoM.Translate(playerX, playerY)
-        screen.DrawImage(player.pic, options)
-    }
-
-    if player.PowerupEnergy > 0 {
-        options = &ebiten.DrawRectShaderOptions{}
-        options.GeoM.Translate(playerX, playerY)
-        options.Blend = AlphaBlender
-        options.Images[0] = player.pic
-        options.Uniforms = make(map[string]interface{})
-        // options.Uniforms["Color"] = []float32{0, 0, float32((math.Sin(float64(player.Counter) * 7 * math.Pi / 180.0) + 1) / 2), 1}
-        alpha := float32((math.Sin(float64(player.PowerupEnergy) * 7 * math.Pi / 180.0) + 1) / 2)
-        r, g, b, _ := PowerupColor.RGBA()
-        useColor := color.RGBA{R: uint8(r / 255), G: uint8(g / 255), B: uint8(b / 255), A: uint8(255.0 * alpha)}
-        options.Uniforms["Color"] = toFloatArray(useColor)
-        // options.Uniforms["Color"] = []float32{0, 0, 1, 1}
-        screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.EdgeShader, options)
-    }
 
     gunFace := &text.GoTextFace{Source: font, Size: 10}
 
@@ -621,6 +609,47 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, imageMa
 
         sub := health.SubImage(image.Rect(0, health.Bounds().Dy() - int(useHeight), health.Bounds().Dx(), health.Bounds().Dy())).(*ebiten.Image)
         screen.DrawImage(sub, options)
+    }
+}
+
+func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, camera *Camera) {
+    playerX, playerY := camera.Apply(player.x, player.y)
+    playerX -= float64(player.pic.Bounds().Dx()) / 2
+    playerY -= float64(player.pic.Bounds().Dy()) / 2
+
+    options := &ebiten.DrawRectShaderOptions{}
+    options.GeoM.Translate(playerX + player.velocityX * 3, playerY + 10)
+    options.Blend = AlphaBlender
+    options.Images[0] = player.pic
+    bounds := player.pic.Bounds()
+    screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.ShadowShader, options)
+
+    if player.Jump > 0 {
+        options := &ebiten.DrawRectShaderOptions{}
+        options.GeoM.Translate(playerX, playerY)
+        options.Blend = AlphaBlender
+        options.Images[0] = player.pic
+        options.Uniforms = make(map[string]interface{})
+        var radians float64 = math.Pi * float64(player.Jump) * 360 / JumpDuration / 180.0
+        options.Uniforms["Red"] = toFloatArray(color.RGBA{R: uint8(math.Abs(math.Sin(radians) / 3) * 255), G: 0, B: 0, A: 0})
+        screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.RedShader, options)
+    } else {
+        options := &ebiten.DrawImageOptions{}
+        options.GeoM.Translate(playerX, playerY)
+        screen.DrawImage(player.pic, options)
+    }
+
+    if player.PowerupEnergy > 0 {
+        options = &ebiten.DrawRectShaderOptions{}
+        options.GeoM.Translate(playerX, playerY)
+        options.Blend = AlphaBlender
+        options.Images[0] = player.pic
+        options.Uniforms = make(map[string]interface{})
+        alpha := float32((math.Sin(float64(player.PowerupEnergy) * 7 * math.Pi / 180.0) + 1) / 2)
+        r, g, b, _ := PowerupColor.RGBA()
+        useColor := color.RGBA{R: uint8(r / 255), G: uint8(g / 255), B: uint8(b / 255), A: uint8(255.0 * alpha)}
+        options.Uniforms["Color"] = toFloatArray(useColor)
+        screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.EdgeShader, options)
     }
 }
 
@@ -1101,6 +1130,7 @@ type Game struct {
 
     // time when the last screenshot was taken
     LastScreenshot time.Time
+    Camera *Camera
 }
 
 func (game *Game) GetCounter(name string, limit int) *GameCounter {
@@ -1206,7 +1236,7 @@ func (game *Game) MakeEnemies(count int) error {
             case 4: generator = MakeGroupGenerator2x2()
         }
 
-        x := randomFloat(50, ScreenWidth - 50)
+        x := randomFloat(50, LogicalWidth - 50)
         y := float64(-200)
         kind := rand.N(9)
 
@@ -1342,6 +1372,7 @@ func (game *Game) Update(run *Run) error {
         }
 
         game.Player.Move()
+        game.Camera.TrackPlayer(game.Player)
     }
 
     for _, asteroid := range game.Asteroids {
@@ -1466,7 +1497,7 @@ func (game *Game) Update(run *Run) error {
 
                             // create a powerup every X kills
                             if game.Player.Kills % 20 == 0 {
-                                game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, ScreenWidth-10), -20))
+                                game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, LogicalWidth-10), -20))
                             }
 
                             explodeEnemy(enemy)
@@ -1585,7 +1616,7 @@ func (game *Game) Update(run *Run) error {
     game.Asteroids = asteroidOut
 
     if rand.N(6000) == 0 {
-        game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, ScreenWidth-10), -20))
+        game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, LogicalWidth-10), -20))
     }
 
     if !game.BossMode && !game.End.Load(){
@@ -1594,7 +1625,7 @@ func (game *Game) Update(run *Run) error {
         }
 
         if len(game.Asteroids) < 15 && rand.N(200) == 0 {
-            game.Asteroids = append(game.Asteroids, MakeAsteroid(randomFloat(-50, ScreenWidth + 50), -50))
+            game.Asteroids = append(game.Asteroids, MakeAsteroid(randomFloat(-50, LogicalWidth + 50), -50))
         }
 
         // create the boss after 2 minutes
@@ -1608,7 +1639,7 @@ func (game *Game) Update(run *Run) error {
                 if err != nil {
                     log.Printf("Unable to load boss: %v", err)
                 } else {
-                    boss, err := MakeBoss1(ScreenWidth / 2, -150, rawImage, boss1Pic, game.Difficulty)
+                    boss, err := MakeBoss1(LogicalWidth / 2, -150, rawImage, boss1Pic, game.Difficulty)
                     if err != nil {
                         log.Printf("Unable to make boss: %v", err)
                     } else {
@@ -1665,39 +1696,42 @@ func (game *Game) TestAlphaCircle(screen *ebiten.Image){
 }
 
 func (game *Game) Draw(screen *ebiten.Image) {
-    game.Background.Draw(screen)
+    game.Background.Draw(screen, game.Camera)
 
     for _, enemy := range game.Enemies {
-        enemy.Draw(screen, game.ShaderManager)
+        enemy.Draw(screen, game.ShaderManager, game.Camera)
     }
 
     for _, powerup := range game.Powerups {
-        powerup.Draw(screen, game.ImageManager, game.ShaderManager, ebiten.GeoM{})
+        powerup.Draw(screen, game.ImageManager, game.ShaderManager, game.Camera.WorldGeoM())
     }
 
     for _, explosion := range game.Explosions {
-        explosion.Draw(screen, game.ShaderManager)
+        explosion.Draw(screen, game.ShaderManager, game.Camera)
     }
 
     for _, asteroid := range game.Asteroids {
-        asteroid.Draw(screen, game.ImageManager, game.ShaderManager)
+        asteroid.Draw(screen, game.ImageManager, game.ShaderManager, game.Camera)
     }
 
-    // ebitenutil.DebugPrint(screen, "debugging")
     if game.Player.IsAlive() {
-        game.Player.Draw(screen, game.ShaderManager, game.ImageManager, game.Font)
+        game.Player.Draw(screen, game.ShaderManager, game.Camera)
     }
 
     for _, bullet := range game.Bullets {
-        bullet.Draw(screen)
+        bullet.Draw(screen, game.Camera)
     }
 
     for _, bullet := range game.EnemyBullets {
-        bullet.Draw(screen)
+        bullet.Draw(screen, game.Camera)
     }
 
     for _, bomb := range game.Bombs {
-        bomb.Draw(screen, game.ImageManager, game.ShaderManager)
+        bomb.Draw(screen, game.ImageManager, game.ShaderManager, game.Camera)
+    }
+
+    if game.Player.IsAlive() {
+        game.Player.DrawHud(screen, game.ImageManager, game.Font)
     }
 
     if game.WhiteFlash > 0 {
@@ -1852,7 +1886,7 @@ func MakeGame(soundManager *SoundManager, run *Run, difficulty float64) (*Game, 
         return nil, fmt.Errorf("game: no player created")
     }
 
-    run.Player.x = ScreenWidth / 2
+    run.Player.x = LogicalWidth / 2
     run.Player.y = ScreenHeight - 100
 
     /*
@@ -1892,7 +1926,10 @@ func MakeGame(soundManager *SoundManager, run *Run, difficulty float64) (*Game, 
         Quit: quitContext,
         Cancel: cancel,
         Difficulty: difficulty,
+        Camera: &Camera{x: float64(LogicalWidth-ScreenWidth) / 2, y: 0},
     }
+
+    game.Camera.TrackPlayer(game.Player)
 
     err = game.MakeEnemies(2)
     if err != nil {
