@@ -42,7 +42,7 @@ const debugForceBoss = false
 const ScreenWidth = 1200
 const ScreenHeight = 800
 const LogicalWidth = 2000
-const CameraEdgeMargin = 100
+const CameraEdgeMargin = 300
 const CameraEdgeFadeWidth = 100
 const CameraEdgeFadeAlpha = 0.85
 
