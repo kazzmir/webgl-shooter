@@ -37,6 +37,7 @@ type multiplayerEnvelope struct {
 	StartGame   *startGameMessage `json:"start_game,omitempty"`
 	Input       *playerInputState `json:"input,omitempty"`
 	PlayerState *playerState      `json:"player_state,omitempty"`
+	LatencyPing *latencyPingMessage `json:"latency_ping,omitempty"`
 	BulletMade  *bulletMadeMessage `json:"bullet_made,omitempty"`
 	PowerupCollected *powerupCollectedMessage `json:"powerup_collected,omitempty"`
 	Spawn       *spawnMessage     `json:"spawn,omitempty"`
@@ -45,6 +46,10 @@ type multiplayerEnvelope struct {
 
 type startGameMessage struct {
 	Difficulty float64 `json:"difficulty"`
+}
+
+type latencyPingMessage struct {
+	LogicalClock uint64 `json:"logical_clock"`
 }
 
 type bulletMadeMessage struct {
@@ -81,6 +86,8 @@ type gameMultiplayer struct {
 	Peer        PeerConnector
 	RemoteInput playerInputState
 	PendingCollectedPowerups []powerupState
+	PeerLatencyMS int
+	HasPeerLatency bool
 }
 
 type playerState struct {
@@ -373,6 +380,12 @@ func (game *Game) processNetworkMessages(run *Run, messages [][]byte) error {
 			if envelope.PlayerState != nil && game.RemotePlayer != nil {
 				applyPlayerState(game.RemotePlayer, *envelope.PlayerState)
 			}
+		case "latency_ping":
+			if envelope.LatencyPing != nil && game.Multiplayer != nil {
+				tickDelta := math.Abs(float64(game.Counter) - float64(envelope.LatencyPing.LogicalClock))
+				game.Multiplayer.PeerLatencyMS = int(math.Round(tickDelta * 1000.0 / 60.0))
+				game.Multiplayer.HasPeerLatency = true
+			}
 		case "bullet_made":
 			if game.isMaster() && envelope.BulletMade != nil {
 				game.Bullets = append(game.Bullets, game.makeBulletFromState(envelope.BulletMade.Bullet))
@@ -436,6 +449,21 @@ func (game *Game) maybeSendPlayerState() {
 		PlayerState: &state,
 	}); err != nil && game.Counter%120 == 0 {
 		log.Printf("Unable to send player state: %v", err)
+	}
+}
+
+func (game *Game) maybeSendLatencyPing() {
+	if game.Multiplayer == nil || game.Multiplayer.Peer == nil || game.Counter%30 != 0 {
+		return
+	}
+
+	if err := game.Multiplayer.Peer.SendGameMessage(multiplayerEnvelope{
+		Kind: "latency_ping",
+		LatencyPing: &latencyPingMessage{
+			LogicalClock: game.Counter,
+		},
+	}); err != nil && game.Counter%120 == 0 {
+		log.Printf("Unable to send latency_ping: %v", err)
 	}
 }
 

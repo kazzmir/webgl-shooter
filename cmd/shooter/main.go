@@ -1372,6 +1372,7 @@ func (game *Game) Update(run *Run) error {
 
 		game.Player.Move()
 		game.maybeSendPlayerState()
+		game.maybeSendLatencyPing()
 		game.Camera.TrackPlayer(game.Player)
 	}
 
@@ -1773,6 +1774,20 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
 	if game.Player.IsAlive() {
 		game.Player.DrawHud(screen, game.ImageManager, game.Font)
+	}
+
+	if game.Multiplayer != nil && game.Multiplayer.HasPeerLatency {
+		face := &text.GoTextFace{Source: game.Font, Size: 15}
+		op := &text.DrawOptions{}
+		op.GeoM.Translate(ScreenWidth-170, 4)
+		latencyColor := color.RGBA{R: 0xff, G: 0, B: 0, A: 0xff}
+		if game.Multiplayer.PeerLatencyMS < 20 {
+			latencyColor = color.RGBA{R: 0, G: 0xff, B: 0, A: 0xff}
+		} else if game.Multiplayer.PeerLatencyMS < 100 {
+			latencyColor = color.RGBA{R: 0xff, G: 0xff, B: 0, A: 0xff}
+		}
+		op.ColorScale.ScaleWithColor(latencyColor)
+		text.Draw(screen, fmt.Sprintf("Peer: %dms", game.Multiplayer.PeerLatencyMS), face, op)
 	}
 
 	if game.WhiteFlash > 0 {
