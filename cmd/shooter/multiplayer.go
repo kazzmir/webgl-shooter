@@ -17,6 +17,7 @@ const (
 	multiplayerRoleMaster = "master"
 	multiplayerRoleSlave  = "slave"
 	snapshotInterval      = 30
+	multiplayerSpawnOffset = 100
 )
 
 type playerInputState struct {
@@ -281,12 +282,22 @@ func (run *Run) StartGame(role string, notifyPeer bool) error {
 		if err != nil {
 			return err
 		}
-		remotePlayer.Health = 0
 		game.Multiplayer = &gameMultiplayer{
 			Role: role,
 			Peer: run.PeerConnector,
 		}
 		game.RemotePlayer = remotePlayer
+		baseX := float64(LogicalWidth) / 2
+		baseY := float64(ScreenHeight - 100)
+		if role == multiplayerRoleMaster {
+			game.Player.x = baseX - multiplayerSpawnOffset
+			game.RemotePlayer.x = baseX + multiplayerSpawnOffset
+		} else {
+			game.Player.x = baseX + multiplayerSpawnOffset
+			game.RemotePlayer.x = baseX - multiplayerSpawnOffset
+		}
+		game.Player.y = baseY
+		game.RemotePlayer.y = baseY
 		if role == multiplayerRoleSlave {
 			game.Enemies = nil
 			game.Asteroids = nil
