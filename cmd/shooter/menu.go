@@ -316,6 +316,7 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 				barWidth := graphWidth / float64(len(history))
 				for i, sample := range history {
 					barHeight := float64(sample) / float64(maxLatency) * (graphHeight - 8)
+					barHeight = math.Max(3, barHeight)
 					barColor := color.RGBA{R: 0xff, G: 0, B: 0, A: 0xff}
 					if sample < 20 {
 						barColor = color.RGBA{R: 0, G: 0xff, B: 0, A: 0xff}
