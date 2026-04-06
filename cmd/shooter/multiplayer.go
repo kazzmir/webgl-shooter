@@ -32,11 +32,12 @@ type playerInputState struct {
 }
 
 type multiplayerEnvelope struct {
-	Kind      string             `json:"kind"`
-	StartGame *startGameMessage  `json:"start_game,omitempty"`
-	Input     *playerInputState  `json:"input,omitempty"`
-	Spawn     *spawnMessage      `json:"spawn,omitempty"`
-	Snapshot  *snapshotMessage   `json:"snapshot,omitempty"`
+	Kind        string            `json:"kind"`
+	StartGame   *startGameMessage `json:"start_game,omitempty"`
+	Input       *playerInputState `json:"input,omitempty"`
+	PlayerState *playerState      `json:"player_state,omitempty"`
+	Spawn       *spawnMessage     `json:"spawn,omitempty"`
+	Snapshot    *snapshotMessage  `json:"snapshot,omitempty"`
 }
 
 type startGameMessage struct {
@@ -276,10 +277,16 @@ func (run *Run) StartGame(role string, notifyPeer bool) error {
 	}
 
 	if role != "" {
+		remotePlayer, err := MakePlayer(0, 0, false)
+		if err != nil {
+			return err
+		}
+		remotePlayer.Health = 0
 		game.Multiplayer = &gameMultiplayer{
 			Role: role,
 			Peer: run.PeerConnector,
 		}
+		game.RemotePlayer = remotePlayer
 		if role == multiplayerRoleSlave {
 			game.Enemies = nil
 			game.Asteroids = nil
@@ -326,22 +333,7 @@ func (game *Game) isSlave() bool {
 }
 
 func (game *Game) resolvePlayerInput() playerInputState {
-	if game.Multiplayer == nil {
-		return gatherLocalPlayerInput()
-	}
-
-	if game.isSlave() {
-		input := gatherLocalPlayerInput()
-		if err := game.Multiplayer.Peer.SendGameMessage(multiplayerEnvelope{
-			Kind:  "input",
-			Input: &input,
-		}); err != nil && game.Counter%60 == 0 {
-			log.Printf("Unable to send remote input: %v", err)
-		}
-		return input
-	}
-
-	return game.Multiplayer.RemoteInput
+	return gatherLocalPlayerInput()
 }
 
 func (game *Game) processNetworkMessages(run *Run, messages [][]byte) error {
@@ -353,9 +345,9 @@ func (game *Game) processNetworkMessages(run *Run, messages [][]byte) error {
 		}
 
 		switch envelope.Kind {
-		case "input":
-			if game.isMaster() && envelope.Input != nil {
-				game.Multiplayer.RemoteInput = *envelope.Input
+		case "player_state":
+			if envelope.PlayerState != nil && game.RemotePlayer != nil {
+				applyPlayerState(game.RemotePlayer, *envelope.PlayerState)
 			}
 		case "snapshot":
 			if game.isSlave() && envelope.Snapshot != nil {
@@ -398,6 +390,20 @@ func (game *Game) maybeSendSnapshot() {
 		Snapshot: &snapshot,
 	}); err != nil && game.Counter%120 == 0 {
 		log.Printf("Unable to send snapshot: %v", err)
+	}
+}
+
+func (game *Game) maybeSendPlayerState() {
+	if game.Multiplayer == nil || game.Multiplayer.Peer == nil {
+		return
+	}
+
+	state := serializePlayer(game.Player)
+	if err := game.Multiplayer.Peer.SendGameMessage(multiplayerEnvelope{
+		Kind:        "player_state",
+		PlayerState: &state,
+	}); err != nil && game.Counter%120 == 0 {
+		log.Printf("Unable to send player state: %v", err)
 	}
 }
 
@@ -537,7 +543,9 @@ func (game *Game) applySpawn(spawn spawnMessage) error {
 }
 
 func (game *Game) applySnapshot(snapshot snapshotMessage) error {
-	applyPlayerState(game.Player, snapshot.Player)
+	if game.RemotePlayer != nil {
+		applyPlayerState(game.RemotePlayer, snapshot.Player)
+	}
 	game.Counter = snapshot.Counter
 	game.Difficulty = snapshot.Difficulty
 	game.BossMode = snapshot.BossMode

@@ -31,6 +31,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/colorm"
 	_ "github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -636,7 +637,28 @@ func (player *Player) DrawHud(screen *ebiten.Image, imageManager *ImageManager, 
 	}
 }
 
+func (player *Player) drawBase(screen *ebiten.Image, camera *Camera, tint *colorm.ColorM) {
+	playerX, playerY := camera.Apply(player.x, player.y)
+	playerX -= float64(player.pic.Bounds().Dx()) / 2
+	playerY -= float64(player.pic.Bounds().Dy()) / 2
+
+	if tint != nil {
+		options := &colorm.DrawImageOptions{}
+		options.GeoM.Translate(playerX, playerY)
+		colorm.DrawImage(screen, player.pic, *tint, options)
+		return
+	}
+
+	options := &ebiten.DrawImageOptions{}
+	options.GeoM.Translate(playerX, playerY)
+	screen.DrawImage(player.pic, options)
+}
+
 func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, camera *Camera) {
+	player.DrawWithTint(screen, shaders, camera, nil)
+}
+
+func (player *Player) DrawWithTint(screen *ebiten.Image, shaders *ShaderManager, camera *Camera, tint *colorm.ColorM) {
 	playerX, playerY := camera.Apply(player.x, player.y)
 	playerX -= float64(player.pic.Bounds().Dx()) / 2
 	playerY -= float64(player.pic.Bounds().Dy()) / 2
@@ -648,6 +670,8 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, camera 
 	bounds := player.pic.Bounds()
 	screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.ShadowShader, options)
 
+	player.drawBase(screen, camera, tint)
+
 	if player.Jump > 0 {
 		options := &ebiten.DrawRectShaderOptions{}
 		options.GeoM.Translate(playerX, playerY)
@@ -657,10 +681,6 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, camera 
 		var radians float64 = math.Pi * float64(player.Jump) * 360 / JumpDuration / 180.0
 		options.Uniforms["Red"] = toFloatArray(color.RGBA{R: uint8(math.Abs(math.Sin(radians)/3) * 255), G: 0, B: 0, A: 0})
 		screen.DrawRectShader(bounds.Dx(), bounds.Dy(), shaders.RedShader, options)
-	} else {
-		options := &ebiten.DrawImageOptions{}
-		options.GeoM.Translate(playerX, playerY)
-		screen.DrawImage(player.pic, options)
 	}
 
 	if player.PowerupEnergy > 0 {
@@ -1097,6 +1117,7 @@ type Game struct {
 	LastScreenshot time.Time
 	Camera         *Camera
 	Multiplayer    *gameMultiplayer
+	RemotePlayer   *Player
 }
 
 func (game *Game) GetCounter(name string, limit int) *GameCounter {
@@ -1348,6 +1369,7 @@ func (game *Game) Update(run *Run) error {
 		}
 
 		game.Player.Move()
+		game.maybeSendPlayerState()
 		game.Camera.TrackPlayer(game.Player)
 	}
 
@@ -1696,8 +1718,18 @@ func (game *Game) Draw(screen *ebiten.Image) {
 		asteroid.Draw(screen, game.ImageManager, game.ShaderManager, game.Camera)
 	}
 
+	if game.RemotePlayer != nil && game.RemotePlayer.IsAlive() {
+		game.RemotePlayer.Draw(screen, game.ShaderManager, game.Camera)
+	}
+
 	if game.Player.IsAlive() {
-		game.Player.Draw(screen, game.ShaderManager, game.Camera)
+		if game.isSlave() {
+			var tint colorm.ColorM
+			tint.Scale(0.5, 1.0, 0.5, 1.0)
+			game.Player.DrawWithTint(screen, game.ShaderManager, game.Camera, &tint)
+		} else {
+			game.Player.Draw(screen, game.ShaderManager, game.Camera)
+		}
 	}
 
 	for _, bullet := range game.Bullets {
