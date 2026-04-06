@@ -27,7 +27,20 @@ func (editor *PeerEditor) Handle(chars []rune, keys []ebiten.Key) {
 		return
 	}
 
+	controlPressed := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyControlLeft) || ebiten.IsKeyPressed(ebiten.KeyControlRight)
+
 	for _, key := range keys {
+		if controlPressed {
+			switch key {
+			case ebiten.KeyU:
+				editor.Value = ""
+				continue
+			case ebiten.KeyW:
+				editor.deleteLastWord()
+				continue
+			}
+		}
+
 		switch key {
 		case ebiten.KeyEscape:
 			editor.Active = false
@@ -76,15 +89,16 @@ func (editor *PeerEditor) Draw(screen *ebiten.Image, font *text.GoTextFaceSource
 
 	drawText(screen, titleFace, 180, 220, editor.Title, color.RGBA{R: 255, G: 255, B: 255, A: 255})
 	drawText(screen, bodyFace, 180, 255, "Type a value, press Enter to save, or Escape to cancel.", color.RGBA{R: 190, G: 210, B: 255, A: 255})
+	drawText(screen, bodyFace, 180, 280, "Ctrl+U clears the line. Ctrl+W deletes the last word.", color.RGBA{R: 190, G: 210, B: 255, A: 255})
 	if editor.MaxLength > 0 {
-		drawText(screen, bodyFace, 180, 280, fmt.Sprintf("Maximum length: %d characters.", editor.MaxLength), color.RGBA{R: 190, G: 210, B: 255, A: 255})
+		drawText(screen, bodyFace, 180, 305, fmt.Sprintf("Maximum length: %d characters.", editor.MaxLength), color.RGBA{R: 190, G: 210, B: 255, A: 255})
 	}
 
 	value := editor.Value
 	if (counter/30)%2 == 0 {
 		value += "_"
 	}
-	drawText(screen, valueFace, 180, 315, value, color.RGBA{R: 255, G: 120, B: 120, A: 255})
+	drawText(screen, valueFace, 180, 340, value, color.RGBA{R: 255, G: 120, B: 120, A: 255})
 }
 
 func (menu *Menu) openPeerEditor(title string, value string, apply func(string)) {
@@ -113,6 +127,16 @@ func (editor *PeerEditor) deleteLastRune() {
 
 	_, size := utf8.DecodeLastRuneInString(editor.Value)
 	editor.Value = editor.Value[:len(editor.Value)-size]
+}
+
+func (editor *PeerEditor) deleteLastWord() {
+	for strings.HasSuffix(editor.Value, " ") {
+		editor.deleteLastRune()
+	}
+
+	for editor.Value != "" && !strings.HasSuffix(editor.Value, " ") {
+		editor.deleteLastRune()
+	}
 }
 
 func (menu *Menu) peerServerLabel() string {
