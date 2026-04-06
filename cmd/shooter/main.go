@@ -1986,15 +1986,8 @@ func (run *Run) Update() error {
 	case RunGame:
 		err := run.Game.Update(run)
 		if errors.Is(err, LevelEnd) {
-			newGame, err := MakeGame(run.SoundManager, run, run.Game.Difficulty*1.5)
-			if err != nil {
-				return err
-			}
-
-			run.Game.Close()
-			run.Game = newGame
-			// run.Mode = RunMenu
-			return nil
+			notifyPeer := run.Game != nil && run.Game.isMaster()
+			return run.StartNextLevel(run.Game.Difficulty*1.5, notifyPeer)
 		} else {
 			return err
 		}

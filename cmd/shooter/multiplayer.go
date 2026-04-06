@@ -35,6 +35,7 @@ type playerInputState struct {
 type multiplayerEnvelope struct {
 	Kind        string            `json:"kind"`
 	StartGame   *startGameMessage `json:"start_game,omitempty"`
+	LevelStart  *levelStartMessage `json:"level_start,omitempty"`
 	Input       *playerInputState `json:"input,omitempty"`
 	PlayerState *playerState      `json:"player_state,omitempty"`
 	LatencyPing *latencyPingMessage `json:"latency_ping,omitempty"`
@@ -45,6 +46,10 @@ type multiplayerEnvelope struct {
 }
 
 type startGameMessage struct {
+	Difficulty float64 `json:"difficulty"`
+}
+
+type levelStartMessage struct {
 	Difficulty float64 `json:"difficulty"`
 }
 
@@ -341,6 +346,80 @@ func (run *Run) StartGame(role string, notifyPeer bool) error {
 	return nil
 }
 
+func (run *Run) setupNextLevel(difficulty float64, role string, remotePlayer *Player) (*Game, error) {
+	game, err := MakeGame(run.SoundManager, run, difficulty)
+	if err != nil {
+		return nil, err
+	}
+
+	if role != "" {
+		if remotePlayer == nil {
+			remotePlayer, err = MakePlayer(0, 0, false)
+			if err != nil {
+				return nil, err
+			}
+		}
+		game.Multiplayer = &gameMultiplayer{
+			Role: role,
+			Peer: run.PeerConnector,
+		}
+		game.RemotePlayer = remotePlayer
+		baseX := float64(LogicalWidth) / 2
+		baseY := float64(ScreenHeight - 100)
+		if role == multiplayerRoleMaster {
+			game.Player.x = baseX - multiplayerSpawnOffset
+			game.RemotePlayer.x = baseX + multiplayerSpawnOffset
+		} else {
+			game.Player.x = baseX + multiplayerSpawnOffset
+			game.RemotePlayer.x = baseX - multiplayerSpawnOffset
+		}
+		game.Player.y = baseY
+		game.RemotePlayer.y = baseY
+		if role == multiplayerRoleSlave {
+			game.Enemies = nil
+			game.Asteroids = nil
+			game.Powerups = nil
+			game.Bullets = nil
+			game.EnemyBullets = nil
+			game.Bombs = nil
+		}
+	}
+
+	return game, nil
+}
+
+func (run *Run) StartNextLevel(difficulty float64, notifyPeer bool) error {
+	role := ""
+	var remotePlayer *Player
+	if run.Game != nil && run.Game.Multiplayer != nil {
+		role = run.Game.Multiplayer.Role
+		remotePlayer = run.Game.RemotePlayer
+	}
+
+	game, err := run.setupNextLevel(difficulty, role, remotePlayer)
+	if err != nil {
+		return err
+	}
+
+	if run.Game != nil {
+		run.Game.Close()
+	}
+	run.Game = game
+	run.Mode = RunGame
+
+	if notifyPeer && game.isMaster() && game.Multiplayer != nil && game.Multiplayer.Peer != nil {
+		if err := game.Multiplayer.Peer.SendGameMessage(multiplayerEnvelope{
+			Kind:       "level_start",
+			LevelStart: &levelStartMessage{Difficulty: difficulty},
+		}); err != nil {
+			log.Printf("Unable to send level start message: %v", err)
+		}
+		game.sendSnapshot()
+	}
+
+	return nil
+}
+
 func (run *Run) handleMenuMultiplayerMessages(messages [][]byte) error {
 	for _, raw := range messages {
 		var envelope multiplayerEnvelope
@@ -400,6 +479,10 @@ func (game *Game) processNetworkMessages(run *Run, messages [][]byte) error {
 					return err
 				}
 			}
+		case "level_start":
+			if game.isSlave() && envelope.LevelStart != nil {
+				return run.StartNextLevel(envelope.LevelStart.Difficulty, false)
+			}
 		}
 	}
 	return nil
@@ -407,6 +490,14 @@ func (game *Game) processNetworkMessages(run *Run, messages [][]byte) error {
 
 func (game *Game) maybeSendSnapshot() {
 	if !game.isMaster() || game.Counter%snapshotInterval != 0 {
+		return
+	}
+
+	game.sendSnapshot()
+}
+
+func (game *Game) sendSnapshot() {
+	if !game.isMaster() || game.Multiplayer == nil || game.Multiplayer.Peer == nil {
 		return
 	}
 
