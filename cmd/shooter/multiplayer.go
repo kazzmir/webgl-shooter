@@ -113,6 +113,7 @@ type bulletState struct {
 	VelocityY float64 `json:"velocity_y"`
 	Health    int     `json:"health"`
 	Kind      string  `json:"kind"`
+	RemainingLife int  `json:"remaining_life"`
 }
 
 type asteroidState struct {
@@ -723,6 +724,7 @@ func serializeBullet(bullet *Bullet) bulletState {
 		VelocityY: bullet.velocityY,
 		Health:    bullet.health,
 		Kind:      bulletKind(bullet),
+		RemainingLife: bullet.RemainingLife,
 	}
 }
 
@@ -735,6 +737,10 @@ func serializeBullets(bullets []*Bullet) []bulletState {
 }
 
 func bulletKind(bullet *Bullet) string {
+	if bullet.Kind != "" {
+		return bullet.Kind
+	}
+
 	switch bullet.Gun.(type) {
 	case *BeamGun:
 		return "beam"
@@ -763,6 +769,8 @@ func (game *Game) makeBulletFromState(state bulletState) *Bullet {
 		velocityX: state.VelocityX,
 		velocityY: state.VelocityY,
 		health:    state.Health,
+		Kind:      state.Kind,
+		RemainingLife: state.RemainingLife,
 	}
 
 	switch state.Kind {
@@ -790,6 +798,12 @@ func (game *Game) makeBulletFromState(state bulletState) *Bullet {
 		pic := ebiten.NewImage(3, 3)
 		pic.Fill(color.White)
 		bullet.pic = pic
+		bullet.Update = func(self *Bullet) bool {
+			if self.RemainingLife > 0 {
+				self.RemainingLife -= 1
+			}
+			return self.RemainingLife > 0
+		}
 	default:
 		pic, _, err := game.ImageManager.LoadImage(gameImages.ImageBullet)
 		if err == nil {

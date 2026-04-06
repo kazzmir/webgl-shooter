@@ -169,6 +169,8 @@ type Bullet struct {
 	pic                  *ebiten.Image
 	animation            *Animation
 	health               int
+	Kind                 string
+	RemainingLife        int
 	Gun                  Gun
 
 	// optional func that returns true if we should keep the bullet, and false if we should remove it

@@ -670,16 +670,18 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
                     velocityX: 0,
                     velocityY: 0,
                     pic: nil,
+                    Kind: "lightning",
+                    RemainingLife: life,
                     Gun: lightning,
                     Update: func(self *Bullet) bool {
-                        life -= 1
-                        if life <= 0 {
-                            return false
+                        if self.RemainingLife > 0 {
+                            self.RemainingLife -= 1
                         }
-                        return true
+                        return self.RemainingLife > 0
                     },
                     CustomDraw: func(self *Bullet, screen *ebiten.Image, camera *Camera) {
                         // var options ebiten.DrawImageOptions
+                        life := self.RemainingLife
                         alpha := uint8(255)
                         if life < 20 {
                             alpha = uint8(255.0 * float64(life) / 20.0)
