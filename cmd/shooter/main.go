@@ -1971,12 +1971,12 @@ func (run *Run) Update() error {
 
 	if run.PeerConnector != nil {
 		messages := run.PeerConnector.DrainMessages()
-		if run.Mode == RunMenu {
-			if err := run.handleMenuMultiplayerMessages(messages); err != nil {
+		if run.Game != nil {
+			if err := run.Game.processNetworkMessages(run, messages); err != nil {
 				return err
 			}
-		} else if run.Game != nil {
-			if err := run.Game.processNetworkMessages(run, messages); err != nil {
+		} else if run.Mode == RunMenu {
+			if err := run.handleMenuMultiplayerMessages(messages); err != nil {
 				return err
 			}
 		}
