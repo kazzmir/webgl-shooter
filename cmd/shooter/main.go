@@ -1702,6 +1702,12 @@ func (game *Game) TestAlphaCircle(screen *ebiten.Image) {
 func (game *Game) Draw(screen *ebiten.Image) {
 	game.Background.Draw(screen, game.Camera)
 
+	makeSlaveTint := func() *colorm.ColorM {
+		var tint colorm.ColorM
+		tint.Scale(0.5, 1.0, 0.5, 1.0)
+		return &tint
+	}
+
 	for _, enemy := range game.Enemies {
 		enemy.Draw(screen, game.ShaderManager, game.Camera)
 	}
@@ -1719,14 +1725,12 @@ func (game *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if game.RemotePlayer != nil && game.RemotePlayer.IsAlive() {
-		game.RemotePlayer.Draw(screen, game.ShaderManager, game.Camera)
+		game.RemotePlayer.DrawWithTint(screen, game.ShaderManager, game.Camera, makeSlaveTint())
 	}
 
 	if game.Player.IsAlive() {
 		if game.isSlave() {
-			var tint colorm.ColorM
-			tint.Scale(0.5, 1.0, 0.5, 1.0)
-			game.Player.DrawWithTint(screen, game.ShaderManager, game.Camera, &tint)
+			game.Player.DrawWithTint(screen, game.ShaderManager, game.Camera, makeSlaveTint())
 		} else {
 			game.Player.Draw(screen, game.ShaderManager, game.Camera)
 		}
