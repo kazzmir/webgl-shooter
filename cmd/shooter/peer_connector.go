@@ -27,6 +27,10 @@ type PeerConnector interface {
 	IsConnected() bool
 	IsMaster() bool
 	IsSlave() bool
+	Tick()
+	HasLatency() bool
+	LatencyMS() int
+	LatencyHistoryMS() []int
 	ServerURL() string
 	RoomID() string
 	SetServerURL(string)
@@ -53,6 +57,10 @@ type peerConnector struct {
 	statusLine         string
 	statusPending      bool
 	incomingMessages   [][]byte
+	logicalClock       uint64
+	peerLatencyMS      int
+	hasPeerLatency     bool
+	latencyHistoryMS   []int
 }
 
 type peerJoinRoomRequest struct {
@@ -72,6 +80,16 @@ type peerSignalingRequest struct {
 
 type peerSignalingResponse struct {
 	SessionDescription webrtc.SessionDescription `json:"session_description"`
+}
+
+type peerLatencyEnvelope struct {
+	Kind        string                   `json:"kind"`
+	LatencyPing *peerLatencyPingMessage  `json:"latency_ping,omitempty"`
+}
+
+type peerLatencyPingMessage struct {
+	LogicalClock uint64 `json:"logical_clock"`
+	Echo         bool   `json:"echo"`
 }
 
 func newPeerConnector() PeerConnector {
@@ -126,6 +144,49 @@ func (connector *peerConnector) IsSlave() bool {
 	connector.mutex.Lock()
 	defer connector.mutex.Unlock()
 	return connector.roomRole == "answerer"
+}
+
+func (connector *peerConnector) Tick() {
+	connector.mutex.Lock()
+	connector.logicalClock++
+	logicalClock := connector.logicalClock
+	dataChannel := connector.dataChannel
+	connector.mutex.Unlock()
+
+	if dataChannel == nil || dataChannel.ReadyState() != webrtc.DataChannelStateOpen || logicalClock%30 != 0 {
+		return
+	}
+
+	payload, err := json.Marshal(peerLatencyEnvelope{
+		Kind: "latency_ping",
+		LatencyPing: &peerLatencyPingMessage{
+			LogicalClock: logicalClock,
+			Echo:         false,
+		},
+	})
+	if err != nil {
+		return
+	}
+
+	_ = dataChannel.SendText(string(payload))
+}
+
+func (connector *peerConnector) HasLatency() bool {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+	return connector.hasPeerLatency
+}
+
+func (connector *peerConnector) LatencyMS() int {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+	return connector.peerLatencyMS
+}
+
+func (connector *peerConnector) LatencyHistoryMS() []int {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+	return append([]int(nil), connector.latencyHistoryMS...)
 }
 
 func (connector *peerConnector) RoomID() string {
@@ -457,6 +518,9 @@ func (connector *peerConnector) attachDataChannel(peerConnection *webrtc.PeerCon
 	})
 
 	dataChannel.OnMessage(func(message webrtc.DataChannelMessage) {
+		if connector.handleLatencyMessage(message.Data) {
+			return
+		}
 		connector.queueIncomingMessage(message.Data)
 	})
 
@@ -483,6 +547,10 @@ func (connector *peerConnector) finishSession(note string) error {
 	}
 	connector.statusPending = false
 	connector.incomingMessages = nil
+	connector.logicalClock = 0
+	connector.hasPeerLatency = false
+	connector.peerLatencyMS = 0
+	connector.latencyHistoryMS = nil
 	connector.mutex.Unlock()
 
 	if currentParticipantIdentifier != "" {
@@ -692,6 +760,61 @@ func (connector *peerConnector) queueIncomingMessage(message []byte) {
 
 	copyMessage := append([]byte(nil), message...)
 	connector.incomingMessages = append(connector.incomingMessages, copyMessage)
+}
+
+func (connector *peerConnector) handleLatencyMessage(message []byte) bool {
+	var envelope peerLatencyEnvelope
+	if err := json.Unmarshal(message, &envelope); err != nil {
+		return false
+	}
+	if envelope.Kind != "latency_ping" || envelope.LatencyPing == nil {
+		return false
+	}
+
+	if !envelope.LatencyPing.Echo {
+		connector.mutex.Lock()
+		dataChannel := connector.dataChannel
+		connector.mutex.Unlock()
+
+		if dataChannel == nil || dataChannel.ReadyState() != webrtc.DataChannelStateOpen {
+			return true
+		}
+
+		replyPayload, err := json.Marshal(peerLatencyEnvelope{
+			Kind: "latency_ping",
+			LatencyPing: &peerLatencyPingMessage{
+				LogicalClock: envelope.LatencyPing.LogicalClock,
+				Echo:         true,
+			},
+		})
+		if err != nil {
+			return true
+		}
+
+		_ = dataChannel.SendText(string(replyPayload))
+		return true
+	}
+
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+
+	if connector.logicalClock < envelope.LatencyPing.LogicalClock {
+		return true
+	}
+
+	tickDelta := connector.logicalClock - envelope.LatencyPing.LogicalClock
+	latencyMS := int((tickDelta * 1000 / 60) / 2)
+	connector.recordLatencySample(latencyMS)
+	return true
+}
+
+func (connector *peerConnector) recordLatencySample(latencyMS int) {
+	connector.peerLatencyMS = latencyMS
+	connector.hasPeerLatency = true
+	connector.latencyHistoryMS = append(connector.latencyHistoryMS, latencyMS)
+	if len(connector.latencyHistoryMS) > 20 {
+		connector.latencyHistoryMS = append([]int(nil), connector.latencyHistoryMS[len(connector.latencyHistoryMS)-20:]...)
+	}
 }
 
 func (connector *peerConnector) hasActiveSession() bool {

@@ -280,6 +280,54 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 	if menu.MultiplayerOpen && menu.PeerConnector != nil {
 		drawText(screen, text.GoTextFace{Source: menu.Font, Size: 28}, x, 60, "Multiplayer", color.RGBA{R: 255, G: 255, B: 255, A: 255})
 		drawText(screen, text.GoTextFace{Source: menu.Font, Size: 14}, x, y, menu.PeerConnector.StatusLine(menu.Counter), color.RGBA{R: 200, G: 220, B: 255, A: 255})
+
+		if menu.PeerConnector.IsConnected() && menu.PeerConnector.HasLatency() {
+			latencyMS := menu.PeerConnector.LatencyMS()
+			latencyColor := color.RGBA{R: 0xff, G: 0, B: 0, A: 0xff}
+			if latencyMS < 20 {
+				latencyColor = color.RGBA{R: 0, G: 0xff, B: 0, A: 0xff}
+			} else if latencyMS < 100 {
+				latencyColor = color.RGBA{R: 0xff, G: 0xff, B: 0, A: 0xff}
+			}
+
+			latencyY := y + 24
+			drawText(screen, text.GoTextFace{Source: menu.Font, Size: 14}, x, latencyY, fmt.Sprintf("Latency: %dms", latencyMS), latencyColor)
+
+			graphX := x
+			graphY := latencyY + 14
+			graphWidth := 220.0
+			graphHeight := 70.0
+			vector.FillRect(screen, float32(graphX), float32(graphY), float32(graphWidth), float32(graphHeight), premultiplyAlpha(color.RGBA{R: 0x10, G: 0x18, B: 0x20, A: 220}), true)
+			vector.StrokeRect(screen, float32(graphX), float32(graphY), float32(graphWidth), float32(graphHeight), 1, color.RGBA{R: 0xaa, G: 0xaa, B: 0xaa, A: 0xff}, true)
+			drawText(screen, text.GoTextFace{Source: menu.Font, Size: 10}, graphX+4, graphY+12, "10s", color.RGBA{R: 180, G: 180, B: 180, A: 255})
+
+			history := menu.PeerConnector.LatencyHistoryMS()
+			maxLatency := 100
+			for _, sample := range history {
+				if sample > maxLatency {
+					maxLatency = sample
+				}
+			}
+			if maxLatency <= 0 {
+				maxLatency = 100
+			}
+
+			if len(history) > 0 {
+				barWidth := graphWidth / float64(len(history))
+				for i, sample := range history {
+					barHeight := float64(sample) / float64(maxLatency) * (graphHeight - 8)
+					barColor := color.RGBA{R: 0xff, G: 0, B: 0, A: 0xff}
+					if sample < 20 {
+						barColor = color.RGBA{R: 0, G: 0xff, B: 0, A: 0xff}
+					} else if sample < 100 {
+						barColor = color.RGBA{R: 0xff, G: 0xff, B: 0, A: 0xff}
+					}
+					barX := graphX + float64(i)*barWidth + 1
+					barY := graphY + graphHeight - barHeight - 2
+					vector.FillRect(screen, float32(barX), float32(barY), float32(math.Max(1, barWidth-2)), float32(barHeight), premultiplyAlpha(barColor), true)
+				}
+			}
+		}
 	}
 
 	hintX := 500
