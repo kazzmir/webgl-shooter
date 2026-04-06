@@ -53,6 +53,8 @@ var (
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+
 	address := flag.String("addr", ":8500", "server listen address")
 	flag.Parse()
 
@@ -193,6 +195,7 @@ func (server *signalingServer) joinRoom(roomIdentifier string) (joinRoomResponse
 			participantRoles: map[string]string{},
 		}
 		server.rooms[roomIdentifier] = room
+		log.Printf("created signaling room %q", roomIdentifier)
 	}
 
 	if len(room.participantRoles) >= 2 {
