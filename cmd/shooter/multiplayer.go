@@ -37,12 +37,18 @@ type multiplayerEnvelope struct {
 	StartGame   *startGameMessage `json:"start_game,omitempty"`
 	Input       *playerInputState `json:"input,omitempty"`
 	PlayerState *playerState      `json:"player_state,omitempty"`
+	BulletMade  *bulletMadeMessage `json:"bullet_made,omitempty"`
 	Spawn       *spawnMessage     `json:"spawn,omitempty"`
 	Snapshot    *snapshotMessage  `json:"snapshot,omitempty"`
 }
 
 type startGameMessage struct {
 	Difficulty float64 `json:"difficulty"`
+}
+
+type bulletMadeMessage struct {
+	CreatedAt uint64      `json:"created_at"`
+	Bullet    bulletState `json:"bullet"`
 }
 
 type spawnMessage struct {
@@ -236,7 +242,7 @@ func (player *Player) ApplyInput(game *Game, run *Run, input playerInputState, a
 		player.Bombs -= 1
 		player.BombCounter = BombDelay
 	}
-	if allowProjectiles && input.Shoot {
+	if (allowProjectiles || game.isSlave()) && input.Shoot {
 		game.AddPlayerBullets(game.Player.Shoot(game.ImageManager, game.SoundManager)...)
 	}
 
@@ -360,6 +366,10 @@ func (game *Game) processNetworkMessages(run *Run, messages [][]byte) error {
 			if envelope.PlayerState != nil && game.RemotePlayer != nil {
 				applyPlayerState(game.RemotePlayer, *envelope.PlayerState)
 			}
+		case "bullet_made":
+			if game.isMaster() && envelope.BulletMade != nil {
+				game.Bullets = append(game.Bullets, game.makeBulletFromState(envelope.BulletMade.Bullet))
+			}
 		case "snapshot":
 			if game.isSlave() && envelope.Snapshot != nil {
 				if err := game.applySnapshot(*envelope.Snapshot); err != nil {
@@ -426,6 +436,10 @@ func (game *Game) AddPlayerBullets(bullets ...*Bullet) {
 	if game.isMaster() {
 		for _, bullet := range bullets {
 			game.sendSpawn("bullet", game.Counter, serializeBullet(bullet))
+		}
+	} else if game.isSlave() {
+		for _, bullet := range bullets {
+			game.sendBulletMade(game.Counter, bullet)
 		}
 	}
 }
@@ -561,6 +575,7 @@ func (game *Game) applySnapshot(snapshot snapshotMessage) error {
 	game.Difficulty = snapshot.Difficulty
 	game.BossMode = snapshot.BossMode
 	game.End.Store(snapshot.End)
+	game.Explosions = nil
 
 	game.Bullets = make([]*Bullet, 0, len(snapshot.Bullets))
 	for _, bullet := range snapshot.Bullets {
@@ -601,6 +616,22 @@ func (game *Game) applySnapshot(snapshot snapshotMessage) error {
 	}
 
 	return nil
+}
+
+func (game *Game) sendBulletMade(createdAt uint64, bullet *Bullet) {
+	if game.Multiplayer == nil || game.Multiplayer.Peer == nil || bullet == nil {
+		return
+	}
+
+	if err := game.Multiplayer.Peer.SendGameMessage(multiplayerEnvelope{
+		Kind: "bullet_made",
+		BulletMade: &bulletMadeMessage{
+			CreatedAt: createdAt,
+			Bullet: serializeBullet(bullet),
+		},
+	}); err != nil && game.Counter%120 == 0 {
+		log.Printf("Unable to send bullet_made: %v", err)
+	}
 }
 
 func serializePlayer(player *Player) playerState {
