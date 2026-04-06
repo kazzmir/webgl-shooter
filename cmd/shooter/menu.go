@@ -93,7 +93,10 @@ type Menu struct {
 	Font          *text.GoTextFaceSource
 	Counter       uint64
 	Options       []*MenuOption
+	MultiplayerOptions []*MenuOption
 	Selected      int
+	MultiplayerSelected int
+	MultiplayerOpen bool
 	SoundManager  *SoundManager
 	ImageManager  *ImageManager
 	ShaderManager *ShaderManager
@@ -120,6 +123,22 @@ func (option *MenuOption) DoesRespond(key ebiten.Key) bool {
 	}
 
 	return false
+}
+
+func (menu *Menu) currentOptions() []*MenuOption {
+	if menu.MultiplayerOpen {
+		return menu.MultiplayerOptions
+	}
+
+	return menu.Options
+}
+
+func (menu *Menu) currentSelected() *int {
+	if menu.MultiplayerOpen {
+		return &menu.MultiplayerSelected
+	}
+
+	return &menu.Selected
 }
 
 func (menu *Menu) ChooseHint() {
@@ -157,22 +176,28 @@ func (menu *Menu) Update(run *Run) error {
 	menu.Hints[menu.ActiveHint].Update()
 
 	for _, key := range keys {
+		options := menu.currentOptions()
+		selected := menu.currentSelected()
 		switch key {
 		case ebiten.KeyEscape, ebiten.KeyCapsLock:
+			if menu.MultiplayerOpen {
+				menu.MultiplayerOpen = false
+				return nil
+			}
 			if run.Game != nil {
 				run.Mode = RunGame
 			}
 		case ebiten.KeyArrowUp:
-			menu.Selected -= 1
-			if menu.Selected < 0 {
-				menu.Selected = len(menu.Options) - 1
+			*selected -= 1
+			if *selected < 0 {
+				*selected = len(options) - 1
 			}
 			menu.SoundManager.Play(audioFiles.AudioBeep)
 		case ebiten.KeyArrowDown:
-			menu.Selected = (menu.Selected + 1) % len(menu.Options)
+			*selected = (*selected + 1) % len(options)
 			menu.SoundManager.Play(audioFiles.AudioBeep)
 		default:
-			option := menu.Options[menu.Selected]
+			option := options[*selected]
 			if option.DoesRespond(key) {
 				menu.SoundManager.Play(audioFiles.AudioBeep)
 				err := option.Action(option, run, key)
@@ -207,16 +232,19 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 
 	_, height := text.Measure("X", &face, 0)
 
+	options := menu.currentOptions()
+	selected := *menu.currentSelected()
+
 	optionWidth := 150.0
-	for _, option := range menu.Options {
+	for _, option := range options {
 		width, _ := text.Measure(option.Label(), &face, 0)
 		optionWidth = math.Max(optionWidth, width+20)
 	}
 
-	for i, option := range menu.Options {
+	for i, option := range options {
 		label := option.Label()
 		drawColor := color.RGBA{R: 255, G: 255, B: 255, A: 32}
-		if menu.Selected == i {
+		if selected == i {
 			drawColor = color.RGBA{R: 255, G: 255, B: 255, A: uint8(a)}
 		}
 		vector.FillRect(screen, float32(x-10), float32(y-10), float32(optionWidth), float32(height+10+10), premultiplyAlpha(drawColor), true)
@@ -230,7 +258,8 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 		y += float64(height + 40)
 	}
 
-	if menu.PeerConnector != nil {
+	if menu.MultiplayerOpen && menu.PeerConnector != nil {
+		drawText(screen, text.GoTextFace{Source: menu.Font, Size: 28}, x, 60, "Multiplayer", color.RGBA{R: 255, G: 255, B: 255, A: 255})
 		drawText(screen, text.GoTextFace{Source: menu.Font, Size: 14}, x, y, menu.PeerConnector.StatusLine(), color.RGBA{R: 200, G: 220, B: 255, A: 255})
 	}
 
@@ -436,6 +465,7 @@ func makeHintPowerups() *Hint {
 func createMenu(quit context.Context, soundManager *SoundManager, initialVolume float64, cheats bool, peerConnector PeerConnector) (*Menu, error) {
 
 	var options []*MenuOption
+	var multiplayerOptions []*MenuOption
 	var menu *Menu
 
 	options = append(options, &MenuOption{
@@ -544,6 +574,15 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 	})
 
 	options = append(options, &MenuOption{
+		Text: "Multiplayer",
+		Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
+			menu.MultiplayerOpen = true
+			return nil
+		},
+		Respond: []ebiten.Key{ebiten.KeyEnter},
+	})
+
+	multiplayerOptions = append(multiplayerOptions, &MenuOption{
 		TextFunc: func() string {
 			return menu.peerServerLabel()
 		},
@@ -554,7 +593,7 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 		Respond: []ebiten.Key{ebiten.KeyEnter},
 	})
 
-	options = append(options, &MenuOption{
+	multiplayerOptions = append(multiplayerOptions, &MenuOption{
 		TextFunc: func() string {
 			return menu.peerRoomLabel()
 		},
@@ -565,12 +604,21 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 		Respond: []ebiten.Key{ebiten.KeyEnter},
 	})
 
-	options = append(options, &MenuOption{
+	multiplayerOptions = append(multiplayerOptions, &MenuOption{
 		TextFunc: func() string {
 			return peerConnector.MenuLabel()
 		},
 		Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
 			return peerConnector.Action()
+		},
+		Respond: []ebiten.Key{ebiten.KeyEnter},
+	})
+
+	multiplayerOptions = append(multiplayerOptions, &MenuOption{
+		Text: "Back",
+		Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
+			menu.MultiplayerOpen = false
+			return nil
 		},
 		Respond: []ebiten.Key{ebiten.KeyEnter},
 	})
@@ -602,14 +650,15 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 	}
 
 	menu = &Menu{
-		Font:          font,
-		Options:       options,
-		ImageManager:  MakeImageManager(),
-		ShaderManager: shaderManager,
-		PeerConnector: peerConnector,
-		SoundManager:  soundManager,
-		Hints:         hints,
-		ActiveHint:    -1,
+		Font:               font,
+		Options:            options,
+		MultiplayerOptions: multiplayerOptions,
+		ImageManager:       MakeImageManager(),
+		ShaderManager:      shaderManager,
+		PeerConnector:      peerConnector,
+		SoundManager:       soundManager,
+		Hints:              hints,
+		ActiveHint:         -1,
 	}
 
 	return menu, nil
