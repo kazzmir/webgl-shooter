@@ -27,6 +27,32 @@ func drawText(screen *ebiten.Image, face text.GoTextFace, x, y float64, str stri
 	text.Draw(screen, str, &face, op)
 }
 
+func drawPeerStageBox(screen *ebiten.Image, face text.GoTextFace, x float64, y float64, width float64, height float64, stage PeerConnectionStage, counter uint64) {
+	background := color.RGBA{R: 0x12, G: 0x18, B: 0x1f, A: 0xdd}
+	border := color.RGBA{R: 0x3c, G: 0x46, B: 0x52, A: 0xff}
+	textColor := color.RGBA{R: 0x88, G: 0x94, B: 0xa4, A: 0xff}
+
+	if stage.Completed {
+		background = color.RGBA{R: 0x44, G: 0x58, B: 0x70, A: 0xf0}
+		border = color.RGBA{R: 0xe8, G: 0xf2, B: 0xff, A: 0xff}
+		textColor = color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+	} else if stage.Current {
+		background = color.RGBA{R: 0x54, G: 0x46, B: 0x12, A: 0xe8}
+		border = color.RGBA{R: 0xff, G: 0xdc, B: 0x52, A: 0xff}
+		textColor = color.RGBA{R: 0xff, G: 0xf8, B: 0xd0, A: 0xff}
+
+		glowAlpha := uint8(70 + (math.Sin(float64(counter)/8)+1)*45)
+		glow := premultiplyAlpha(color.RGBA{R: 0xff, G: 0xd8, B: 0x3a, A: glowAlpha})
+		vector.FillRect(screen, float32(x-3), float32(y-3), float32(width+6), float32(height+6), glow, true)
+	}
+
+	vector.FillRect(screen, float32(x), float32(y), float32(width), float32(height), premultiplyAlpha(background), true)
+	vector.StrokeRect(screen, float32(x), float32(y), float32(width), float32(height), 2, border, true)
+	_, textHeight := text.Measure(stage.Label, &face, 0)
+	textY := y + (height-textHeight)/2
+	drawText(screen, face, x+10, textY, stage.Label, textColor)
+}
+
 type MenuAction func(self *MenuOption, run *Run, key ebiten.Key) error
 
 type MenuOption struct {
@@ -279,7 +305,25 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 
 	if menu.MultiplayerOpen && menu.PeerConnector != nil {
 		drawText(screen, text.GoTextFace{Source: menu.Font, Size: 28}, x, 60, "Multiplayer", color.RGBA{R: 255, G: 255, B: 255, A: 255})
-		drawText(screen, text.GoTextFace{Source: menu.Font, Size: 14}, x, y, menu.PeerConnector.StatusLine(menu.Counter), color.RGBA{R: 200, G: 220, B: 255, A: 255})
+		statusY := y
+		stages := menu.PeerConnector.ConnectionStages()
+		if len(stages) > 0 && !menu.PeerConnector.IsConnected() {
+			stageFace := text.GoTextFace{Source: menu.Font, Size: 13}
+			stageX := x
+			stageY := y
+			stageWidth := 170.0
+			stageHeight := 30.0
+			stageGapY := 8.0
+
+			for i, stage := range stages {
+				boxY := stageY + float64(i)*(stageHeight+stageGapY)
+				drawPeerStageBox(screen, stageFace, stageX, boxY, stageWidth, stageHeight, stage, menu.Counter)
+			}
+
+			statusY = stageY + float64(len(stages))*(stageHeight+stageGapY) + 10
+		}
+
+		drawText(screen, text.GoTextFace{Source: menu.Font, Size: 14}, x, statusY, menu.PeerConnector.StatusLine(menu.Counter), color.RGBA{R: 200, G: 220, B: 255, A: 255})
 
 		if menu.PeerConnector.IsConnected() && menu.PeerConnector.HasLatency() {
 			latencyMS := menu.PeerConnector.LatencyMS()
@@ -290,7 +334,7 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 				latencyColor = color.RGBA{R: 0xff, G: 0xff, B: 0, A: 0xff}
 			}
 
-			latencyY := y + 24
+			latencyY := statusY + 24
 			drawText(screen, text.GoTextFace{Source: menu.Font, Size: 14}, x, latencyY, fmt.Sprintf("Latency: %dms", latencyMS), latencyColor)
 
 			graphX := x

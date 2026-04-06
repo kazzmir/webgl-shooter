@@ -24,6 +24,7 @@ var errPeerSessionExpired = errors.New("peer session expired")
 type PeerConnector interface {
 	MenuLabel() string
 	StatusLine(counter uint64) string
+	ConnectionStages() []PeerConnectionStage
 	IsConnected() bool
 	IsMaster() bool
 	IsSlave() bool
@@ -39,6 +40,23 @@ type PeerConnector interface {
 	DrainMessages() [][]byte
 	Action() error
 }
+
+type PeerConnectionStage struct {
+	Label     string
+	Completed bool
+	Current   bool
+}
+
+const (
+	peerStageJoinRoom    = "join-room"
+	peerStageMakeOffer   = "make-offer"
+	peerStageGatherOffer = "gather-offer"
+	peerStageWaitAnswer  = "wait-answer"
+	peerStageWaitOffer   = "wait-offer"
+	peerStageMakeAnswer  = "make-answer"
+	peerStageGatherAnswer = "gather-answer"
+	peerStageOpenChannel = "open-channel"
+)
 
 type peerConnector struct {
 	mutex sync.Mutex
@@ -56,6 +74,8 @@ type peerConnector struct {
 	lastRoomIdentifier string
 	statusLine         string
 	statusPending      bool
+	currentStage       string
+	completedStages    map[string]bool
 	incomingMessages   [][]byte
 	logicalClock       uint64
 	peerLatencyMS      int
@@ -96,6 +116,7 @@ func newPeerConnector() PeerConnector {
 	return &peerConnector{
 		lastServerBaseURL: "http://localhost:8500",
 		statusLine:        "Peer: idle",
+		completedStages:   make(map[string]bool),
 	}
 }
 
@@ -120,6 +141,26 @@ func (connector *peerConnector) StatusLine(counter uint64) string {
 
 	frames := []string{"|", "/", "-", "\\"}
 	return connector.statusLine + " " + frames[(counter/12)%uint64(len(frames))]
+}
+
+func (connector *peerConnector) ConnectionStages() []PeerConnectionStage {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+
+	stageIDs := connector.connectionStageIDsLocked()
+	if len(stageIDs) == 0 {
+		return nil
+	}
+
+	out := make([]PeerConnectionStage, 0, len(stageIDs))
+	for _, stageID := range stageIDs {
+		out = append(out, PeerConnectionStage{
+			Label:     connector.connectionStageLabelLocked(stageID),
+			Completed: connector.completedStages[stageID],
+			Current:   connector.currentStage == stageID && connector.statusPending,
+		})
+	}
+	return out
 }
 
 func (connector *peerConnector) ServerURL() string {
@@ -269,7 +310,7 @@ func (connector *peerConnector) Action() error {
 
 	connector.rememberDefaults(serverBaseURL, roomIdentifier)
 	sessionNumber := connector.startSession(serverBaseURL, roomIdentifier)
-	connector.setPendingStatus(fmt.Sprintf("Peer: joining room %q", roomIdentifier))
+	connector.setPendingStageStatus(peerStageJoinRoom, fmt.Sprintf("Peer: joining room %q", roomIdentifier))
 
 	go connector.runConnect(sessionNumber, serverBaseURL, roomIdentifier)
 	return nil
@@ -289,7 +330,7 @@ func (connector *peerConnector) runConnect(sessionNumber uint64, serverBaseURL s
 	}
 
 	connector.setRoomMembership(joinResponse.ParticipantIdentifier, joinResponse.Role)
-	connector.setPendingStatus(fmt.Sprintf("Peer: joined as %s", joinResponse.Role))
+	connector.setStageStatus(peerStageJoinRoom, fmt.Sprintf("Peer: joined as %s", joinResponse.Role))
 	go connector.keepRoomAlive(sessionNumber)
 
 	if joinResponse.Role == "offerer" {
@@ -308,7 +349,7 @@ func (connector *peerConnector) runConnect(sessionNumber uint64, serverBaseURL s
 }
 
 func (connector *peerConnector) connectAsOfferer(sessionNumber uint64) error {
-	connector.setPendingStatus("Peer: creating offer")
+	connector.setPendingStageStatus(peerStageMakeOffer, "Peer: creating offer")
 
 	peerConnection, err := connector.newPeerConnection()
 	if err != nil {
@@ -334,7 +375,8 @@ func (connector *peerConnector) connectAsOfferer(sessionNumber uint64) error {
 		return err
 	}
 
-	connector.setPendingStatus("Peer: gathering offer candidates")
+	connector.setStageStatus(peerStageMakeOffer, "Peer: offer created")
+	connector.setPendingStageStatus(peerStageGatherOffer, "Peer: gathering offer candidates")
 	<-webrtc.GatheringCompletePromise(peerConnection)
 
 	if !connector.isCurrentSession(sessionNumber) {
@@ -350,7 +392,8 @@ func (connector *peerConnector) connectAsOfferer(sessionNumber uint64) error {
 		return err
 	}
 
-	connector.setPendingStatus("Peer: offer sent, waiting for answer")
+	connector.setStageStatus(peerStageGatherOffer, "Peer: offer candidates gathered")
+	connector.setPendingStageStatus(peerStageWaitAnswer, "Peer: offer sent, waiting for answer")
 
 	answerDescription, err := connector.waitForSessionDescription(sessionNumber, "answer")
 	if err != nil {
@@ -363,12 +406,13 @@ func (connector *peerConnector) connectAsOfferer(sessionNumber uint64) error {
 		return err
 	}
 
-	connector.setPendingStatus("Peer: answer received, opening data channel")
+	connector.setStageStatus(peerStageWaitAnswer, "Peer: answer received")
+	connector.setPendingStageStatus(peerStageOpenChannel, "Peer: answer received, opening data channel")
 	return nil
 }
 
 func (connector *peerConnector) connectAsAnswerer(sessionNumber uint64) error {
-	connector.setPendingStatus("Peer: waiting for offer")
+	connector.setPendingStageStatus(peerStageWaitOffer, "Peer: waiting for offer")
 
 	offerDescription, err := connector.waitForSessionDescription(sessionNumber, "offer")
 	if err != nil {
@@ -378,7 +422,8 @@ func (connector *peerConnector) connectAsAnswerer(sessionNumber uint64) error {
 		return fmt.Errorf("expected offer, got %s", offerDescription.Type.String())
 	}
 
-	connector.setPendingStatus("Peer: offer received, creating answer")
+	connector.setStageStatus(peerStageWaitOffer, "Peer: offer received")
+	connector.setPendingStageStatus(peerStageMakeAnswer, "Peer: offer received, creating answer")
 	peerConnection, err := connector.newPeerConnection()
 	if err != nil {
 		return err
@@ -401,7 +446,8 @@ func (connector *peerConnector) connectAsAnswerer(sessionNumber uint64) error {
 		return err
 	}
 
-	connector.setPendingStatus("Peer: gathering answer candidates")
+	connector.setStageStatus(peerStageMakeAnswer, "Peer: answer created")
+	connector.setPendingStageStatus(peerStageGatherAnswer, "Peer: gathering answer candidates")
 	<-webrtc.GatheringCompletePromise(peerConnection)
 
 	if !connector.isCurrentSession(sessionNumber) {
@@ -417,7 +463,8 @@ func (connector *peerConnector) connectAsAnswerer(sessionNumber uint64) error {
 		return err
 	}
 
-	connector.setPendingStatus("Peer: answer sent, waiting for peer")
+	connector.setStageStatus(peerStageGatherAnswer, "Peer: answer candidates gathered")
+	connector.setPendingStageStatus(peerStageOpenChannel, "Peer: answer sent, waiting for peer")
 	return nil
 }
 
@@ -462,9 +509,17 @@ func (connector *peerConnector) newPeerConnection() (*webrtc.PeerConnection, err
 
 		switch state {
 		case webrtc.PeerConnectionStateConnected:
-			connector.setStatus(fmt.Sprintf("Peer: connected as %s", connector.currentRole()))
+			connector.mutex.Lock()
+			dataChannel := connector.dataChannel
+			dataChannelOpen := dataChannel != nil && dataChannel.ReadyState() == webrtc.DataChannelStateOpen
+			connector.mutex.Unlock()
+			if dataChannelOpen {
+				connector.setStageStatus(peerStageOpenChannel, fmt.Sprintf("Peer: connected as %s", connector.currentRole()))
+			} else {
+				connector.setPendingStageStatus(peerStageOpenChannel, fmt.Sprintf("Peer: connected as %s", connector.currentRole()))
+			}
 		case webrtc.PeerConnectionStateConnecting:
-			connector.setPendingStatus("Peer: connecting")
+			connector.setPendingStageStatus(peerStageOpenChannel, "Peer: connecting")
 		case webrtc.PeerConnectionStateDisconnected:
 			connector.setStatus("Peer: disconnected")
 		case webrtc.PeerConnectionStateFailed:
@@ -499,7 +554,7 @@ func (connector *peerConnector) attachDataChannel(peerConnection *webrtc.PeerCon
 		if !connector.isCurrentDataChannel(dataChannel) {
 			return
 		}
-		connector.setStatus(fmt.Sprintf("Peer: connected as %s", connector.currentRole()))
+		connector.setStageStatus(peerStageOpenChannel, fmt.Sprintf("Peer: connected as %s", connector.currentRole()))
 	})
 
 	dataChannel.OnClose(func() {
@@ -524,7 +579,7 @@ func (connector *peerConnector) attachDataChannel(peerConnection *webrtc.PeerCon
 		connector.queueIncomingMessage(message.Data)
 	})
 
-	connector.setPendingStatus("Peer: data channel attached, waiting to open")
+	connector.setPendingStageStatus(peerStageOpenChannel, "Peer: data channel attached, waiting to open")
 }
 
 func (connector *peerConnector) finishSession(note string) error {
@@ -546,6 +601,8 @@ func (connector *peerConnector) finishSession(note string) error {
 		connector.statusLine = "Peer: idle"
 	}
 	connector.statusPending = false
+	connector.currentStage = ""
+	connector.completedStages = make(map[string]bool)
 	connector.incomingMessages = nil
 	connector.logicalClock = 0
 	connector.hasPeerLatency = false
@@ -582,6 +639,8 @@ func (connector *peerConnector) startSession(serverBaseURL string, roomIdentifie
 	connector.roomIdentifier = roomIdentifier
 	connector.participantIdentifier = ""
 	connector.roomRole = ""
+	connector.currentStage = ""
+	connector.completedStages = make(map[string]bool)
 	return connector.sessionNumber
 }
 
@@ -864,16 +923,80 @@ func (connector *peerConnector) clearDataChannel(dataChannel *webrtc.DataChannel
 	}
 }
 
+func (connector *peerConnector) connectionStageIDsLocked() []string {
+	switch connector.roomRole {
+	case "offerer":
+		return []string{peerStageJoinRoom, peerStageMakeOffer, peerStageGatherOffer, peerStageWaitAnswer, peerStageOpenChannel}
+	case "answerer":
+		return []string{peerStageJoinRoom, peerStageWaitOffer, peerStageMakeAnswer, peerStageGatherAnswer, peerStageOpenChannel}
+	case "":
+		if connector.serverBaseURL == "" && connector.peerConnection == nil {
+			return nil
+		}
+		return []string{peerStageJoinRoom, peerStageOpenChannel}
+	default:
+		return []string{peerStageJoinRoom, peerStageOpenChannel}
+	}
+}
+
+func (connector *peerConnector) connectionStageLabelLocked(stage string) string {
+	switch stage {
+	case peerStageJoinRoom:
+		return "Join room"
+	case peerStageMakeOffer:
+		return "Create offer"
+	case peerStageGatherOffer:
+		return "Gather offer"
+	case peerStageWaitAnswer:
+		return "Wait answer"
+	case peerStageWaitOffer:
+		return "Wait offer"
+	case peerStageMakeAnswer:
+		return "Create answer"
+	case peerStageGatherAnswer:
+		return "Gather answer"
+	case peerStageOpenChannel:
+		return "Open channel"
+	default:
+		return stage
+	}
+}
+
 func (connector *peerConnector) setStatus(status string) {
 	connector.mutex.Lock()
 	defer connector.mutex.Unlock()
 	connector.statusLine = status
 	connector.statusPending = false
+	connector.currentStage = ""
 }
 
 func (connector *peerConnector) setPendingStatus(status string) {
 	connector.mutex.Lock()
 	defer connector.mutex.Unlock()
+	connector.statusLine = status
+	connector.statusPending = true
+	connector.currentStage = ""
+}
+
+func (connector *peerConnector) setStageStatus(stage string, status string) {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+	if connector.completedStages == nil {
+		connector.completedStages = make(map[string]bool)
+	}
+	connector.completedStages[stage] = true
+	connector.currentStage = ""
+	connector.statusLine = status
+	connector.statusPending = false
+}
+
+func (connector *peerConnector) setPendingStageStatus(stage string, status string) {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+	if connector.completedStages == nil {
+		connector.completedStages = make(map[string]bool)
+	}
+	connector.currentStage = stage
 	connector.statusLine = status
 	connector.statusPending = true
 }
