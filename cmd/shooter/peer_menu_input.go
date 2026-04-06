@@ -1,0 +1,98 @@
+package main
+
+import (
+	"fmt"
+	"image/color"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	"github.com/hajimehoshi/ebiten/v2/vector"
+)
+
+type PeerEditor struct {
+	Active bool
+	Title  string
+	Value  string
+	Apply  func(string)
+}
+
+func (editor *PeerEditor) Handle(chars []rune, keys []ebiten.Key) {
+	if !editor.Active {
+		return
+	}
+
+	for _, key := range keys {
+		switch key {
+		case ebiten.KeyEscape:
+			editor.Active = false
+			return
+		case ebiten.KeyEnter:
+			editor.Active = false
+			if editor.Apply != nil {
+				editor.Apply(strings.TrimSpace(editor.Value))
+			}
+			return
+		case ebiten.KeyBackspace:
+			if editor.Value != "" {
+				_, size := utf8.DecodeLastRuneInString(editor.Value)
+				editor.Value = editor.Value[:len(editor.Value)-size]
+			}
+		}
+	}
+
+	for _, char := range chars {
+		if char < 32 || char == 127 {
+			continue
+		}
+		editor.Value += string(char)
+	}
+}
+
+func (editor *PeerEditor) Draw(screen *ebiten.Image, font *text.GoTextFaceSource, counter uint64) {
+	if !editor.Active {
+		return
+	}
+
+	vector.DrawFilledRect(screen, 150, 180, 900, 220, color.RGBA{R: 10, G: 18, B: 28, A: 240}, true)
+	vector.StrokeRect(screen, 150, 180, 900, 220, 2, color.RGBA{R: 220, G: 230, B: 255, A: 255}, true)
+
+	titleFace := text.GoTextFace{Source: font, Size: 22}
+	bodyFace := text.GoTextFace{Source: font, Size: 16}
+	valueFace := text.GoTextFace{Source: font, Size: 18}
+
+	drawText(screen, titleFace, 180, 220, editor.Title, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+	drawText(screen, bodyFace, 180, 255, "Type a value, press Enter to save, or Escape to cancel.", color.RGBA{R: 190, G: 210, B: 255, A: 255})
+
+	value := editor.Value
+	if (counter/30)%2 == 0 {
+		value += "_"
+	}
+	drawText(screen, valueFace, 180, 315, value, color.RGBA{R: 255, G: 120, B: 120, A: 255})
+}
+
+func (menu *Menu) openPeerEditor(title string, value string, apply func(string)) {
+	menu.PeerEditor = &PeerEditor{
+		Active: true,
+		Title:  title,
+		Value:  value,
+		Apply:  apply,
+	}
+}
+
+func (menu *Menu) peerServerLabel() string {
+	value := menu.PeerConnector.ServerURL()
+	if value == "" {
+		value = "<unset>"
+	}
+	return fmt.Sprintf("Peer server: %s", value)
+}
+
+func (menu *Menu) peerRoomLabel() string {
+	value := menu.PeerConnector.RoomID()
+	if value == "" {
+		value = "<unset>"
+	}
+	return fmt.Sprintf("Peer room: %s", value)
+}
