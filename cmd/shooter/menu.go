@@ -335,10 +335,15 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 			}
 
 			latencyY := statusY + 24
+			graphY := latencyY + 18
+			if menu.PeerConnector.IsSlave() {
+				waitY := graphY
+				drawText(screen, text.GoTextFace{Source: menu.Font, Size: 14}, x, waitY, "Waiting for game to start", color.RGBA{R: 0xff, G: 0xf0, B: 0xa0, A: 0xff})
+				graphY = waitY + 20
+			}
 			drawText(screen, text.GoTextFace{Source: menu.Font, Size: 14}, x, latencyY, fmt.Sprintf("Latency: %dms", latencyMS), latencyColor)
 
 			graphX := x
-			graphY := latencyY + 14
 			graphWidth := 220.0
 			graphHeight := 70.0
 			vector.FillRect(screen, float32(graphX), float32(graphY), float32(graphWidth), float32(graphHeight), premultiplyAlpha(color.RGBA{R: 0x10, G: 0x18, B: 0x20, A: 220}), true)
