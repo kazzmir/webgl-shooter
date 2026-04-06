@@ -38,6 +38,7 @@ type multiplayerEnvelope struct {
 	Input       *playerInputState `json:"input,omitempty"`
 	PlayerState *playerState      `json:"player_state,omitempty"`
 	BulletMade  *bulletMadeMessage `json:"bullet_made,omitempty"`
+	PowerupCollected *powerupCollectedMessage `json:"powerup_collected,omitempty"`
 	Spawn       *spawnMessage     `json:"spawn,omitempty"`
 	Snapshot    *snapshotMessage  `json:"snapshot,omitempty"`
 }
@@ -49,6 +50,10 @@ type startGameMessage struct {
 type bulletMadeMessage struct {
 	CreatedAt uint64      `json:"created_at"`
 	Bullet    bulletState `json:"bullet"`
+}
+
+type powerupCollectedMessage struct {
+	Powerup powerupState `json:"powerup"`
 }
 
 type spawnMessage struct {
@@ -75,6 +80,7 @@ type gameMultiplayer struct {
 	Role        string
 	Peer        PeerConnector
 	RemoteInput playerInputState
+	PendingCollectedPowerups []powerupState
 }
 
 type playerState struct {
@@ -371,6 +377,10 @@ func (game *Game) processNetworkMessages(run *Run, messages [][]byte) error {
 			if game.isMaster() && envelope.BulletMade != nil {
 				game.Bullets = append(game.Bullets, game.makeBulletFromState(envelope.BulletMade.Bullet))
 			}
+		case "powerup_collected":
+			if game.isMaster() && envelope.PowerupCollected != nil {
+				game.removeCollectedPowerup(envelope.PowerupCollected.Powerup)
+			}
 		case "snapshot":
 			if game.isSlave() && envelope.Snapshot != nil {
 				if err := game.applySnapshot(*envelope.Snapshot); err != nil {
@@ -593,8 +603,13 @@ func (game *Game) applySnapshot(snapshot snapshotMessage) error {
 		game.Asteroids = append(game.Asteroids, makeAsteroidFromState(asteroid))
 	}
 
-	game.Powerups = make([]Powerup, 0, len(snapshot.Powerups))
-	for _, powerupState := range snapshot.Powerups {
+	filteredPowerups := snapshot.Powerups
+	if game.isSlave() {
+		filteredPowerups = game.filterPendingCollectedPowerups(snapshot.Powerups)
+	}
+
+	game.Powerups = make([]Powerup, 0, len(filteredPowerups))
+	for _, powerupState := range filteredPowerups {
 		powerup, err := makePowerupFromState(powerupState)
 		if err != nil {
 			return err
@@ -633,6 +648,78 @@ func (game *Game) sendBulletMade(createdAt uint64, bullet *Bullet) {
 	}); err != nil && game.Counter%120 == 0 {
 		log.Printf("Unable to send bullet_made: %v", err)
 	}
+}
+
+func (game *Game) noteCollectedPowerup(powerup Powerup) {
+	state := serializePowerup(powerup)
+	if state.Kind == "" {
+		return
+	}
+
+	if game.Multiplayer != nil {
+		game.Multiplayer.PendingCollectedPowerups = append(game.Multiplayer.PendingCollectedPowerups, state)
+		if game.Multiplayer.Peer != nil {
+			if err := game.Multiplayer.Peer.SendGameMessage(multiplayerEnvelope{
+				Kind: "powerup_collected",
+				PowerupCollected: &powerupCollectedMessage{
+					Powerup: state,
+				},
+			}); err != nil && game.Counter%120 == 0 {
+				log.Printf("Unable to send powerup_collected: %v", err)
+			}
+		}
+	}
+}
+
+func (game *Game) removeCollectedPowerup(collected powerupState) {
+	remaining := make([]Powerup, 0, len(game.Powerups))
+	removed := false
+	for _, powerup := range game.Powerups {
+		if !removed && powerupMatchesState(powerup, collected) {
+			removed = true
+			continue
+		}
+		remaining = append(remaining, powerup)
+	}
+	game.Powerups = remaining
+}
+
+func (game *Game) filterPendingCollectedPowerups(snapshotPowerups []powerupState) []powerupState {
+	if game.Multiplayer == nil || len(game.Multiplayer.PendingCollectedPowerups) == 0 {
+		return snapshotPowerups
+	}
+
+	filtered := make([]powerupState, 0, len(snapshotPowerups))
+	stillPending := make([]powerupState, 0, len(game.Multiplayer.PendingCollectedPowerups))
+
+	for _, pending := range game.Multiplayer.PendingCollectedPowerups {
+		matched := false
+		for _, state := range snapshotPowerups {
+			if powerupStatesMatch(state, pending) {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			stillPending = append(stillPending, pending)
+		}
+	}
+
+	for _, state := range snapshotPowerups {
+		skip := false
+		for _, pending := range stillPending {
+			if powerupStatesMatch(state, pending) {
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			filtered = append(filtered, state)
+		}
+	}
+
+	game.Multiplayer.PendingCollectedPowerups = stillPending
+	return filtered
 }
 
 func serializePlayer(player *Player) playerState {
@@ -879,6 +966,17 @@ func serializePowerup(powerup Powerup) powerupState {
 	default:
 		return powerupState{}
 	}
+}
+
+func powerupStatesMatch(a powerupState, b powerupState) bool {
+	if a.Kind != b.Kind {
+		return false
+	}
+	return math.Hypot(a.X-b.X, a.Y-b.Y) <= 40
+}
+
+func powerupMatchesState(powerup Powerup, state powerupState) bool {
+	return powerupStatesMatch(serializePowerup(powerup), state)
 }
 
 func serializePowerups(powerups []Powerup) []powerupState {

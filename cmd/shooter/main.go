@@ -1399,6 +1399,9 @@ func (game *Game) Update(run *Run) error {
 		powerup.Move()
 		if powerup.Collide(game.Player, game.ImageManager) {
 			powerup.Activate(game.Player, game.SoundManager)
+			if game.isSlave() {
+				game.noteCollectedPowerup(powerup)
+			}
 		}
 
 		if powerup.IsAlive() {
