@@ -701,73 +701,7 @@ func saveHeapDump() {
 }
 
 func (player *Player) HandleKeys(game *Game, run *Run) error {
-	keys := make([]ebiten.Key, 0)
-
-	keys = inpututil.AppendPressedKeys(keys)
-
-	maxVelocity := 3.8
-
-	playerAccel := 0.9
-	if player.Jump > 0 {
-		playerAccel = 3
-		maxVelocity = 5.5
-	}
-
-	for _, key := range keys {
-		if key == ebiten.KeyArrowUp {
-			player.velocityY -= playerAccel
-		} else if key == ebiten.KeyArrowDown {
-			player.velocityY += playerAccel
-		} else if key == ebiten.KeyArrowLeft {
-			player.velocityX -= playerAccel
-		} else if key == ebiten.KeyArrowRight {
-			player.velocityX += playerAccel
-		} else if key == ebiten.KeyShift && player.Jump <= -50 {
-			player.Jump = JumpDuration
-		} else if key == ebiten.KeyB && player.BombCounter == 0 && player.Bombs > 0 {
-			game.Bombs = append(game.Bombs, MakeBomb(player.x, player.y-20, 0, -1.8))
-			player.Bombs -= 1
-			player.BombCounter = BombDelay
-		} else if key == ebiten.KeySpace {
-			game.Bullets = append(game.Bullets, game.Player.Shoot(game.ImageManager, game.SoundManager)...)
-		}
-
-		// for debugging
-		/*
-		   else if key == ebiten.KeyM {
-		       saveHeapDump()
-		   }
-		*/
-	}
-
-	player.velocityX = math.Min(maxVelocity, math.Max(-maxVelocity, player.velocityX))
-	player.velocityY = math.Min(maxVelocity, math.Max(-maxVelocity, player.velocityY))
-
-	moreKeys := make([]ebiten.Key, 0)
-	moreKeys = inpututil.AppendJustPressedKeys(moreKeys)
-	for _, key := range moreKeys {
-		// FIXME: make ebiten understand key mapping
-		if key == ebiten.KeyEscape || key == ebiten.KeyCapsLock {
-			// return ebiten.Termination
-			run.Mode = RunMenu
-		} else if key == ebiten.KeyDigit1 {
-			enableGun(player.Guns, 0)
-		} else if key == ebiten.KeyDigit2 {
-			enableGun(player.Guns, 1)
-		} else if key == ebiten.KeyDigit3 {
-			enableGun(player.Guns, 2)
-		} else if key == ebiten.KeyDigit4 {
-			enableGun(player.Guns, 3)
-		} else if key == ebiten.KeyDigit5 {
-			enableGun(player.Guns, 4)
-		}
-	}
-
-	if player.Jump > -50 {
-		player.Jump -= 1
-	}
-
-	return nil
+	return player.ApplyInput(game, run, gatherLocalPlayerInput(), true)
 }
 
 const JumpDuration = 50
@@ -1162,6 +1096,7 @@ type Game struct {
 	// time when the last screenshot was taken
 	LastScreenshot time.Time
 	Camera         *Camera
+	Multiplayer    *gameMultiplayer
 }
 
 func (game *Game) GetCounter(name string, limit int) *GameCounter {
@@ -1250,7 +1185,11 @@ func (game *Game) MakeEnemy(x float64, y float64, kind int, move Movement) error
 		return err
 	}
 
-	game.Enemies = append(game.Enemies, enemy)
+	if normal, ok := enemy.(*NormalEnemy); ok {
+		normal.Kind = fmt.Sprintf("enemy-%d", kind)
+	}
+
+	game.AddEnemy(enemy)
 
 	return nil
 }
@@ -1402,7 +1341,8 @@ func (game *Game) Update(run *Run) error {
 	game.Background.Update()
 
 	if game.Player.IsAlive() {
-		err := game.Player.HandleKeys(game, run)
+		input := game.resolvePlayerInput()
+		err := game.Player.ApplyInput(game, run, input, !game.isSlave())
 		if err != nil {
 			return err
 		}
@@ -1445,7 +1385,9 @@ func (game *Game) Update(run *Run) error {
 
 	for _, enemy := range game.Enemies {
 		bullets := enemy.Move(game.Player, game.ImageManager)
-		game.EnemyBullets = append(game.EnemyBullets, bullets...)
+		if !game.isSlave() {
+			game.AddEnemyBullets(bullets...)
+		}
 
 		if game.Player.IsAlive() {
 			collideX, collideY, isCollide := enemy.CollidePlayer(game.Player)
@@ -1533,7 +1475,7 @@ func (game *Game) Update(run *Run) error {
 
 							// create a powerup every X kills
 							if game.Player.Kills%20 == 0 {
-								game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, LogicalWidth-10), -20))
+								game.AddPowerup(MakeRandomPowerup(randomFloat(10, LogicalWidth-10), -20))
 							}
 
 							explodeEnemy(enemy)
@@ -1541,7 +1483,7 @@ func (game *Game) Update(run *Run) error {
 							// create a powerup where the enemy died every once in a while
 							if rand.N(20) == 0 {
 								x, y := enemy.Coords()
-								game.Powerups = append(game.Powerups, MakeRandomPowerup(x, y))
+								game.AddPowerup(MakeRandomPowerup(x, y))
 							}
 						}
 
@@ -1652,16 +1594,18 @@ func (game *Game) Update(run *Run) error {
 	game.Asteroids = asteroidOut
 
 	if rand.N(6000) == 0 {
-		game.Powerups = append(game.Powerups, MakeRandomPowerup(randomFloat(10, LogicalWidth-10), -20))
+		if !game.isSlave() {
+			game.AddPowerup(MakeRandomPowerup(randomFloat(10, LogicalWidth-10), -20))
+		}
 	}
 
 	if !game.BossMode && !game.End.Load() {
-		if len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.N(100) == 0) {
+		if !game.isSlave() && (len(game.Enemies) == 0 || (len(game.Enemies) < 10 && rand.N(100) == 0)) {
 			game.MakeEnemies(1)
 		}
 
-		if len(game.Asteroids) < 15 && rand.N(200) == 0 {
-			game.Asteroids = append(game.Asteroids, MakeAsteroid(randomFloat(-50, LogicalWidth+50), -50))
+		if !game.isSlave() && len(game.Asteroids) < 15 && rand.N(200) == 0 {
+			game.AddAsteroid(MakeAsteroid(randomFloat(-50, LogicalWidth+50), -50))
 		}
 
 		// create the boss after 2 minutes
@@ -1679,7 +1623,7 @@ func (game *Game) Update(run *Run) error {
 					if err != nil {
 						log.Printf("Unable to make boss: %v", err)
 					} else {
-						game.Enemies = append(game.Enemies, boss)
+						game.AddEnemy(boss)
 
 						go func() {
 							for {
@@ -1703,6 +1647,8 @@ func (game *Game) Update(run *Run) error {
 	if !game.Player.IsAlive() {
 		return PlayerDied
 	}
+
+	game.maybeSendSnapshot()
 
 	return nil
 }
@@ -1838,6 +1784,8 @@ type Run struct {
 	Cancel        context.CancelFunc
 	Volume        float64
 	SoundManager  *SoundManager
+	PeerConnector PeerConnector
+	Cheats        bool
 }
 
 func (run *Run) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
@@ -1882,6 +1830,19 @@ func (run *Run) DecreaseVolume() {
 }
 
 func (run *Run) Update() error {
+	if run.PeerConnector != nil {
+		messages := run.PeerConnector.DrainMessages()
+		if run.Mode == RunMenu {
+			if err := run.handleMenuMultiplayerMessages(messages); err != nil {
+				return err
+			}
+		} else if run.Game != nil {
+			if err := run.Game.processNetworkMessages(run, messages); err != nil {
+				return err
+			}
+		}
+	}
+
 	switch run.Mode {
 	case RunGame:
 		err := run.Game.Update(run)
@@ -1983,10 +1944,12 @@ func MakeGame(soundManager *SoundManager, run *Run, difficulty float64) (*Game, 
 
 	game.Camera.TrackPlayer(game.Player)
 
-	err = game.MakeEnemies(2)
-	if err != nil {
-		cancel()
-		return nil, err
+	if game.Multiplayer == nil || game.Multiplayer.Role != multiplayerRoleSlave {
+		err = game.MakeEnemies(2)
+		if err != nil {
+			cancel()
+			return nil, err
+		}
 	}
 
 	// for debugging
@@ -2073,6 +2036,8 @@ func main() {
 		Menu:         menu,
 		Volume:       initialVolume,
 		SoundManager: soundManager,
+		PeerConnector: peerConnector,
+		Cheats:       *cheats,
 	}
 
 	log.Printf("Running")

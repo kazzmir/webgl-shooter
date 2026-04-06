@@ -206,6 +206,7 @@ type Enemy interface {
 }
 
 type NormalEnemy struct {
+    Kind string
     x, y float64
     // velocityX, velocityY float64
     Life float64
@@ -387,6 +388,7 @@ func (enemy *NormalEnemy) Draw(screen *ebiten.Image, shaders *ShaderManager, cam
 
 func MakeEnemy1(x float64, y float64, rawImage image.Image, image *ebiten.Image, move Movement, difficulty float64) (Enemy, error) {
     return &NormalEnemy{
+        Kind: "enemy1",
         x: x,
         y: y,
         move: move,
@@ -402,6 +404,7 @@ func MakeEnemy1(x float64, y float64, rawImage image.Image, image *ebiten.Image,
 
 func MakeEnemy2(x float64, y float64, rawImage image.Image, pic *ebiten.Image, move Movement, difficulty float64) (Enemy, error) {
     return &NormalEnemy{
+        Kind: "enemy2",
         x: x,
         y: y,
         move: move,
@@ -578,6 +581,7 @@ func (boss *Boss1Movement) Experience() float64 {
 
 func MakeBoss1(x float64, y float64, rawImage image.Image, pic *ebiten.Image, difficulty float64) (Enemy, error) {
     return &NormalEnemy{
+        Kind: "boss1",
         x: x,
         y: y,
         move: &Boss1Movement{

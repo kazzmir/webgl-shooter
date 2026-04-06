@@ -128,7 +128,7 @@ func (option *MenuOption) DoesRespond(key ebiten.Key) bool {
 
 func (menu *Menu) currentOptions() []*MenuOption {
 	if menu.MultiplayerOpen {
-		if menu.PeerConnector != nil && menu.PeerConnector.IsConnected() && menu.MultiplayerStartOption != nil {
+		if menu.PeerConnector != nil && menu.PeerConnector.IsConnected() && menu.PeerConnector.IsMaster() && menu.MultiplayerStartOption != nil {
 			options := make([]*MenuOption, 0, len(menu.MultiplayerOptions)+1)
 			last := len(menu.MultiplayerOptions) - 1
 			if last < 0 {
@@ -489,25 +489,7 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 	var menu *Menu
 
 	startNewGame := func(run *Run) error {
-		run.Mode = RunGame
-
-		if run.Game != nil {
-			run.Game.Cancel()
-		}
-
-		player, err := MakePlayer(0, 0, cheats)
-		if err != nil {
-			return err
-		}
-		run.Player = player
-
-		game, err := MakeGame(soundManager, run, 1)
-		if err != nil {
-			return err
-		}
-
-		run.Game = game
-		return nil
+		return run.StartGame("", false)
 	}
 
 	options = append(options, &MenuOption{
@@ -640,7 +622,7 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 	multiplayerStartOption = &MenuOption{
 		Text: "Start game",
 		Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
-			return startNewGame(run)
+			return run.StartGame(multiplayerRoleMaster, true)
 		},
 		Respond: []ebiten.Key{ebiten.KeyEnter},
 	}

@@ -25,10 +25,14 @@ type PeerConnector interface {
 	MenuLabel() string
 	StatusLine(counter uint64) string
 	IsConnected() bool
+	IsMaster() bool
+	IsSlave() bool
 	ServerURL() string
 	RoomID() string
 	SetServerURL(string)
 	SetRoomID(string)
+	SendGameMessage(any) error
+	DrainMessages() [][]byte
 	Action() error
 }
 
@@ -48,6 +52,7 @@ type peerConnector struct {
 	lastRoomIdentifier string
 	statusLine         string
 	statusPending      bool
+	incomingMessages   [][]byte
 }
 
 type peerJoinRoomRequest struct {
@@ -111,6 +116,18 @@ func (connector *peerConnector) IsConnected() bool {
 	return connector.dataChannel != nil && connector.dataChannel.ReadyState() == webrtc.DataChannelStateOpen
 }
 
+func (connector *peerConnector) IsMaster() bool {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+	return connector.roomRole == "offerer"
+}
+
+func (connector *peerConnector) IsSlave() bool {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+	return connector.roomRole == "answerer"
+}
+
 func (connector *peerConnector) RoomID() string {
 	connector.mutex.Lock()
 	defer connector.mutex.Unlock()
@@ -131,6 +148,39 @@ func (connector *peerConnector) SetRoomID(roomIdentifier string) {
 		roomIdentifier = string([]rune(roomIdentifier)[:peerRoomIDMaxLength])
 	}
 	connector.lastRoomIdentifier = roomIdentifier
+}
+
+func (connector *peerConnector) SendGameMessage(payload any) error {
+	connector.mutex.Lock()
+	dataChannel := connector.dataChannel
+	connector.mutex.Unlock()
+
+	if dataChannel == nil {
+		return errors.New("peer data channel is not ready")
+	}
+	if dataChannel.ReadyState() != webrtc.DataChannelStateOpen {
+		return fmt.Errorf("peer data channel is %s", dataChannel.ReadyState().String())
+	}
+
+	messagePayload, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	return dataChannel.SendText(string(messagePayload))
+}
+
+func (connector *peerConnector) DrainMessages() [][]byte {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+
+	if len(connector.incomingMessages) == 0 {
+		return nil
+	}
+
+	messages := connector.incomingMessages
+	connector.incomingMessages = nil
+	return messages
 }
 
 func (connector *peerConnector) Action() error {
@@ -407,7 +457,7 @@ func (connector *peerConnector) attachDataChannel(peerConnection *webrtc.PeerCon
 	})
 
 	dataChannel.OnMessage(func(message webrtc.DataChannelMessage) {
-		_ = message
+		connector.queueIncomingMessage(message.Data)
 	})
 
 	connector.setPendingStatus("Peer: data channel attached, waiting to open")
@@ -432,6 +482,7 @@ func (connector *peerConnector) finishSession(note string) error {
 		connector.statusLine = "Peer: idle"
 	}
 	connector.statusPending = false
+	connector.incomingMessages = nil
 	connector.mutex.Unlock()
 
 	if currentParticipantIdentifier != "" {
@@ -633,6 +684,14 @@ func (connector *peerConnector) keepRoomAlive(sessionNumber uint64) {
 			connector.setStatus("Peer: heartbeat failed: " + err.Error())
 		}
 	}
+}
+
+func (connector *peerConnector) queueIncomingMessage(message []byte) {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+
+	copyMessage := append([]byte(nil), message...)
+	connector.incomingMessages = append(connector.incomingMessages, copyMessage)
 }
 
 func (connector *peerConnector) hasActiveSession() bool {
