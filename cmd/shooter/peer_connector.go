@@ -23,6 +23,7 @@ var errPeerSessionExpired = errors.New("peer session expired")
 type PeerConnector interface {
 	MenuLabel() string
 	StatusLine(counter uint64) string
+	IsConnected() bool
 	ServerURL() string
 	RoomID() string
 	SetServerURL(string)
@@ -101,6 +102,12 @@ func (connector *peerConnector) ServerURL() string {
 	connector.mutex.Lock()
 	defer connector.mutex.Unlock()
 	return connector.lastServerBaseURL
+}
+
+func (connector *peerConnector) IsConnected() bool {
+	connector.mutex.Lock()
+	defer connector.mutex.Unlock()
+	return connector.dataChannel != nil && connector.dataChannel.ReadyState() == webrtc.DataChannelStateOpen
 }
 
 func (connector *peerConnector) RoomID() string {

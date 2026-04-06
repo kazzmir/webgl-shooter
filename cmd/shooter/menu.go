@@ -94,6 +94,7 @@ type Menu struct {
 	Counter       uint64
 	Options       []*MenuOption
 	MultiplayerOptions []*MenuOption
+	MultiplayerStartOption *MenuOption
 	Selected      int
 	MultiplayerSelected int
 	MultiplayerOpen bool
@@ -127,6 +128,18 @@ func (option *MenuOption) DoesRespond(key ebiten.Key) bool {
 
 func (menu *Menu) currentOptions() []*MenuOption {
 	if menu.MultiplayerOpen {
+		if menu.PeerConnector != nil && menu.PeerConnector.IsConnected() && menu.MultiplayerStartOption != nil {
+			options := make([]*MenuOption, 0, len(menu.MultiplayerOptions)+1)
+			last := len(menu.MultiplayerOptions) - 1
+			if last < 0 {
+				return menu.MultiplayerOptions
+			}
+			options = append(options, menu.MultiplayerOptions[:last]...)
+			options = append(options, menu.MultiplayerStartOption)
+			options = append(options, menu.MultiplayerOptions[last])
+			return options
+		}
+
 		return menu.MultiplayerOptions
 	}
 
@@ -178,6 +191,9 @@ func (menu *Menu) Update(run *Run) error {
 	for _, key := range keys {
 		options := menu.currentOptions()
 		selected := menu.currentSelected()
+		if *selected >= len(options) {
+			*selected = len(options) - 1
+		}
 		switch key {
 		case ebiten.KeyEscape, ebiten.KeyCapsLock:
 			if menu.MultiplayerOpen {
@@ -234,6 +250,9 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 
 	options := menu.currentOptions()
 	selected := *menu.currentSelected()
+	if selected >= len(options) {
+		selected = len(options) - 1
+	}
 
 	optionWidth := 150.0
 	for _, option := range options {
@@ -466,31 +485,35 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 
 	var options []*MenuOption
 	var multiplayerOptions []*MenuOption
+	var multiplayerStartOption *MenuOption
 	var menu *Menu
+
+	startNewGame := func(run *Run) error {
+		run.Mode = RunGame
+
+		if run.Game != nil {
+			run.Game.Cancel()
+		}
+
+		player, err := MakePlayer(0, 0, cheats)
+		if err != nil {
+			return err
+		}
+		run.Player = player
+
+		game, err := MakeGame(soundManager, run, 1)
+		if err != nil {
+			return err
+		}
+
+		run.Game = game
+		return nil
+	}
 
 	options = append(options, &MenuOption{
 		Text: "New game",
 		Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
-			run.Mode = RunGame
-
-			if run.Game != nil {
-				run.Game.Cancel()
-			}
-
-			player, err := MakePlayer(0, 0, cheats)
-			if err != nil {
-				return err
-			}
-			run.Player = player
-
-			game, err := MakeGame(soundManager, run, 1)
-			if err != nil {
-				return err
-			}
-
-			run.Game = game
-
-			return nil
+			return startNewGame(run)
 		},
 		Respond: []ebiten.Key{ebiten.KeyEnter},
 	})
@@ -614,6 +637,14 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 		Respond: []ebiten.Key{ebiten.KeyEnter},
 	})
 
+	multiplayerStartOption = &MenuOption{
+		Text: "Start game",
+		Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
+			return startNewGame(run)
+		},
+		Respond: []ebiten.Key{ebiten.KeyEnter},
+	}
+
 	multiplayerOptions = append(multiplayerOptions, &MenuOption{
 		Text: "Back",
 		Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
@@ -653,6 +684,7 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 		Font:               font,
 		Options:            options,
 		MultiplayerOptions: multiplayerOptions,
+		MultiplayerStartOption: multiplayerStartOption,
 		ImageManager:       MakeImageManager(),
 		ShaderManager:      shaderManager,
 		PeerConnector:      peerConnector,
