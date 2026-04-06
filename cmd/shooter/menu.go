@@ -598,7 +598,7 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 			return menu.peerRoomLabel()
 		},
 		Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
-			menu.openPeerEditor("Peer room ID", peerConnector.RoomID(), peerConnector.SetRoomID)
+			menu.openPeerRoomEditor(peerConnector.RoomID(), peerConnector.SetRoomID)
 			return nil
 		},
 		Respond: []ebiten.Key{ebiten.KeyEnter},

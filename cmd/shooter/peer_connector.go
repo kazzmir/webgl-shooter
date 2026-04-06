@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/pion/webrtc/v4"
 )
@@ -117,7 +118,11 @@ func (connector *peerConnector) SetServerURL(serverBaseURL string) {
 func (connector *peerConnector) SetRoomID(roomIdentifier string) {
 	connector.mutex.Lock()
 	defer connector.mutex.Unlock()
-	connector.lastRoomIdentifier = strings.TrimSpace(roomIdentifier)
+	roomIdentifier = strings.TrimSpace(roomIdentifier)
+	if utf8.RuneCountInString(roomIdentifier) > peerRoomIDMaxLength {
+		roomIdentifier = string([]rune(roomIdentifier)[:peerRoomIDMaxLength])
+	}
+	connector.lastRoomIdentifier = roomIdentifier
 }
 
 func (connector *peerConnector) Action() error {

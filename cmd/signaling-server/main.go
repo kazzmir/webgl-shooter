@@ -12,6 +12,8 @@ import (
 	"sync"
 )
 
+const maxRoomIdentifierLength = 100
+
 type signalingServer struct {
 	mutex sync.Mutex
 	rooms map[string]*roomState
@@ -47,6 +49,7 @@ var (
 	errRoomNotFound        = errors.New("room was not found")
 	errParticipantNotFound = errors.New("participant was not found")
 	errRoleMismatch        = errors.New("participant role does not match this signal type")
+	errRoomIdentifierTooLong = errors.New("room_identifier must be 100 characters or fewer")
 )
 
 func main() {
@@ -94,9 +97,9 @@ func (server *signalingServer) handleJoinRoom(responseWriter http.ResponseWriter
 		return
 	}
 
-	roomIdentifier := strings.TrimSpace(joinRequest.RoomIdentifier)
-	if roomIdentifier == "" {
-		http.Error(responseWriter, "room_identifier is required", http.StatusBadRequest)
+	roomIdentifier, err := validateRoomIdentifier(joinRequest.RoomIdentifier)
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -140,9 +143,9 @@ func (server *signalingServer) handleAnswer(responseWriter http.ResponseWriter, 
 func (server *signalingServer) handleSignal(responseWriter http.ResponseWriter, request *http.Request, signalKind string) {
 	switch request.Method {
 	case http.MethodGet:
-		roomIdentifier := strings.TrimSpace(request.URL.Query().Get("room_identifier"))
-		if roomIdentifier == "" {
-			http.Error(responseWriter, "room_identifier is required", http.StatusBadRequest)
+		roomIdentifier, err := validateRoomIdentifier(request.URL.Query().Get("room_identifier"))
+		if err != nil {
+			http.Error(responseWriter, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -258,11 +261,11 @@ func (server *signalingServer) getSignal(roomIdentifier string, signalKind strin
 }
 
 func (server *signalingServer) setSignal(signalKind string, signalRequest signalingRequest) error {
-	roomIdentifier := strings.TrimSpace(signalRequest.RoomIdentifier)
-	participantIdentifier := strings.TrimSpace(signalRequest.ParticipantIdentifier)
-	if roomIdentifier == "" {
-		return errors.New("room_identifier is required")
+	roomIdentifier, err := validateRoomIdentifier(signalRequest.RoomIdentifier)
+	if err != nil {
+		return err
 	}
+	participantIdentifier := strings.TrimSpace(signalRequest.ParticipantIdentifier)
 	if participantIdentifier == "" {
 		return errors.New("participant_identifier is required")
 	}
@@ -313,4 +316,15 @@ func generateParticipantIdentifier() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(randomBytes), nil
+}
+
+func validateRoomIdentifier(roomIdentifier string) (string, error) {
+	roomIdentifier = strings.TrimSpace(roomIdentifier)
+	if roomIdentifier == "" {
+		return "", errors.New("room_identifier is required")
+	}
+	if len([]rune(roomIdentifier)) > maxRoomIdentifierLength {
+		return "", errRoomIdentifierTooLong
+	}
+	return roomIdentifier, nil
 }

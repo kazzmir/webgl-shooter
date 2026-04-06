@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -87,5 +88,14 @@ func TestSetSignalRequiresMatchingRole(t *testing.T) {
 	})
 	if !errors.Is(err, errRoleMismatch) {
 		t.Fatalf("set answer err = %v, want %v", err, errRoleMismatch)
+	}
+}
+
+func TestValidateRoomIdentifierRejectsLongValue(t *testing.T) {
+	roomIdentifier := strings.Repeat("a", maxRoomIdentifierLength+1)
+
+	_, err := validateRoomIdentifier(roomIdentifier)
+	if !errors.Is(err, errRoomIdentifierTooLong) {
+		t.Fatalf("validate room id err = %v, want %v", err, errRoomIdentifierTooLong)
 	}
 }

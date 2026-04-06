@@ -7,15 +7,19 @@ import (
 	"unicode/utf8"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
+
+const peerRoomIDMaxLength = 100
 
 type PeerEditor struct {
 	Active bool
 	Title  string
 	Value  string
 	Apply  func(string)
+	MaxLength int
 }
 
 func (editor *PeerEditor) Handle(chars []rune, keys []ebiten.Key) {
@@ -46,7 +50,15 @@ func (editor *PeerEditor) Handle(chars []rune, keys []ebiten.Key) {
 		if char < 32 || char == 127 {
 			continue
 		}
+		if editor.MaxLength > 0 && utf8.RuneCountInString(editor.Value) >= editor.MaxLength {
+			break
+		}
 		editor.Value += string(char)
+	}
+
+	backspaceDuration := inpututil.KeyPressDuration(ebiten.KeyBackspace)
+	if backspaceDuration >= 20 && backspaceDuration%3 == 0 {
+		editor.deleteLastRune()
 	}
 }
 
@@ -64,6 +76,9 @@ func (editor *PeerEditor) Draw(screen *ebiten.Image, font *text.GoTextFaceSource
 
 	drawText(screen, titleFace, 180, 220, editor.Title, color.RGBA{R: 255, G: 255, B: 255, A: 255})
 	drawText(screen, bodyFace, 180, 255, "Type a value, press Enter to save, or Escape to cancel.", color.RGBA{R: 190, G: 210, B: 255, A: 255})
+	if editor.MaxLength > 0 {
+		drawText(screen, bodyFace, 180, 280, fmt.Sprintf("Maximum length: %d characters.", editor.MaxLength), color.RGBA{R: 190, G: 210, B: 255, A: 255})
+	}
 
 	value := editor.Value
 	if (counter/30)%2 == 0 {
@@ -79,6 +94,25 @@ func (menu *Menu) openPeerEditor(title string, value string, apply func(string))
 		Value:  value,
 		Apply:  apply,
 	}
+}
+
+func (menu *Menu) openPeerRoomEditor(value string, apply func(string)) {
+	menu.PeerEditor = &PeerEditor{
+		Active: true,
+		Title:  "Peer room ID",
+		Value:  value,
+		Apply:  apply,
+		MaxLength: peerRoomIDMaxLength,
+	}
+}
+
+func (editor *PeerEditor) deleteLastRune() {
+	if editor.Value == "" {
+		return
+	}
+
+	_, size := utf8.DecodeLastRuneInString(editor.Value)
+	editor.Value = editor.Value[:len(editor.Value)-size]
 }
 
 func (menu *Menu) peerServerLabel() string {
