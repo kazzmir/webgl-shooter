@@ -121,6 +121,29 @@ func drawEdgeFade(screen *ebiten.Image, x1 float32, x2 float32, alpha1 float32, 
 	screen.DrawTriangles(vertices, indices, triangleFillImage, nil)
 }
 
+func drawOffscreenPlayerIndicator(screen *ebiten.Image, font *text.GoTextFaceSource, camera *Camera, player *Player) {
+	if player == nil || !player.IsAlive() || font == nil {
+		return
+	}
+
+	screenX, screenY := camera.Apply(player.x, player.y)
+	if screenX >= 0 && screenX <= ScreenWidth {
+		return
+	}
+
+	face := text.GoTextFace{Source: font, Size: 18}
+	label := "player"
+	textWidth, textHeight := text.Measure(label, &face, 0)
+	padding := 12.0
+	textX := padding
+	if screenX > ScreenWidth {
+		textX = ScreenWidth - textWidth - padding
+	}
+	textY := math.Max(0, math.Min(ScreenHeight-textHeight, screenY-textHeight/2))
+
+	drawText(screen, face, textX, textY, label, color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff})
+}
+
 // generates a bunch of colors between start and end, interpolating linerally
 func linearGradient(start color.Color, end color.Color, steps uint32) chan color.RGBA {
 	out := make(chan color.RGBA)
@@ -1811,6 +1834,8 @@ func (game *Game) Draw(screen *ebiten.Image) {
 			game.RemotePlayer.Draw(screen, game.ShaderManager, game.Camera)
 		}
 	}
+
+	drawOffscreenPlayerIndicator(screen, game.Font, game.Camera, game.RemotePlayer)
 
 	if game.Player.IsAlive() {
 		if game.isSlave() {
