@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestJoinRoomAssignsRoles(t *testing.T) {
@@ -97,5 +98,49 @@ func TestValidateRoomIdentifierRejectsLongValue(t *testing.T) {
 	_, err := validateRoomIdentifier(roomIdentifier)
 	if !errors.Is(err, errRoomIdentifierTooLong) {
 		t.Fatalf("validate room id err = %v, want %v", err, errRoomIdentifierTooLong)
+	}
+}
+
+func TestPingRoomUpdatesLastPingTime(t *testing.T) {
+	server := &signalingServer{
+		rooms: map[string]*roomState{
+			"alpha": {
+				participantRoles: map[string]string{},
+			},
+		},
+	}
+
+	now := time.Now()
+	if err := server.pingRoom("alpha", now); err != nil {
+		t.Fatalf("ping room: %v", err)
+	}
+
+	if got := server.rooms["alpha"].lastPingAt; !got.Equal(now) {
+		t.Fatalf("lastPingAt = %v, want %v", got, now)
+	}
+}
+
+func TestCleanupExpiredRoomsRemovesStaleEntries(t *testing.T) {
+	now := time.Now()
+	server := &signalingServer{
+		rooms: map[string]*roomState{
+			"fresh": {
+				participantRoles: map[string]string{},
+				lastPingAt:       now.Add(-30 * time.Second),
+			},
+			"stale": {
+				participantRoles: map[string]string{},
+				lastPingAt:       now.Add(-61 * time.Second),
+			},
+		},
+	}
+
+	server.cleanupExpiredRooms(now)
+
+	if _, ok := server.rooms["stale"]; ok {
+		t.Fatalf("stale room was not removed")
+	}
+	if _, ok := server.rooms["fresh"]; !ok {
+		t.Fatalf("fresh room was removed")
 	}
 }

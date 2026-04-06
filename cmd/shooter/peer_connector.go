@@ -17,6 +17,7 @@ import (
 )
 
 const signalPollInterval = time.Second
+const roomPingInterval = 5 * time.Second
 
 var errPeerSessionExpired = errors.New("peer session expired")
 
@@ -178,6 +179,7 @@ func (connector *peerConnector) runConnect(sessionNumber uint64, serverBaseURL s
 
 	connector.setRoomMembership(joinResponse.ParticipantIdentifier, joinResponse.Role)
 	connector.setPendingStatus(fmt.Sprintf("Peer: joined as %s", joinResponse.Role))
+	go connector.keepRoomAlive(sessionNumber)
 
 	if joinResponse.Role == "offerer" {
 		err = connector.connectAsOfferer(sessionNumber)
@@ -488,6 +490,21 @@ func (connector *peerConnector) joinRoom(serverBaseURL string, roomIdentifier st
 	return responseBody, nil
 }
 
+func (connector *peerConnector) pingRoom() error {
+	serverBaseURL, roomIdentifier, _ := connector.currentSignalingTarget()
+	if serverBaseURL == "" || roomIdentifier == "" {
+		return errPeerSessionExpired
+	}
+
+	_, err := connector.performJSONRequest(
+		http.MethodPost,
+		serverBaseURL+"/api/rooms/ping",
+		peerJoinRoomRequest{RoomIdentifier: roomIdentifier},
+		nil,
+	)
+	return err
+}
+
 func (connector *peerConnector) leaveRoom(serverBaseURL string, roomIdentifier string, participantIdentifier string) error {
 	if serverBaseURL == "" || roomIdentifier == "" || participantIdentifier == "" {
 		return nil
@@ -594,6 +611,28 @@ func (connector *peerConnector) performJSONRequest(method string, requestURL str
 	}
 
 	return response.StatusCode, nil
+}
+
+func (connector *peerConnector) keepRoomAlive(sessionNumber uint64) {
+	if err := connector.pingRoom(); err != nil && !errors.Is(err, errPeerSessionExpired) {
+		connector.setStatus("Peer: heartbeat failed: " + err.Error())
+	}
+
+	ticker := time.NewTicker(roomPingInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if !connector.isCurrentSession(sessionNumber) {
+			return
+		}
+
+		if err := connector.pingRoom(); err != nil {
+			if errors.Is(err, errPeerSessionExpired) {
+				return
+			}
+			connector.setStatus("Peer: heartbeat failed: " + err.Error())
+		}
+	}
 }
 
 func (connector *peerConnector) hasActiveSession() bool {

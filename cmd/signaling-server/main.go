@@ -10,9 +10,12 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 const maxRoomIdentifierLength = 100
+const roomExpirationWindow = 60 * time.Second
+const roomCleanupInterval = 5 * time.Second
 
 type signalingServer struct {
 	mutex sync.Mutex
@@ -23,6 +26,7 @@ type roomState struct {
 	participantRoles map[string]string
 	offerPayload     json.RawMessage
 	answerPayload    json.RawMessage
+	lastPingAt       time.Time
 }
 
 type joinRoomRequest struct {
@@ -65,8 +69,11 @@ func main() {
 	multiplexer := http.NewServeMux()
 	multiplexer.HandleFunc("/api/rooms/join", server.handleJoinRoom)
 	multiplexer.HandleFunc("/api/rooms/leave", server.handleLeaveRoom)
+	multiplexer.HandleFunc("/api/rooms/ping", server.handlePingRoom)
 	multiplexer.HandleFunc("/api/rooms/offer", server.handleOffer)
 	multiplexer.HandleFunc("/api/rooms/answer", server.handleAnswer)
+
+	go server.cleanupExpiredRoomsLoop()
 
 	log.Printf("signaling server listening on %s", *address)
 	log.Fatal(http.ListenAndServe(*address, withCommonHeaders(multiplexer)))
@@ -134,6 +141,36 @@ func (server *signalingServer) handleLeaveRoom(responseWriter http.ResponseWrite
 	responseWriter.WriteHeader(http.StatusNoContent)
 }
 
+func (server *signalingServer) handlePingRoom(responseWriter http.ResponseWriter, request *http.Request) {
+	if request.Method != http.MethodPost {
+		http.Error(responseWriter, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var pingRequest joinRoomRequest
+	if err := json.NewDecoder(request.Body).Decode(&pingRequest); err != nil {
+		http.Error(responseWriter, "invalid ping request", http.StatusBadRequest)
+		return
+	}
+
+	roomIdentifier, err := validateRoomIdentifier(pingRequest.RoomIdentifier)
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := server.pingRoom(roomIdentifier, time.Now()); err != nil {
+		if errors.Is(err, errRoomNotFound) {
+			http.Error(responseWriter, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	responseWriter.WriteHeader(http.StatusNoContent)
+}
+
 func (server *signalingServer) handleOffer(responseWriter http.ResponseWriter, request *http.Request) {
 	server.handleSignal(responseWriter, request, "offer")
 }
@@ -193,6 +230,7 @@ func (server *signalingServer) joinRoom(roomIdentifier string) (joinRoomResponse
 	if room == nil {
 		room = &roomState{
 			participantRoles: map[string]string{},
+			lastPingAt:       time.Now(),
 		}
 		server.rooms[roomIdentifier] = room
 		log.Printf("created signaling room %q", roomIdentifier)
@@ -213,6 +251,7 @@ func (server *signalingServer) joinRoom(roomIdentifier string) (joinRoomResponse
 	}
 
 	room.participantRoles[participantIdentifier] = role
+	room.lastPingAt = time.Now()
 	return joinRoomResponse{
 		ParticipantIdentifier: participantIdentifier,
 		Role:                  role,
@@ -299,10 +338,12 @@ func (server *signalingServer) setSignal(signalKind string, signalRequest signal
 	if signalKind == "offer" {
 		room.offerPayload = append(json.RawMessage(nil), signalRequest.SessionDescription...)
 		room.answerPayload = nil
+		room.lastPingAt = time.Now()
 		return nil
 	}
 
 	room.answerPayload = append(json.RawMessage(nil), signalRequest.SessionDescription...)
+	room.lastPingAt = time.Now()
 	return nil
 }
 
@@ -330,4 +371,42 @@ func validateRoomIdentifier(roomIdentifier string) (string, error) {
 		return "", errRoomIdentifierTooLong
 	}
 	return roomIdentifier, nil
+}
+
+func (server *signalingServer) pingRoom(roomIdentifier string, now time.Time) error {
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+
+	room := server.rooms[roomIdentifier]
+	if room == nil {
+		return errRoomNotFound
+	}
+
+	room.lastPingAt = now
+	return nil
+}
+
+func (server *signalingServer) cleanupExpiredRoomsLoop() {
+	ticker := time.NewTicker(roomCleanupInterval)
+	defer ticker.Stop()
+
+	for now := range ticker.C {
+		server.cleanupExpiredRooms(now)
+	}
+}
+
+func (server *signalingServer) cleanupExpiredRooms(now time.Time) {
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+
+	for roomIdentifier, room := range server.rooms {
+		if room.lastPingAt.IsZero() {
+			room.lastPingAt = now
+			continue
+		}
+		if now.Sub(room.lastPingAt) >= roomExpirationWindow {
+			delete(server.rooms, roomIdentifier)
+			log.Printf("expired signaling room %q", roomIdentifier)
+		}
+	}
 }
