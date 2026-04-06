@@ -1393,6 +1393,17 @@ func (game *Game) Update(run *Run) error {
 				explodeAsteroid(asteroid)
 			}
 		}
+
+		if game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() && asteroid.IsAlive() && asteroid.Collide(game.RemotePlayer, game.ImageManager) {
+			game.RemotePlayer.Damage(2)
+			asteroid.Damage(2)
+
+			if !asteroid.IsAlive() {
+				game.Shake()
+				game.SoundManager.Play(audioFiles.AudioExplosion3)
+				explodeAsteroid(asteroid)
+			}
+		}
 	}
 
 	var powerupOut []Powerup
@@ -1403,6 +1414,9 @@ func (game *Game) Update(run *Run) error {
 			if game.isSlave() {
 				game.noteCollectedPowerup(powerup)
 			}
+		}
+		if game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() && powerup.Collide(game.RemotePlayer, game.ImageManager) {
+			powerup.Activate(game.RemotePlayer, game.SoundManager)
 		}
 
 		if powerup.IsAlive() {
@@ -1438,6 +1452,26 @@ func (game *Game) Update(run *Run) error {
 					game.Player.Kills += 1
 					game.SoundManager.Play(audioFiles.AudioExplosion3)
 
+					explodeEnemy(enemy)
+				}
+			}
+		}
+
+		if game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() {
+			collideX, collideY, isCollide := enemy.CollidePlayer(game.RemotePlayer)
+			if isCollide {
+				game.GetCounter("slave hit enemy", 30).Do(func() {
+					game.SoundManager.Play(audioFiles.AudioHit1)
+				})
+
+				makeAnimatedExplosion(collideX, collideY, gameImages.ImageHit2)
+				enemy.Damage(2)
+				game.RemotePlayer.Damage(2)
+
+				if !enemy.IsAlive() {
+					game.RemotePlayer.Score += 1
+					game.RemotePlayer.Kills += 1
+					game.SoundManager.Play(audioFiles.AudioExplosion3)
 					explodeEnemy(enemy)
 				}
 			}
@@ -1550,6 +1584,20 @@ func (game *Game) Update(run *Run) error {
 				if !game.Player.IsAlive() {
 					game.PlayerDied.Do(playerDied)
 				}
+
+				animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit2)
+				if err == nil {
+					game.Explosions = append(game.Explosions, MakeAnimatedExplosion(bullet.x, bullet.y, animation))
+				} else {
+					log.Printf("Could not load explosion sheet: %v", err)
+				}
+
+				bullet.Damage(1)
+			}
+
+			if bullet.IsAlive() && game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() && game.RemotePlayer.Collide(bullet.x, bullet.y) {
+				game.SoundManager.Play(audioFiles.AudioHit2)
+				game.RemotePlayer.Damage(bullet.Strength)
 
 				animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit2)
 				if err == nil {

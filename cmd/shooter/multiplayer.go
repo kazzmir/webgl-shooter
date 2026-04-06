@@ -71,6 +71,7 @@ type snapshotMessage struct {
 	Counter      uint64          `json:"counter"`
 	Difficulty   float64         `json:"difficulty"`
 	Player       playerState     `json:"player"`
+	SlavePlayer  *playerState    `json:"slave_player,omitempty"`
 	Bullets      []bulletState   `json:"bullets"`
 	EnemyBullets []bulletState   `json:"enemy_bullets"`
 	Asteroids    []asteroidState `json:"asteroids"`
@@ -429,6 +430,10 @@ func (game *Game) maybeSendSnapshot() {
 		BossMode:     game.BossMode,
 		End:          game.End.Load(),
 	}
+	if game.RemotePlayer != nil {
+		slavePlayer := serializePlayer(game.RemotePlayer)
+		snapshot.SlavePlayer = &slavePlayer
+	}
 
 	if err := game.Multiplayer.Peer.SendGameMessage(multiplayerEnvelope{
 		Kind:     "snapshot",
@@ -609,6 +614,9 @@ func (game *Game) applySpawn(spawn spawnMessage) error {
 func (game *Game) applySnapshot(snapshot snapshotMessage) error {
 	if game.RemotePlayer != nil {
 		applyPlayerState(game.RemotePlayer, snapshot.Player)
+	}
+	if game.isSlave() && snapshot.SlavePlayer != nil {
+		applyPlayerState(game.Player, *snapshot.SlavePlayer)
 	}
 	game.Counter = snapshot.Counter
 	game.Difficulty = snapshot.Difficulty
