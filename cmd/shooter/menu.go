@@ -189,7 +189,7 @@ func (menu *Menu) Update(run *Run) error {
 func (menu *Menu) Draw(screen *ebiten.Image) {
 	// screen.Fill(color.RGBA{0, 0, 0, 0xff})
 
-	var x float64 = 200
+	var x float64 = 100
 	var y float64 = 100
 
 	angle := float64(menu.Counter%360) * math.Pi / 180.0 * 9
@@ -219,7 +219,7 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 		if menu.Selected == i {
 			drawColor = color.RGBA{R: 255, G: 255, B: 255, A: uint8(a)}
 		}
-		vector.DrawFilledRect(screen, float32(x-10), float32(y-10), float32(optionWidth), float32(height+10+10), premultiplyAlpha(drawColor), true)
+		vector.FillRect(screen, float32(x-10), float32(y-10), float32(optionWidth), float32(height+10+10), premultiplyAlpha(drawColor), true)
 
 		op := &text.DrawOptions{}
 		op.GeoM.Translate(x, y)
@@ -234,8 +234,8 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 		drawText(screen, text.GoTextFace{Source: menu.Font, Size: 14}, x, y, menu.PeerConnector.StatusLine(), color.RGBA{R: 200, G: 220, B: 255, A: 255})
 	}
 
-	hintX := 300
-	hintY := 500
+	hintX := 500
+	hintY := 400
 	hintWidth := 500
 	hintHeight := 240
 	hintArea := screen.SubImage(image.Rect(hintX, hintY, hintX+hintWidth, hintY+hintHeight)).(*ebiten.Image)
