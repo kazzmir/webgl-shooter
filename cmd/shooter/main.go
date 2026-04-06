@@ -1725,7 +1725,11 @@ func (game *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if game.RemotePlayer != nil && game.RemotePlayer.IsAlive() {
-		game.RemotePlayer.DrawWithTint(screen, game.ShaderManager, game.Camera, makeSlaveTint())
+		if game.isMaster() {
+			game.RemotePlayer.DrawWithTint(screen, game.ShaderManager, game.Camera, makeSlaveTint())
+		} else {
+			game.RemotePlayer.Draw(screen, game.ShaderManager, game.Camera)
+		}
 	}
 
 	if game.Player.IsAlive() {
