@@ -329,6 +329,7 @@ func MakeShaderManager() (*ShaderManager, error) {
 }
 
 const BombDelay = 60
+const RespawnBlinkDuration = 120
 
 type Player struct {
 	x, y                 float64
@@ -355,6 +356,7 @@ type Player struct {
 	Experience float64
 
 	PowerupEnergy int
+	RespawnBlink  int
 }
 
 func (player *Player) IncreaseBombs() {
@@ -391,6 +393,9 @@ func (player *Player) IncreaseMaxEnergy(amount float64) {
 */
 
 func (player *Player) Damage(amount float64) {
+	if player.RespawnBlink > 0 {
+		return
+	}
 	player.Health -= amount
 	if player.Health < 0 {
 		player.Health = 0
@@ -399,6 +404,10 @@ func (player *Player) Damage(amount float64) {
 
 func (player *Player) IsAlive() bool {
 	return player.Health > 0
+}
+
+func (player *Player) IsInvulnerable() bool {
+	return player.RespawnBlink > 0
 }
 
 func (player *Player) Bounds() image.Rectangle {
@@ -454,6 +463,9 @@ func (player *Player) EnableNextGun() {
 
 func (player *Player) Move() {
 	player.Counter += 1
+	if player.RespawnBlink > 0 {
+		player.RespawnBlink -= 1
+	}
 
 	player.x += player.velocityX
 	player.y += player.velocityY
@@ -661,6 +673,10 @@ func (player *Player) Draw(screen *ebiten.Image, shaders *ShaderManager, camera 
 }
 
 func (player *Player) DrawWithTint(screen *ebiten.Image, shaders *ShaderManager, camera *Camera, tint *colorm.ColorM) {
+	if player.RespawnBlink > 0 && (player.Counter/6)%2 == 0 {
+		return
+	}
+
 	playerX, playerY := camera.Apply(player.x, player.y)
 	playerX -= float64(player.pic.Bounds().Dx()) / 2
 	playerY -= float64(player.pic.Bounds().Dy()) / 2
@@ -724,6 +740,16 @@ func saveHeapDump() {
 
 func (player *Player) HandleKeys(game *Game, run *Run) error {
 	return player.ApplyInput(game, run, gatherLocalPlayerInput(), true)
+}
+
+func (player *Player) Respawn() {
+	player.Health = player.MaxHealth
+	player.velocityX = 0
+	player.velocityY = 0
+	player.RespawnBlink = RespawnBlinkDuration
+	for _, gun := range player.Guns {
+		gun.Downgrade()
+	}
 }
 
 const JumpDuration = 50
@@ -1097,8 +1123,6 @@ type Game struct {
 
 	Difficulty float64
 
-	PlayerDied sync.Once
-
 	BossMode bool
 	// runs one time when the boss should appear
 	DoBoss sync.Once
@@ -1252,7 +1276,6 @@ func (game *Game) MakeEnemies(count int) error {
 }
 
 var LevelEnd error = errors.New("end of level")
-var PlayerDied error = errors.New("player died")
 
 func (game *Game) UpdateCounters() {
 	for _, counter := range game.Counters {
@@ -1328,11 +1351,10 @@ func (game *Game) Update(run *Run) error {
 		makeAnimatedExplosion(asteroid.x, asteroid.y, gameImages.ImageExplosion3)
 	}
 
-	playerDied := func() {
+	respawnPlayer := func(player *Player) {
 		game.SoundManager.Play(audioFiles.AudioExplosion3)
-		game.End.Store(true)
-
-		makeAnimatedExplosion(game.Player.x, game.Player.y, gameImages.ImageExplosion2)
+		makeAnimatedExplosion(player.x, player.y, gameImages.ImageExplosion2)
+		player.Respawn()
 	}
 
 	if game.End.Load() {
@@ -1377,12 +1399,12 @@ func (game *Game) Update(run *Run) error {
 
 	for _, asteroid := range game.Asteroids {
 		asteroid.Move()
-		if asteroid.Collide(game.Player, game.ImageManager) {
+		if !game.Player.IsInvulnerable() && asteroid.Collide(game.Player, game.ImageManager) {
 			game.Player.Damage(2)
 			asteroid.Damage(2)
 
 			if !game.Player.IsAlive() {
-				game.PlayerDied.Do(playerDied)
+				respawnPlayer(game.Player)
 			}
 
 			if !asteroid.IsAlive() {
@@ -1393,9 +1415,12 @@ func (game *Game) Update(run *Run) error {
 			}
 		}
 
-		if game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() && asteroid.IsAlive() && asteroid.Collide(game.RemotePlayer, game.ImageManager) {
+		if game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() && !game.RemotePlayer.IsInvulnerable() && asteroid.IsAlive() && asteroid.Collide(game.RemotePlayer, game.ImageManager) {
 			game.RemotePlayer.Damage(2)
 			asteroid.Damage(2)
+			if !game.RemotePlayer.IsAlive() {
+				respawnPlayer(game.RemotePlayer)
+			}
 
 			if !asteroid.IsAlive() {
 				game.Shake()
@@ -1430,7 +1455,7 @@ func (game *Game) Update(run *Run) error {
 			game.AddEnemyBullets(bullets...)
 		}
 
-		if game.Player.IsAlive() {
+		if game.Player.IsAlive() && !game.Player.IsInvulnerable() {
 			collideX, collideY, isCollide := enemy.CollidePlayer(game.Player)
 
 			if isCollide {
@@ -1443,7 +1468,7 @@ func (game *Game) Update(run *Run) error {
 				enemy.Damage(2)
 				game.Player.Damage(2)
 				if !game.Player.IsAlive() {
-					game.PlayerDied.Do(playerDied)
+					respawnPlayer(game.Player)
 				}
 
 				if !enemy.IsAlive() {
@@ -1456,7 +1481,7 @@ func (game *Game) Update(run *Run) error {
 			}
 		}
 
-		if game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() {
+		if game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() && !game.RemotePlayer.IsInvulnerable() {
 			collideX, collideY, isCollide := enemy.CollidePlayer(game.RemotePlayer)
 			if isCollide {
 				game.GetCounter("slave hit enemy", 30).Do(func() {
@@ -1466,6 +1491,9 @@ func (game *Game) Update(run *Run) error {
 				makeAnimatedExplosion(collideX, collideY, gameImages.ImageHit2)
 				enemy.Damage(2)
 				game.RemotePlayer.Damage(2)
+				if !game.RemotePlayer.IsAlive() {
+					respawnPlayer(game.RemotePlayer)
+				}
 
 				if !enemy.IsAlive() {
 					game.RemotePlayer.Score += 1
@@ -1576,12 +1604,12 @@ func (game *Game) Update(run *Run) error {
 		for _, bullet := range game.EnemyBullets {
 			bullet.Move()
 
-			if game.Player.IsAlive() && game.Player.Collide(bullet.x, bullet.y) {
+			if game.Player.IsAlive() && !game.Player.IsInvulnerable() && game.Player.Collide(bullet.x, bullet.y) {
 				game.SoundManager.Play(audioFiles.AudioHit2)
 
 				game.Player.Damage(bullet.Strength)
 				if !game.Player.IsAlive() {
-					game.PlayerDied.Do(playerDied)
+					respawnPlayer(game.Player)
 				}
 
 				animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit2)
@@ -1594,9 +1622,12 @@ func (game *Game) Update(run *Run) error {
 				bullet.Damage(1)
 			}
 
-			if bullet.IsAlive() && game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() && game.RemotePlayer.Collide(bullet.x, bullet.y) {
+			if bullet.IsAlive() && game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() && !game.RemotePlayer.IsInvulnerable() && game.RemotePlayer.Collide(bullet.x, bullet.y) {
 				game.SoundManager.Play(audioFiles.AudioHit2)
 				game.RemotePlayer.Damage(bullet.Strength)
+				if !game.RemotePlayer.IsAlive() {
+					respawnPlayer(game.RemotePlayer)
+				}
 
 				animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit2)
 				if err == nil {
@@ -1717,10 +1748,6 @@ func (game *Game) Update(run *Run) error {
 			})
 		}
 
-	}
-
-	if !game.Player.IsAlive() {
-		return PlayerDied
 	}
 
 	game.maybeSendSnapshot()
@@ -1967,12 +1994,6 @@ func (run *Run) Update() error {
 			run.Game.Close()
 			run.Game = newGame
 			// run.Mode = RunMenu
-			return nil
-		} else if errors.Is(err, PlayerDied) {
-			run.Player = nil
-			run.Game.Close()
-			run.Game = nil
-			run.Mode = RunMenu
 			return nil
 		} else {
 			return err

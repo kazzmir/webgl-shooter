@@ -107,6 +107,7 @@ type playerState struct {
 	Level         int        `json:"level"`
 	Experience    float64    `json:"experience"`
 	Guns          []gunState `json:"guns"`
+	RespawnBlink  int        `json:"respawn_blink"`
 }
 
 type gunState struct {
@@ -754,6 +755,7 @@ func serializePlayer(player *Player) playerState {
 		Level:         player.Level,
 		Experience:    player.Experience,
 		Guns:          serializeGuns(player.Guns),
+		RespawnBlink:  player.RespawnBlink,
 	}
 }
 
@@ -775,6 +777,7 @@ func applyPlayerState(player *Player, state playerState) {
 	player.Level = state.Level
 	player.Experience = state.Experience
 	player.Guns = makeGunsFromState(state.Guns)
+	player.RespawnBlink = state.RespawnBlink
 }
 
 func serializeGuns(guns []Gun) []gunState {
