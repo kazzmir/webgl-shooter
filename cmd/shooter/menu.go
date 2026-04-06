@@ -260,7 +260,7 @@ func (menu *Menu) Draw(screen *ebiten.Image) {
 
 	if menu.MultiplayerOpen && menu.PeerConnector != nil {
 		drawText(screen, text.GoTextFace{Source: menu.Font, Size: 28}, x, 60, "Multiplayer", color.RGBA{R: 255, G: 255, B: 255, A: 255})
-		drawText(screen, text.GoTextFace{Source: menu.Font, Size: 14}, x, y, menu.PeerConnector.StatusLine(), color.RGBA{R: 200, G: 220, B: 255, A: 255})
+		drawText(screen, text.GoTextFace{Source: menu.Font, Size: 14}, x, y, menu.PeerConnector.StatusLine(menu.Counter), color.RGBA{R: 200, G: 220, B: 255, A: 255})
 	}
 
 	hintX := 500
