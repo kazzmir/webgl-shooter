@@ -16,7 +16,7 @@ import (
 const (
 	multiplayerRoleMaster = "master"
 	multiplayerRoleSlave  = "slave"
-	snapshotInterval      = 30
+	snapshotInterval      = 60
 	multiplayerSpawnOffset = 100
 )
 
