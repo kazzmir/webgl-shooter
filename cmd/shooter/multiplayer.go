@@ -131,6 +131,8 @@ type bulletState struct {
 	VelocityY float64 `json:"velocity_y"`
 	Health    int     `json:"health"`
 	Kind      string  `json:"kind"`
+	Owner     string  `json:"owner"`
+	GunKind   string  `json:"gun_kind"`
 	RemainingLife int  `json:"remaining_life"`
 }
 
@@ -545,6 +547,11 @@ func (game *Game) AddPlayerBullets(bullets ...*Bullet) {
 	if len(bullets) == 0 {
 		return
 	}
+	owner := game.localBulletOwner()
+	for _, bullet := range bullets {
+		bullet.Owner = owner
+		bullet.GunKind = gunKindFromGun(bullet.Gun)
+	}
 	game.Bullets = append(game.Bullets, bullets...)
 	if game.isMaster() {
 		for _, bullet := range bullets {
@@ -918,6 +925,8 @@ func serializeBullet(bullet *Bullet) bulletState {
 		VelocityY: bullet.velocityY,
 		Health:    bullet.health,
 		Kind:      bulletKind(bullet),
+		Owner:     bullet.Owner,
+		GunKind:   bullet.GunKind,
 		RemainingLife: bullet.RemainingLife,
 	}
 }
@@ -955,6 +964,34 @@ func bulletKind(bullet *Bullet) string {
 	return "basic"
 }
 
+func gunKindFromGun(gun Gun) string {
+	switch gun.(type) {
+	case *BasicGun:
+		return "basic"
+	case *BeamGun:
+		return "beam"
+	case *MissleGun:
+		return "missile"
+	case *LightningGun:
+		return "lightning"
+	case *DualBasicGun:
+		return "dual-basic"
+	}
+	return ""
+}
+
+func findPlayerGunByKind(player *Player, kind string) Gun {
+	if player == nil || kind == "" {
+		return nil
+	}
+	for _, gun := range player.Guns {
+		if gunKindFromGun(gun) == kind {
+			return gun
+		}
+	}
+	return nil
+}
+
 func (game *Game) makeBulletFromState(state bulletState) *Bullet {
 	bullet := &Bullet{
 		x:         state.X,
@@ -964,8 +1001,13 @@ func (game *Game) makeBulletFromState(state bulletState) *Bullet {
 		velocityY: state.VelocityY,
 		health:    state.Health,
 		Kind:      state.Kind,
+		Owner:     state.Owner,
+		GunKind:   state.GunKind,
 		RemainingLife: state.RemainingLife,
 	}
+
+	ownerPlayer := game.bulletOwnerPlayer(bullet)
+	bullet.Gun = findPlayerGunByKind(ownerPlayer, state.GunKind)
 
 	switch state.Kind {
 	case "beam":

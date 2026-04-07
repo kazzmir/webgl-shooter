@@ -158,6 +158,61 @@ func (game *Game) pickEnemyTarget() *Player {
 	return targets[rand.N(len(targets))]
 }
 
+func (game *Game) localBulletOwner() string {
+	if game.isMaster() {
+		return multiplayerRoleMaster
+	}
+	if game.isSlave() {
+		return multiplayerRoleSlave
+	}
+	return "local"
+}
+
+func (game *Game) bulletOwnerPlayer(bullet *Bullet) *Player {
+	if bullet == nil {
+		return nil
+	}
+
+	switch bullet.Owner {
+	case multiplayerRoleSlave:
+		if game.isMaster() && game.RemotePlayer != nil {
+			return game.RemotePlayer
+		}
+		if game.isSlave() {
+			return game.Player
+		}
+	case multiplayerRoleMaster:
+		if game.isSlave() && game.RemotePlayer != nil {
+			return game.RemotePlayer
+		}
+		return game.Player
+	case "local", "":
+		return game.Player
+	}
+
+	return game.Player
+}
+
+func (game *Game) addBulletScore(bullet *Bullet, amount uint64) {
+	owner := game.bulletOwnerPlayer(bullet)
+	if owner != nil {
+		owner.Score += amount
+	}
+}
+
+func (game *Game) addBulletKillRewards(bullet *Bullet, enemy Enemy) {
+	owner := game.bulletOwnerPlayer(bullet)
+	if owner == nil {
+		return
+	}
+
+	owner.Kills += 1
+	owner.AddExperience(enemy.Experience())
+	if owner.Kills%20 == 0 {
+		game.AddPowerup(MakeRandomPowerup(randomFloat(10, LogicalWidth-10), -20))
+	}
+}
+
 // generates a bunch of colors between start and end, interpolating linerally
 func linearGradient(start color.Color, end color.Color, steps uint32) chan color.RGBA {
 	out := make(chan color.RGBA)
@@ -207,6 +262,8 @@ type Bullet struct {
 	animation            *Animation
 	health               int
 	Kind                 string
+	Owner                string
+	GunKind              string
 	RemainingLife        int
 	Gun                  Gun
 
@@ -1561,7 +1618,7 @@ func (game *Game) Update(run *Run) error {
 			for _, asteroid := range game.Asteroids {
 				if asteroid.IsAlive() && asteroid.Collision(bullet.x, bullet.y, game.ImageManager) {
 					asteroid.Damage(bullet.Strength)
-					game.Player.Score += 1
+					game.addBulletScore(bullet, 1)
 					bullet.Damage(1)
 
 					game.SoundManager.Play(audioFiles.AudioHit1)
@@ -1588,7 +1645,7 @@ func (game *Game) Update(run *Run) error {
 			if bullet.IsAlive() {
 				for _, enemy := range game.Enemies {
 					if enemy.IsAlive() && enemy.Collision(bullet.x, bullet.y) {
-						game.Player.Score += 1
+						game.addBulletScore(bullet, 1)
 						if bullet.Gun != nil {
 							bullet.Gun.IncreaseExperience(bullet.Strength)
 						}
@@ -1596,15 +1653,10 @@ func (game *Game) Update(run *Run) error {
 						enemy.Damage(bullet.Strength)
 						if !enemy.IsAlive() {
 							game.Shake()
-							game.Player.Kills += 1
-							game.Player.AddExperience(enemy.Experience())
+							game.addBulletKillRewards(bullet, enemy)
 							game.SoundManager.Play(audioFiles.AudioExplosion3)
 
 							// create a powerup every X kills
-							if game.Player.Kills%20 == 0 {
-								game.AddPowerup(MakeRandomPowerup(randomFloat(10, LogicalWidth-10), -20))
-							}
-
 							explodeEnemy(enemy)
 
 							// create a powerup where the enemy died every once in a while
