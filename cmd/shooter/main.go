@@ -144,6 +144,20 @@ func drawOffscreenPlayerIndicator(screen *ebiten.Image, font *text.GoTextFaceSou
 	drawText(screen, face, textX, textY, label, color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff})
 }
 
+func (game *Game) pickEnemyTarget() *Player {
+	var targets []*Player
+	if game.Player != nil && game.Player.IsAlive() {
+		targets = append(targets, game.Player)
+	}
+	if game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() {
+		targets = append(targets, game.RemotePlayer)
+	}
+	if len(targets) == 0 {
+		return game.Player
+	}
+	return targets[rand.N(len(targets))]
+}
+
 // generates a bunch of colors between start and end, interpolating linerally
 func linearGradient(start color.Color, end color.Color, steps uint32) chan color.RGBA {
 	out := make(chan color.RGBA)
@@ -1473,7 +1487,8 @@ func (game *Game) Update(run *Run) error {
 	game.Powerups = powerupOut
 
 	for _, enemy := range game.Enemies {
-		bullets := enemy.Move(game.Player, game.ImageManager)
+		targetPlayer := game.pickEnemyTarget()
+		bullets := enemy.Move(targetPlayer, game.ImageManager)
 		if !game.isSlave() {
 			game.AddEnemyBullets(bullets...)
 		}
