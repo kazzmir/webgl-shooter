@@ -1474,7 +1474,9 @@ func (game *Game) Update(run *Run) error {
 	}
 
 	game.MusicPlayer.Do(func() {
-		game.SoundManager.PlayLoop(audioFiles.AudioStellarPulseSong, game.Quit)
+		choices := []audioFiles.AudioName{audioFiles.AudioChillSong, audioFiles.AudioStellarPulseSong}
+		use := choices[rand.N(len(choices))]
+		game.SoundManager.PlayLoop(use, game.Quit)
 	})
 
 	game.Background.Update()
