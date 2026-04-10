@@ -20,16 +20,17 @@ import (
 )
 
 type Gun interface {
-    Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error)
-    Rate() float64
-    DoSound(soundManager *SoundManager)
-    DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace)
-    IsEnabled() bool
-    SetEnabled(bool)
-    GetLevel() int
-    IncreaseExperience(float64)
-    Update()
-    EnergyUsed() float64
+	Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error)
+	Rate() float64
+	DoSound(soundManager *SoundManager)
+	DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace)
+	IsEnabled() bool
+	SetEnabled(bool)
+	GetLevel() int
+	IncreaseExperience(float64)
+	Downgrade()
+	Update()
+	EnergyUsed() float64
 
     // a value from 0.0 to 1.0 indicating how close the gun is to leveling up
     LevelPercent() float64
@@ -45,7 +46,14 @@ type BasicGun struct {
 }
 
 func experienceForLevel(level int) float64 {
-    return 90 * math.Pow(1.7, float64(level))
+	return 90 * math.Pow(1.7, float64(level))
+}
+
+func downgradeLevel(level *int, experience *float64) {
+	if *level > 0 {
+		*level -= 1
+	}
+	*experience = 0
 }
 
 func (basic *BasicGun) GetLevel() int {
@@ -65,12 +73,16 @@ func (basic *BasicGun) EnergyUsed() float64 {
 }
 
 func (basic *BasicGun) IncreaseExperience(amount float64) {
-    basic.experience += amount
+	basic.experience += amount
     // log.Printf("BasicGun gained %f experience, total %f", amount, basic.experience)
     if basic.experience >= experienceForLevel(basic.level) {
         basic.experience -= experienceForLevel(basic.level)
         basic.level += 1
-    }
+	}
+}
+
+func (basic *BasicGun) Downgrade() {
+	downgradeLevel(&basic.level, &basic.experience)
 }
 
 func (basic *BasicGun) LevelPercent() float64 {
@@ -245,6 +257,10 @@ func (dual *DualBasicGun) LevelPercent() float64 {
 func (dual *DualBasicGun) IncreaseExperience(experience float64) {
 }
 
+func (dual *DualBasicGun) Downgrade() {
+	downgradeLevel(&dual.level, &dual.experience)
+}
+
 func (dual *DualBasicGun) Update() {
     if dual.counter > 0 {
         dual.counter -= 1
@@ -360,12 +376,16 @@ func (beam *BeamGun) GetLevel() int {
 }
 
 func (beam *BeamGun) IncreaseExperience(experience float64) {
-    beam.experience += experience
+	beam.experience += experience
 
     if beam.experience >= experienceForLevel(beam.level) {
         beam.experience -= experienceForLevel(beam.level)
         beam.level += 1
-    }
+	}
+}
+
+func (beam *BeamGun) Downgrade() {
+	downgradeLevel(&beam.level, &beam.experience)
 }
 
 func (beam *BeamGun) EnergyUsed() float64 {
@@ -460,12 +480,16 @@ func (missle *MissleGun) LevelPercent() float64 {
 }
 
 func (missle *MissleGun) IncreaseExperience(experience float64) {
-    missle.experience += experience
+	missle.experience += experience
 
     if missle.experience >= experienceForLevel(missle.level) {
         missle.experience -= experienceForLevel(missle.level)
         missle.level += 1
-    }
+	}
+}
+
+func (missle *MissleGun) Downgrade() {
+	downgradeLevel(&missle.level, &missle.experience)
 }
 
 func (missle *MissleGun) Update() {
@@ -670,16 +694,18 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
                     velocityX: 0,
                     velocityY: 0,
                     pic: nil,
+                    Kind: "lightning",
+                    RemainingLife: life,
                     Gun: lightning,
                     Update: func(self *Bullet) bool {
-                        life -= 1
-                        if life <= 0 {
-                            return false
+                        if self.RemainingLife > 0 {
+                            self.RemainingLife -= 1
                         }
-                        return true
+                        return self.RemainingLife > 0
                     },
                     CustomDraw: func(self *Bullet, screen *ebiten.Image, camera *Camera) {
                         // var options ebiten.DrawImageOptions
+                        life := self.RemainingLife
                         alpha := uint8(255)
                         if life < 20 {
                             alpha = uint8(255.0 * float64(life) / 20.0)
@@ -781,12 +807,16 @@ func (lightning *LightningGun) SetEnabled(enabled bool) {
 }
 
 func (lightning *LightningGun) IncreaseExperience(value float64) {
-    lightning.experience += value
+	lightning.experience += value
 
     if lightning.experience >= experienceForLevel(lightning.level) {
         lightning.experience -= experienceForLevel(lightning.level)
         lightning.level += 1
-    }
+	}
+}
+
+func (lightning *LightningGun) Downgrade() {
+	downgradeLevel(&lightning.level, &lightning.experience)
 }
 
 func (lightning *LightningGun) Update() {

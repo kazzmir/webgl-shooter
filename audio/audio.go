@@ -23,6 +23,9 @@ var Shoot1Data []byte
 //go:embed music/stellar-pulse.ogg
 var SongStellarPulseData []byte
 
+//go:embed music/chill.ogg
+var SongChillData []byte
+
 //go:embed effects/explosion1.ogg
 var Explosion1Data []byte
 
@@ -50,6 +53,7 @@ const AudioHit1 = AudioName("hit1")
 const AudioHit2 = AudioName("hit2")
 const AudioShoot1 = AudioName("shoot1")
 const AudioStellarPulseSong = AudioName("stellar-pulse")
+const AudioChillSong = AudioName("chill")
 const AudioExplosion1 = AudioName("explosion1")
 const AudioExplosion2 = AudioName("explosion2")
 const AudioExplosion3 = AudioName("explosion3")
@@ -58,7 +62,7 @@ const AudioBeep = AudioName("beep")
 const AudioHealth = AudioName("health")
 const AudioLightning = AudioName("lightning")
 
-var AllSounds []AudioName = []AudioName{AudioHit1, AudioHit2, AudioShoot1, AudioStellarPulseSong, AudioExplosion1, AudioExplosion2, AudioExplosion3, AudioEnergy, AudioBeep, AudioHealth, AudioLightning}
+var AllSounds []AudioName = []AudioName{AudioHit1, AudioHit2, AudioShoot1, AudioStellarPulseSong, AudioChillSong, AudioExplosion1, AudioExplosion2, AudioExplosion3, AudioEnergy, AudioBeep, AudioHealth, AudioLightning}
 
 func LoadSound(name AudioName, sampleRate int) (io.Reader, error) {
     switch name {
@@ -66,6 +70,7 @@ func LoadSound(name AudioName, sampleRate int) (io.Reader, error) {
         case AudioHit2: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Hit2Data))
         case AudioShoot1: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Shoot1Data))
         case AudioStellarPulseSong: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(SongStellarPulseData))
+        case AudioChillSong: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(SongChillData))
         case AudioExplosion1: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Explosion1Data))
         case AudioExplosion2: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Explosion2Data))
         case AudioExplosion3: return vorbis.DecodeWithSampleRate(sampleRate, bytes.NewReader(Explosion3Data))
