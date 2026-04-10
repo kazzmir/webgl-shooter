@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"image/color"
 	"log"
 	"math"
-	"image/color"
 
 	gameImages "github.com/kazzmir/webgl-shooter/images"
 
@@ -14,35 +14,35 @@ import (
 )
 
 const (
-	multiplayerRoleMaster = "master"
-	multiplayerRoleSlave  = "slave"
-	snapshotInterval      = 60
+	multiplayerRoleMaster  = "master"
+	multiplayerRoleSlave   = "slave"
+	snapshotInterval       = 60
 	multiplayerSpawnOffset = 100
 )
 
 type playerInputState struct {
-	Up        bool `json:"up"`
-	Down      bool `json:"down"`
-	Left      bool `json:"left"`
-	Right     bool `json:"right"`
-	Jump      bool `json:"jump"`
-	Bomb      bool `json:"bomb"`
-	Shoot     bool `json:"shoot"`
-	OpenMenu  bool `json:"open_menu"`
+	Up        bool    `json:"up"`
+	Down      bool    `json:"down"`
+	Left      bool    `json:"left"`
+	Right     bool    `json:"right"`
+	Jump      bool    `json:"jump"`
+	Bomb      bool    `json:"bomb"`
+	Shoot     bool    `json:"shoot"`
+	OpenMenu  bool    `json:"open_menu"`
 	ToggleGun [5]bool `json:"toggle_gun"`
 }
 
 type multiplayerEnvelope struct {
-	Kind        string            `json:"kind"`
-	StartGame   *startGameMessage `json:"start_game,omitempty"`
-	LevelStart  *levelStartMessage `json:"level_start,omitempty"`
-	Input       *playerInputState `json:"input,omitempty"`
-	PlayerState *playerState      `json:"player_state,omitempty"`
-	LatencyPing *latencyPingMessage `json:"latency_ping,omitempty"`
-	BulletMade  *bulletMadeMessage `json:"bullet_made,omitempty"`
+	Kind             string                   `json:"kind"`
+	StartGame        *startGameMessage        `json:"start_game,omitempty"`
+	LevelStart       *levelStartMessage       `json:"level_start,omitempty"`
+	Input            *playerInputState        `json:"input,omitempty"`
+	PlayerState      *playerState             `json:"player_state,omitempty"`
+	LatencyPing      *latencyPingMessage      `json:"latency_ping,omitempty"`
+	BulletMade       *bulletMadeMessage       `json:"bullet_made,omitempty"`
 	PowerupCollected *powerupCollectedMessage `json:"powerup_collected,omitempty"`
-	Spawn       *spawnMessage     `json:"spawn,omitempty"`
-	Snapshot    *snapshotMessage  `json:"snapshot,omitempty"`
+	Spawn            *spawnMessage            `json:"spawn,omitempty"`
+	Snapshot         *snapshotMessage         `json:"snapshot,omitempty"`
 }
 
 type startGameMessage struct {
@@ -88,9 +88,9 @@ type snapshotMessage struct {
 }
 
 type gameMultiplayer struct {
-	Role        string
-	Peer        PeerConnector
-	RemoteInput playerInputState
+	Role                     string
+	Peer                     PeerConnector
+	RemoteInput              playerInputState
 	PendingCollectedPowerups []powerupState
 }
 
@@ -124,26 +124,27 @@ type gunState struct {
 }
 
 type bulletState struct {
-	X         float64 `json:"x"`
-	Y         float64 `json:"y"`
-	Strength  float64 `json:"strength"`
-	VelocityX float64 `json:"velocity_x"`
-	VelocityY float64 `json:"velocity_y"`
-	Health    int     `json:"health"`
-	Kind      string  `json:"kind"`
-	Owner     string  `json:"owner"`
-	GunKind   string  `json:"gun_kind"`
-	RemainingLife int  `json:"remaining_life"`
+	X             float64     `json:"x"`
+	Y             float64     `json:"y"`
+	Strength      float64     `json:"strength"`
+	VelocityX     float64     `json:"velocity_x"`
+	VelocityY     float64     `json:"velocity_y"`
+	Health        int         `json:"health"`
+	Kind          string      `json:"kind"`
+	ElementType   ElementType `json:"element_type"`
+	Owner         string      `json:"owner"`
+	GunKind       string      `json:"gun_kind"`
+	RemainingLife int         `json:"remaining_life"`
 }
 
 type asteroidState struct {
-	X             float64         `json:"x"`
-	Y             float64         `json:"y"`
-	VelocityX     float64         `json:"velocity_x"`
-	VelocityY     float64         `json:"velocity_y"`
-	Rotation      uint64          `json:"rotation"`
-	RotationSpeed float64         `json:"rotation_speed"`
-	Health        float64         `json:"health"`
+	X             float64          `json:"x"`
+	Y             float64          `json:"y"`
+	VelocityX     float64          `json:"velocity_x"`
+	VelocityY     float64          `json:"velocity_y"`
+	Rotation      uint64           `json:"rotation"`
+	RotationSpeed float64          `json:"rotation_speed"`
+	Health        float64          `json:"health"`
 	Pic           gameImages.Image `json:"pic"`
 }
 
@@ -335,7 +336,7 @@ func (run *Run) StartGame(role string, notifyPeer bool) error {
 		}
 		if notifyPeer && role == multiplayerRoleMaster && run.PeerConnector != nil {
 			if err := run.PeerConnector.SendGameMessage(multiplayerEnvelope{
-				Kind: "start_game",
+				Kind:      "start_game",
 				StartGame: &startGameMessage{Difficulty: game.Difficulty},
 			}); err != nil {
 				log.Printf("Unable to send start game message: %v", err)
@@ -551,6 +552,9 @@ func (game *Game) AddPlayerBullets(bullets ...*Bullet) {
 	for _, bullet := range bullets {
 		bullet.Owner = owner
 		bullet.GunKind = gunKindFromGun(bullet.Gun)
+		if bullet.ElementType == "" && bullet.Gun != nil {
+			bullet.ElementType = bullet.Gun.ElementType()
+		}
 	}
 	game.Bullets = append(game.Bullets, bullets...)
 	if game.isMaster() {
@@ -755,7 +759,7 @@ func (game *Game) sendBulletMade(createdAt uint64, bullet *Bullet) {
 		Kind: "bullet_made",
 		BulletMade: &bulletMadeMessage{
 			CreatedAt: createdAt,
-			Bullet: serializeBullet(bullet),
+			Bullet:    serializeBullet(bullet),
 		},
 	}); err != nil && game.Counter%120 == 0 {
 		log.Printf("Unable to send bullet_made: %v", err)
@@ -902,15 +906,15 @@ func makeGunsFromState(states []gunState) []Gun {
 	for _, state := range states {
 		switch state.Kind {
 		case "basic":
-			out = append(out, &BasicGun{enabled: state.Enabled, level: state.Level, experience: state.Experience, counter: state.Counter})
+			out = append(out, &BasicGun{enabled: state.Enabled, level: state.Level, experience: state.Experience, counter: state.Counter, elementType: ElementPhysical})
 		case "beam":
-			out = append(out, &BeamGun{enabled: state.Enabled, level: state.Level, experience: state.Experience, counter: state.Counter})
+			out = append(out, &BeamGun{enabled: state.Enabled, level: state.Level, experience: state.Experience, counter: state.Counter, elementType: ElementPlasma})
 		case "missile":
-			out = append(out, &MissleGun{enabled: state.Enabled, level: state.Level, experience: state.Experience, counter: state.Counter})
+			out = append(out, &MissleGun{enabled: state.Enabled, level: state.Level, experience: state.Experience, counter: state.Counter, elementType: ElementPhysical})
 		case "lightning":
-			out = append(out, &LightningGun{enabled: state.Enabled, level: state.Level, experience: state.Experience, counter: state.Counter})
+			out = append(out, &LightningGun{enabled: state.Enabled, level: state.Level, experience: state.Experience, counter: state.Counter, elementType: ElementLightning})
 		case "dual-basic":
-			out = append(out, &DualBasicGun{enabled: state.Enabled, level: state.Level, experience: state.Experience, counter: state.Counter})
+			out = append(out, &DualBasicGun{enabled: state.Enabled, level: state.Level, experience: state.Experience, counter: state.Counter, elementType: ElementPhysical})
 		}
 	}
 	return out
@@ -918,15 +922,16 @@ func makeGunsFromState(states []gunState) []Gun {
 
 func serializeBullet(bullet *Bullet) bulletState {
 	return bulletState{
-		X:         bullet.x,
-		Y:         bullet.y,
-		Strength:  bullet.Strength,
-		VelocityX: bullet.velocityX,
-		VelocityY: bullet.velocityY,
-		Health:    bullet.health,
-		Kind:      bulletKind(bullet),
-		Owner:     bullet.Owner,
-		GunKind:   bullet.GunKind,
+		X:             bullet.x,
+		Y:             bullet.y,
+		Strength:      bullet.Strength,
+		VelocityX:     bullet.velocityX,
+		VelocityY:     bullet.velocityY,
+		Health:        bullet.health,
+		Kind:          bulletKind(bullet),
+		ElementType:   bullet.ElementType,
+		Owner:         bullet.Owner,
+		GunKind:       bullet.GunKind,
 		RemainingLife: bullet.RemainingLife,
 	}
 }
@@ -994,20 +999,24 @@ func findPlayerGunByKind(player *Player, kind string) Gun {
 
 func (game *Game) makeBulletFromState(state bulletState) *Bullet {
 	bullet := &Bullet{
-		x:         state.X,
-		y:         state.Y,
-		Strength:  state.Strength,
-		velocityX: state.VelocityX,
-		velocityY: state.VelocityY,
-		health:    state.Health,
-		Kind:      state.Kind,
-		Owner:     state.Owner,
-		GunKind:   state.GunKind,
+		x:             state.X,
+		y:             state.Y,
+		Strength:      state.Strength,
+		velocityX:     state.VelocityX,
+		velocityY:     state.VelocityY,
+		health:        state.Health,
+		Kind:          state.Kind,
+		ElementType:   state.ElementType,
+		Owner:         state.Owner,
+		GunKind:       state.GunKind,
 		RemainingLife: state.RemainingLife,
 	}
 
 	ownerPlayer := game.bulletOwnerPlayer(bullet)
 	bullet.Gun = findPlayerGunByKind(ownerPlayer, state.GunKind)
+	if bullet.ElementType == "" && bullet.Gun != nil {
+		bullet.ElementType = bullet.Gun.ElementType()
+	}
 
 	switch state.Kind {
 	case "beam":
@@ -1157,12 +1166,12 @@ func serializeEnemy(enemy Enemy) enemyState {
 		return enemyState{}
 	}
 	return enemyState{
-		Kind: current.Kind,
-		X: current.x,
-		Y: current.y,
-		Life: current.Life,
-		Flip: current.Flip,
-		Hurt: current.hurt,
+		Kind:     current.Kind,
+		X:        current.x,
+		Y:        current.y,
+		Life:     current.Life,
+		Flip:     current.Flip,
+		Hurt:     current.hurt,
 		Movement: serializeMovement(current.move),
 	}
 }
@@ -1238,9 +1247,9 @@ func (game *Game) makeEnemyFromState(state enemyState) (Enemy, error) {
 		}
 		var enemy Enemy
 		if enemyKind == 0 {
-			enemy, err = MakeEnemy1(state.X, state.Y, raw, pic, move, game.Difficulty)
+			enemy, err = MakeEnemy1(state.X, state.Y, raw, pic, move, game.Difficulty, nil, nil)
 		} else {
-			enemy, err = MakeEnemy2(state.X, state.Y, raw, pic, move, game.Difficulty)
+			enemy, err = MakeEnemy2(state.X, state.Y, raw, pic, move, game.Difficulty, nil, nil)
 		}
 		if err != nil {
 			return nil, err

@@ -262,6 +262,7 @@ type Bullet struct {
 	animation            *Animation
 	health               int
 	Kind                 string
+	ElementType          ElementType
 	Owner                string
 	GunKind              string
 	RemainingLife        int
@@ -546,7 +547,11 @@ func haveGun(guns []Gun, gun Gun) bool {
 
 func (player *Player) EnableNextGun() {
 	// guns := []Gun{&DualBasicGun{enabled: true}, &BeamGun{enabled: true}, &MissleGun{enabled: true}}
-	guns := []Gun{&BeamGun{enabled: true}, &LightningGun{enabled: true}, &MissleGun{enabled: true}}
+	guns := []Gun{
+		&BeamGun{enabled: true, elementType: ElementPlasma},
+		&LightningGun{enabled: true, elementType: ElementLightning},
+		&MissleGun{enabled: true, elementType: ElementPhysical},
+	}
 	for _, gun := range guns {
 		if !haveGun(player.Guns, gun) {
 			player.Guns = append(player.Guns, gun)
@@ -872,7 +877,7 @@ func MakePlayer(x, y float64, cheats bool) (*Player, error) {
 		Bombs:     0,
 		Level:     0,
 		Guns: []Gun{
-			&BasicGun{enabled: true, level: 0},
+			&BasicGun{enabled: true, level: 0, elementType: ElementPhysical},
 			// &DualBasicGun{enabled: false},
 			// &BeamGun{enabled: true, level: 0},
 			// &MissleGun{enabled: true, level: 0},
@@ -886,7 +891,11 @@ func MakePlayer(x, y float64, cheats bool) (*Player, error) {
 
 	if cheats {
 		player.Level = 9
-		player.Guns = append(player.Guns, &BeamGun{enabled: true, level: 5}, &LightningGun{enabled: true, level: 5}, &MissleGun{enabled: true, level: 5})
+		player.Guns = append(player.Guns,
+			&BeamGun{enabled: true, level: 5, elementType: ElementPlasma},
+			&LightningGun{enabled: true, level: 5, elementType: ElementLightning},
+			&MissleGun{enabled: true, level: 5, elementType: ElementPhysical},
+		)
 	}
 
 	return player, nil
@@ -1270,55 +1279,55 @@ func (game *Game) MakeEnemy(x float64, y float64, kind int, move Movement) error
 		if err != nil {
 			return err
 		}
-		enemy, err = MakeEnemy1(x, y, raw, pic, move, game.Difficulty)
+		enemy, err = MakeEnemy1(x, y, raw, pic, move, game.Difficulty, nil, []ElementType{ElementPhysical, ElementPlasma, ElementLightning})
 	case 1:
 		pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy2)
 		if err != nil {
 			return err
 		}
-		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
+		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty, []ElementType{ElementPhysical}, []ElementType{ElementLightning})
 	case 2:
 		pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy3)
 		if err != nil {
 			return err
 		}
-		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
+		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty, []ElementType{ElementPlasma}, []ElementType{ElementPhysical})
 	case 3:
 		pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy4)
 		if err != nil {
 			return err
 		}
-		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
+		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty, []ElementType{ElementLightning}, nil)
 	case 4:
 		pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy5)
 		if err != nil {
 			return err
 		}
-		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
+		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty, []ElementType{ElementPhysical}, []ElementType{ElementPlasma})
 	case 5:
 		pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy6)
 		if err != nil {
 			return err
 		}
-		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
+		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty, []ElementType{ElementLightning}, []ElementType{ElementPlasma})
 	case 6:
 		pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy7)
 		if err != nil {
 			return err
 		}
-		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
+		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty, []ElementType{ElementPhysical}, []ElementType{ElementLightning})
 	case 7:
 		pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy8)
 		if err != nil {
 			return err
 		}
-		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
+		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty, []ElementType{ElementPlasma}, []ElementType{ElementLightning})
 	case 8:
 		pic, raw, err := game.ImageManager.LoadImage(gameImages.ImageEnemy9)
 		if err != nil {
 			return err
 		}
-		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty)
+		enemy, err = MakeEnemy2(x, y, raw, pic, move, game.Difficulty, []ElementType{ElementLightning, ElementPlasma}, []ElementType{ElementPhysical})
 
 	}
 
@@ -2249,15 +2258,15 @@ func main() {
 	*/
 
 	run := Run{
-		Mode:         RunMenu,
-		Game:         nil,
-		Quit:         quit,
-		Cancel:       cancel,
-		Menu:         menu,
-		Volume:       initialVolume,
-		SoundManager: soundManager,
+		Mode:          RunMenu,
+		Game:          nil,
+		Quit:          quit,
+		Cancel:        cancel,
+		Menu:          menu,
+		Volume:        initialVolume,
+		SoundManager:  soundManager,
 		PeerConnector: peerConnector,
-		Cheats:       *cheats,
+		Cheats:        *cheats,
 	}
 
 	log.Printf("Running")
