@@ -46,6 +46,9 @@ const LogicalWidth = 2000
 const CameraEdgeMargin = 300
 const CameraEdgeFadeWidth = 100
 const CameraEdgeFadeAlpha = 0.85
+const OffscreenEnemyIndicatorSize = 24
+const OffscreenEnemyIndicatorMaxAlpha = 128.0 / 255.0
+const OffscreenEnemyIndicatorPulseSpeed = 0.12
 
 var triangleFillImage = func() *ebiten.Image {
 	img := ebiten.NewImage(1, 1)
@@ -119,6 +122,95 @@ func drawEdgeFade(screen *ebiten.Image, x1 float32, x2 float32, alpha1 float32, 
 
 	indices := []uint16{0, 1, 2, 0, 2, 3}
 	screen.DrawTriangles(vertices, indices, triangleFillImage, nil)
+}
+
+func drawVerticalEnemyIndicator(screen *ebiten.Image, x1 float32, x2 float32, alpha1 float32, alpha2 float32) {
+	if x2 <= x1 {
+		return
+	}
+
+	vertices := []ebiten.Vertex{
+		{DstX: x1, DstY: 0, SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 0, ColorB: 0, ColorA: alpha1},
+		{DstX: x2, DstY: 0, SrcX: 1, SrcY: 0, ColorR: 1, ColorG: 0, ColorB: 0, ColorA: alpha2},
+		{DstX: x2, DstY: ScreenHeight, SrcX: 1, SrcY: 1, ColorR: 1, ColorG: 0, ColorB: 0, ColorA: alpha2},
+		{DstX: x1, DstY: ScreenHeight, SrcX: 0, SrcY: 1, ColorR: 1, ColorG: 0, ColorB: 0, ColorA: alpha1},
+	}
+
+	indices := []uint16{0, 1, 2, 0, 2, 3}
+	screen.DrawTriangles(vertices, indices, triangleFillImage, nil)
+}
+
+func drawHorizontalEnemyIndicator(screen *ebiten.Image, y1 float32, y2 float32, alpha1 float32, alpha2 float32) {
+	if y2 <= y1 {
+		return
+	}
+
+	vertices := []ebiten.Vertex{
+		{DstX: 0, DstY: y1, SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 0, ColorB: 0, ColorA: alpha1},
+		{DstX: ScreenWidth, DstY: y1, SrcX: 1, SrcY: 0, ColorR: 1, ColorG: 0, ColorB: 0, ColorA: alpha1},
+		{DstX: ScreenWidth, DstY: y2, SrcX: 1, SrcY: 1, ColorR: 1, ColorG: 0, ColorB: 0, ColorA: alpha2},
+		{DstX: 0, DstY: y2, SrcX: 0, SrcY: 1, ColorR: 1, ColorG: 0, ColorB: 0, ColorA: alpha2},
+	}
+
+	indices := []uint16{0, 1, 2, 0, 2, 3}
+	screen.DrawTriangles(vertices, indices, triangleFillImage, nil)
+}
+
+func offscreenEnemyIndicatorAlpha(counter uint64) float32 {
+	glow := (math.Sin(float64(counter)*OffscreenEnemyIndicatorPulseSpeed) + 1) / 2
+	return float32(glow * OffscreenEnemyIndicatorMaxAlpha)
+}
+
+func offscreenEnemySides(enemies []Enemy, camera *Camera) (left bool, right bool, top bool, bottom bool) {
+	if camera == nil {
+		return false, false, false, false
+	}
+
+	viewLeft := int(camera.x)
+	viewRight := viewLeft + ScreenWidth
+	viewTop := int(camera.y)
+	viewBottom := viewTop + ScreenHeight
+
+	for _, enemy := range enemies {
+		if enemy == nil || !enemy.IsAlive() {
+			continue
+		}
+
+		bounds := enemy.Bounds()
+		switch {
+		case bounds.Max.X < viewLeft:
+			left = true
+			continue
+		case bounds.Min.X > viewRight:
+			right = true
+			continue
+		}
+
+		switch {
+		case bounds.Max.Y < viewTop:
+			top = true
+		case bounds.Min.Y > viewBottom:
+			bottom = true
+		}
+
+		if left && right && top && bottom {
+			return left, right, top, bottom
+		}
+	}
+
+	return left, right, top, bottom
+}
+
+func drawOffscreenEnemyIndicators(screen *ebiten.Image, enemies []Enemy, camera *Camera, counter uint64) {
+	left, right, _, _ := offscreenEnemySides(enemies, camera)
+	alpha := offscreenEnemyIndicatorAlpha(counter)
+
+	if left {
+		drawVerticalEnemyIndicator(screen, 0, OffscreenEnemyIndicatorSize, 0, alpha)
+	}
+	if right {
+		drawVerticalEnemyIndicator(screen, ScreenWidth-OffscreenEnemyIndicatorSize, ScreenWidth, alpha, 0)
+	}
 }
 
 func drawOffscreenPlayerIndicator(screen *ebiten.Image, font *text.GoTextFaceSource, camera *Camera, player *Player) {
@@ -1948,6 +2040,8 @@ func (game *Game) Draw(screen *ebiten.Image) {
 		rightAlpha := float32(CameraEdgeFadeAlpha * (1.0 - rightDistance/CameraEdgeFadeWidth))
 		drawEdgeFade(screen, leftX, ScreenWidth, 0, rightAlpha)
 	}
+
+	drawOffscreenEnemyIndicators(screen, game.Enemies, game.Camera, game.Counter)
 
 	if game.Player.IsAlive() {
 		game.Player.DrawHud(screen, game.ImageManager, game.Font)
