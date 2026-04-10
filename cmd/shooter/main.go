@@ -1116,28 +1116,48 @@ type SoundHandler struct {
 }
 
 type SoundManager struct {
-	Sounds     map[audioFiles.AudioName]*SoundHandler
-	Context    *audio.Context
-	SampleRate int
-	Quit       context.Context
-	Volume     float64
+	Sounds        map[audioFiles.AudioName]*SoundHandler
+	Context       *audio.Context
+	SampleRate    int
+	Quit          context.Context
+	MusicVolume   float64
+	EffectsVolume float64
 }
 
-func (manager *SoundManager) SetVolume(volume float64) {
-	manager.Volume = volume
+func clampVolume(volume float64) float64 {
+	if volume < 0 {
+		return 0
+	}
+	if volume > 100 {
+		return 100
+	}
+	return volume
 }
 
-func (manager *SoundManager) GetVolume() float64 {
-	return manager.Volume
+func (manager *SoundManager) SetMusicVolume(volume float64) {
+	manager.MusicVolume = clampVolume(volume)
 }
 
-func MakeSoundManager(quit context.Context, audioContext *audio.Context, volume float64) (*SoundManager, error) {
+func (manager *SoundManager) GetMusicVolume() float64 {
+	return manager.MusicVolume
+}
+
+func (manager *SoundManager) SetEffectsVolume(volume float64) {
+	manager.EffectsVolume = clampVolume(volume)
+}
+
+func (manager *SoundManager) GetEffectsVolume() float64 {
+	return manager.EffectsVolume
+}
+
+func MakeSoundManager(quit context.Context, audioContext *audio.Context, musicVolume float64, effectsVolume float64) (*SoundManager, error) {
 	manager := SoundManager{
-		Sounds:     make(map[audioFiles.AudioName]*SoundHandler),
-		SampleRate: 48000,
-		Context:    audioContext,
-		Quit:       quit,
-		Volume:     volume,
+		Sounds:        make(map[audioFiles.AudioName]*SoundHandler),
+		SampleRate:    48000,
+		Context:       audioContext,
+		Quit:          quit,
+		MusicVolume:   clampVolume(musicVolume),
+		EffectsVolume: clampVolume(effectsVolume),
 	}
 
 	return &manager, manager.LoadAll()
@@ -1222,11 +1242,11 @@ func (manager *SoundManager) LoadAll() error {
 	return nil
 }
 
-func (manager *SoundManager) Play(name audioFiles.AudioName) {
+func (manager *SoundManager) PlayEffect(name audioFiles.AudioName) {
 	if handler, ok := manager.Sounds[name]; ok {
 		player, finish, canPlay := handler.Make()
 		if canPlay {
-			player.SetVolume(manager.GetVolume() / 100.0)
+			player.SetVolume(manager.GetEffectsVolume() / 100.0)
 			player.Play()
 
 			go func() {
@@ -1243,14 +1263,14 @@ func (manager *SoundManager) Play(name audioFiles.AudioName) {
 	}
 }
 
-func (manager *SoundManager) PlayLoop(name audioFiles.AudioName, stop context.Context) {
+func (manager *SoundManager) PlayMusic(name audioFiles.AudioName, stop context.Context) {
 	if handler, ok := manager.Sounds[name]; ok {
 		go func() {
 			player, err := handler.MakeLoop()
 			if err != nil {
 				log.Printf("Failed to play audio loop %v: %v", name, err)
 			} else {
-				player.SetVolume(manager.GetVolume() / 100.0)
+				player.SetVolume(manager.GetMusicVolume() / 100.0)
 				go func() {
 					for {
 						select {
@@ -1262,7 +1282,7 @@ func (manager *SoundManager) PlayLoop(name audioFiles.AudioName, stop context.Co
 								return
 							}
 
-							player.SetVolume(manager.GetVolume() / 100.0)
+							player.SetVolume(manager.GetMusicVolume() / 100.0)
 						}
 					}
 				}()
@@ -1547,7 +1567,7 @@ func (game *Game) Update(run *Run) error {
 	}
 
 	respawnPlayer := func(player *Player) {
-		game.SoundManager.Play(audioFiles.AudioExplosion3)
+		game.SoundManager.PlayEffect(audioFiles.AudioExplosion3)
 		makeAnimatedExplosion(player.x, player.y, gameImages.ImageExplosion2)
 		player.Respawn()
 	}
@@ -1577,7 +1597,7 @@ func (game *Game) Update(run *Run) error {
 	game.MusicPlayer.Do(func() {
 		choices := []audioFiles.AudioName{audioFiles.AudioChillSong, audioFiles.AudioStellarPulseSong}
 		use := choices[rand.N(len(choices))]
-		game.SoundManager.PlayLoop(use, game.Quit)
+		game.SoundManager.PlayMusic(use, game.Quit)
 	})
 
 	game.Background.Update()
@@ -1607,7 +1627,7 @@ func (game *Game) Update(run *Run) error {
 			if !asteroid.IsAlive() {
 				game.Shake()
 
-				game.SoundManager.Play(audioFiles.AudioExplosion3)
+				game.SoundManager.PlayEffect(audioFiles.AudioExplosion3)
 				explodeAsteroid(asteroid)
 			}
 		}
@@ -1621,7 +1641,7 @@ func (game *Game) Update(run *Run) error {
 
 			if !asteroid.IsAlive() {
 				game.Shake()
-				game.SoundManager.Play(audioFiles.AudioExplosion3)
+				game.SoundManager.PlayEffect(audioFiles.AudioExplosion3)
 				explodeAsteroid(asteroid)
 			}
 		}
@@ -1658,7 +1678,7 @@ func (game *Game) Update(run *Run) error {
 
 			if isCollide {
 				game.GetCounter("player hit enemy", 30).Do(func() {
-					game.SoundManager.Play(audioFiles.AudioHit1)
+					game.SoundManager.PlayEffect(audioFiles.AudioHit1)
 				})
 
 				makeAnimatedExplosion(collideX, collideY, gameImages.ImageHit2)
@@ -1672,7 +1692,7 @@ func (game *Game) Update(run *Run) error {
 				if !enemy.IsAlive() {
 					game.Player.Score += 1
 					game.Player.Kills += 1
-					game.SoundManager.Play(audioFiles.AudioExplosion3)
+					game.SoundManager.PlayEffect(audioFiles.AudioExplosion3)
 
 					explodeEnemy(enemy)
 				}
@@ -1683,7 +1703,7 @@ func (game *Game) Update(run *Run) error {
 			collideX, collideY, isCollide := enemy.CollidePlayer(game.RemotePlayer)
 			if isCollide {
 				game.GetCounter("slave hit enemy", 30).Do(func() {
-					game.SoundManager.Play(audioFiles.AudioHit1)
+					game.SoundManager.PlayEffect(audioFiles.AudioHit1)
 				})
 
 				makeAnimatedExplosion(collideX, collideY, gameImages.ImageHit2)
@@ -1696,7 +1716,7 @@ func (game *Game) Update(run *Run) error {
 				if !enemy.IsAlive() {
 					game.RemotePlayer.Score += 1
 					game.RemotePlayer.Kills += 1
-					game.SoundManager.Play(audioFiles.AudioExplosion3)
+					game.SoundManager.PlayEffect(audioFiles.AudioExplosion3)
 					explodeEnemy(enemy)
 				}
 			}
@@ -1724,7 +1744,7 @@ func (game *Game) Update(run *Run) error {
 					game.addBulletScore(bullet, 1)
 					bullet.Damage(1)
 
-					game.SoundManager.Play(audioFiles.AudioHit1)
+					game.SoundManager.PlayEffect(audioFiles.AudioHit1)
 
 					animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit)
 					if err != nil {
@@ -1735,7 +1755,7 @@ func (game *Game) Update(run *Run) error {
 
 					if !asteroid.IsAlive() {
 						game.Shake()
-						game.SoundManager.Play(audioFiles.AudioExplosion3)
+						game.SoundManager.PlayEffect(audioFiles.AudioExplosion3)
 						animation, err := game.ImageManager.LoadAnimation(gameImages.ImageExplosion3)
 						if err == nil {
 							game.Explosions = append(game.Explosions, MakeAnimatedExplosion(asteroid.x, asteroid.y, animation))
@@ -1757,7 +1777,7 @@ func (game *Game) Update(run *Run) error {
 						if !enemy.IsAlive() {
 							game.Shake()
 							game.addBulletKillRewards(bullet, enemy)
-							game.SoundManager.Play(audioFiles.AudioExplosion3)
+							game.SoundManager.PlayEffect(audioFiles.AudioExplosion3)
 
 							// create a powerup every X kills
 							explodeEnemy(enemy)
@@ -1769,7 +1789,7 @@ func (game *Game) Update(run *Run) error {
 							}
 						}
 
-						game.SoundManager.Play(audioFiles.AudioHit1)
+						game.SoundManager.PlayEffect(audioFiles.AudioHit1)
 
 						animation, err := game.ImageManager.LoadAnimation(gameImages.ImageHit)
 						if err != nil {
@@ -1798,7 +1818,7 @@ func (game *Game) Update(run *Run) error {
 			bullet.Move()
 
 			if game.Player.IsAlive() && !game.Player.IsInvulnerable() && game.Player.Collide(bullet.x, bullet.y) {
-				game.SoundManager.Play(audioFiles.AudioHit2)
+				game.SoundManager.PlayEffect(audioFiles.AudioHit2)
 
 				game.Player.Damage(bullet.Strength)
 				if !game.Player.IsAlive() {
@@ -1816,7 +1836,7 @@ func (game *Game) Update(run *Run) error {
 			}
 
 			if bullet.IsAlive() && game.isMaster() && game.RemotePlayer != nil && game.RemotePlayer.IsAlive() && !game.RemotePlayer.IsInvulnerable() && game.RemotePlayer.Collide(bullet.x, bullet.y) {
-				game.SoundManager.Play(audioFiles.AudioHit2)
+				game.SoundManager.PlayEffect(audioFiles.AudioHit2)
 				game.RemotePlayer.Damage(bullet.Strength)
 				if !game.RemotePlayer.IsAlive() {
 					respawnPlayer(game.RemotePlayer)
@@ -1842,7 +1862,7 @@ func (game *Game) Update(run *Run) error {
 	bombExplode := func(bomb *Bomb) {
 		game.WhiteFlash = GameWhiteFlash
 		game.BigShake()
-		game.SoundManager.Play(audioFiles.AudioExplosion3)
+		game.SoundManager.PlayEffect(audioFiles.AudioExplosion3)
 
 		var bombDamage float64 = 50
 
@@ -2114,7 +2134,8 @@ type Run struct {
 	Mode          RunMode
 	Quit          context.Context
 	Cancel        context.CancelFunc
-	Volume        float64
+	MusicVolume   float64
+	EffectsVolume float64
 	SoundManager  *SoundManager
 	PeerConnector PeerConnector
 	Cheats        bool
@@ -2130,35 +2151,29 @@ func (run *Run) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Ima
 	}
 }
 
-func (run *Run) GetVolume() float64 {
-	return run.Volume
+func (run *Run) GetMusicVolume() float64 {
+	return run.MusicVolume
 }
 
-func (run *Run) updateVolume() {
-	if run.Game != nil {
-		run.Game.SoundManager.SetVolume(run.Volume)
+func (run *Run) GetEffectsVolume() float64 {
+	return run.EffectsVolume
+}
+
+func (run *Run) updateVolumes() {
+	if run.SoundManager != nil {
+		run.SoundManager.SetMusicVolume(run.MusicVolume)
+		run.SoundManager.SetEffectsVolume(run.EffectsVolume)
 	}
 }
 
-func (run *Run) SetVolume(volume float64) {
-	run.Volume = volume
-	run.updateVolume()
+func (run *Run) SetMusicVolume(volume float64) {
+	run.MusicVolume = clampVolume(volume)
+	run.updateVolumes()
 }
 
-func (run *Run) IncreaseVolume() {
-	run.Volume += 10
-	if run.Volume > 100 {
-		run.Volume = 100
-	}
-	run.updateVolume()
-}
-
-func (run *Run) DecreaseVolume() {
-	run.Volume -= 10
-	if run.Volume < 0 {
-		run.Volume = 0
-	}
-	run.updateVolume()
+func (run *Run) SetEffectsVolume(volume float64) {
+	run.EffectsVolume = clampVolume(volume)
+	run.updateVolumes()
 }
 
 func (run *Run) Update() error {
@@ -2324,12 +2339,13 @@ func main() {
 
 	audioContext := audio.NewContext(48000)
 
-	var initialVolume float64 = 80
+	var initialMusicVolume float64 = 80
+	var initialEffectsVolume float64 = 80
 
 	quit, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	soundManager, err := MakeSoundManager(quit, audioContext, initialVolume)
+	soundManager, err := MakeSoundManager(quit, audioContext, initialMusicVolume, initialEffectsVolume)
 	if err != nil {
 		log.Printf("Unable to create sound manager: %v", err)
 		return
@@ -2337,7 +2353,7 @@ func main() {
 
 	peerConnector := newPeerConnector()
 
-	menu, err := createMenu(quit, soundManager, initialVolume, *cheats, peerConnector)
+	menu, err := createMenu(quit, soundManager, initialMusicVolume, initialEffectsVolume, *cheats, peerConnector)
 	if err != nil {
 		log.Printf("Unable to create menu: %v", err)
 		return
@@ -2357,7 +2373,8 @@ func main() {
 		Quit:          quit,
 		Cancel:        cancel,
 		Menu:          menu,
-		Volume:        initialVolume,
+		MusicVolume:   initialMusicVolume,
+		EffectsVolume: initialEffectsVolume,
 		SoundManager:  soundManager,
 		PeerConnector: peerConnector,
 		Cheats:        *cheats,

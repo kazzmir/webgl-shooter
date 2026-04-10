@@ -116,19 +116,19 @@ func (hint *Hint) Update() {
 }
 
 type Menu struct {
-	Font          *text.GoTextFaceSource
-	Counter       uint64
-	Options       []*MenuOption
-	MultiplayerOptions []*MenuOption
+	Font                   *text.GoTextFaceSource
+	Counter                uint64
+	Options                []*MenuOption
+	MultiplayerOptions     []*MenuOption
 	MultiplayerStartOption *MenuOption
-	Selected      int
-	MultiplayerSelected int
-	MultiplayerOpen bool
-	SoundManager  *SoundManager
-	ImageManager  *ImageManager
-	ShaderManager *ShaderManager
-	PeerConnector PeerConnector
-	PeerEditor    *PeerEditor
+	Selected               int
+	MultiplayerSelected    int
+	MultiplayerOpen        bool
+	SoundManager           *SoundManager
+	ImageManager           *ImageManager
+	ShaderManager          *ShaderManager
+	PeerConnector          PeerConnector
+	PeerEditor             *PeerEditor
 
 	Hints      []*Hint
 	ActiveHint int
@@ -234,14 +234,14 @@ func (menu *Menu) Update(run *Run) error {
 			if *selected < 0 {
 				*selected = len(options) - 1
 			}
-			menu.SoundManager.Play(audioFiles.AudioBeep)
+			menu.SoundManager.PlayEffect(audioFiles.AudioBeep)
 		case ebiten.KeyArrowDown:
 			*selected = (*selected + 1) % len(options)
-			menu.SoundManager.Play(audioFiles.AudioBeep)
+			menu.SoundManager.PlayEffect(audioFiles.AudioBeep)
 		default:
 			option := options[*selected]
 			if option.DoesRespond(key) {
-				menu.SoundManager.Play(audioFiles.AudioBeep)
+				menu.SoundManager.PlayEffect(audioFiles.AudioBeep)
 				err := option.Action(option, run, key)
 				if err != nil {
 					return err
@@ -579,7 +579,7 @@ func makeHintPowerups() *Hint {
 	}
 }
 
-func createMenu(quit context.Context, soundManager *SoundManager, initialVolume float64, cheats bool, peerConnector PeerConnector) (*Menu, error) {
+func createMenu(quit context.Context, soundManager *SoundManager, initialMusicVolume float64, initialEffectsVolume float64, cheats bool, peerConnector PeerConnector) (*Menu, error) {
 
 	var options []*MenuOption
 	var multiplayerOptions []*MenuOption
@@ -598,35 +598,70 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 		Respond: []ebiten.Key{ebiten.KeyEnter},
 	})
 
-	soundMuted := false
-	lastVolume := initialVolume
+	musicMuted := false
+	lastMusicVolume := initialMusicVolume
 	options = append(options, &MenuOption{
-		Text: fmt.Sprintf("Sound %v", initialVolume),
+		Text: fmt.Sprintf("Music %v", initialMusicVolume),
 		Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
 			switch key {
 			case ebiten.KeyArrowLeft:
-				if !soundMuted {
-					run.DecreaseVolume()
-					lastVolume = run.GetVolume()
+				if !musicMuted {
+					run.SetMusicVolume(run.GetMusicVolume() - 10)
+					lastMusicVolume = run.GetMusicVolume()
 				}
 			case ebiten.KeyArrowRight:
-				if !soundMuted {
-					run.IncreaseVolume()
-					lastVolume = run.GetVolume()
+				if !musicMuted {
+					run.SetMusicVolume(run.GetMusicVolume() + 10)
+					lastMusicVolume = run.GetMusicVolume()
 				}
 			case ebiten.KeyEnter:
-				soundMuted = !soundMuted
-				if soundMuted {
-					run.SetVolume(0)
+				musicMuted = !musicMuted
+				if musicMuted {
+					run.SetMusicVolume(0)
 				} else {
-					run.SetVolume(lastVolume)
+					run.SetMusicVolume(lastMusicVolume)
 				}
 			}
 
-			if soundMuted {
-				self.Text = "Sound Muted"
+			if musicMuted {
+				self.Text = "Music Muted"
 			} else {
-				self.Text = fmt.Sprintf("Sound %v", run.GetVolume())
+				self.Text = fmt.Sprintf("Music %v", run.GetMusicVolume())
+			}
+			return nil
+		},
+		Respond: []ebiten.Key{ebiten.KeyArrowLeft, ebiten.KeyArrowRight, ebiten.KeyEnter},
+	})
+
+	effectsMuted := false
+	lastEffectsVolume := initialEffectsVolume
+	options = append(options, &MenuOption{
+		Text: fmt.Sprintf("Effects %v", initialEffectsVolume),
+		Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
+			switch key {
+			case ebiten.KeyArrowLeft:
+				if !effectsMuted {
+					run.SetEffectsVolume(run.GetEffectsVolume() - 10)
+					lastEffectsVolume = run.GetEffectsVolume()
+				}
+			case ebiten.KeyArrowRight:
+				if !effectsMuted {
+					run.SetEffectsVolume(run.GetEffectsVolume() + 10)
+					lastEffectsVolume = run.GetEffectsVolume()
+				}
+			case ebiten.KeyEnter:
+				effectsMuted = !effectsMuted
+				if effectsMuted {
+					run.SetEffectsVolume(0)
+				} else {
+					run.SetEffectsVolume(lastEffectsVolume)
+				}
+			}
+
+			if effectsMuted {
+				self.Text = "Effects Muted"
+			} else {
+				self.Text = fmt.Sprintf("Effects %v", run.GetEffectsVolume())
 			}
 			return nil
 		},
@@ -761,16 +796,16 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialVolume 
 	}
 
 	menu = &Menu{
-		Font:               font,
-		Options:            options,
-		MultiplayerOptions: multiplayerOptions,
+		Font:                   font,
+		Options:                options,
+		MultiplayerOptions:     multiplayerOptions,
 		MultiplayerStartOption: multiplayerStartOption,
-		ImageManager:       MakeImageManager(),
-		ShaderManager:      shaderManager,
-		PeerConnector:      peerConnector,
-		SoundManager:       soundManager,
-		Hints:              hints,
-		ActiveHint:         -1,
+		ImageManager:           MakeImageManager(),
+		ShaderManager:          shaderManager,
+		PeerConnector:          peerConnector,
+		SoundManager:           soundManager,
+		Hints:                  hints,
+		ActiveHint:             -1,
 	}
 
 	return menu, nil

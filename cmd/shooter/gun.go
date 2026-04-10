@@ -189,7 +189,7 @@ func (basic *BasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager
 }
 
 func (basic *BasicGun) DoSound(soundManager *SoundManager) {
-	soundManager.Play(audioFiles.AudioShoot1)
+	soundManager.PlayEffect(audioFiles.AudioShoot1)
 }
 
 func (basic *BasicGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
@@ -347,7 +347,7 @@ func (dual *DualBasicGun) DrawIcon(screen *ebiten.Image, imageManager *ImageMana
 }
 
 func (dual *DualBasicGun) DoSound(soundManager *SoundManager) {
-	soundManager.Play(audioFiles.AudioShoot1)
+	soundManager.PlayEffect(audioFiles.AudioShoot1)
 }
 
 func (dual *DualBasicGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
@@ -441,7 +441,7 @@ func (beam *BeamGun) Rate() float64 {
 }
 
 func (beam *BeamGun) DoSound(soundManager *SoundManager) {
-	soundManager.Play(audioFiles.AudioShoot1)
+	soundManager.PlayEffect(audioFiles.AudioShoot1)
 }
 
 func (beam *BeamGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace) {
@@ -557,7 +557,7 @@ func (missle *MissleGun) Rate() float64 {
 }
 
 func (missle *MissleGun) DoSound(soundManager *SoundManager) {
-	soundManager.Play(audioFiles.AudioShoot1)
+	soundManager.PlayEffect(audioFiles.AudioShoot1)
 }
 
 func (missle *MissleGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace) {
@@ -836,7 +836,7 @@ func (lightning *LightningGun) Rate() float64 {
 }
 
 func (lightning *LightningGun) DoSound(soundManager *SoundManager) {
-	soundManager.Play(audioFiles.AudioLightning)
+	soundManager.PlayEffect(audioFiles.AudioLightning)
 }
 
 func (lightning *LightningGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, x float64, y float64, textFace *text.GoTextFace) {
