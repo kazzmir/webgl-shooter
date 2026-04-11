@@ -1,4 +1,4 @@
-.PHONY: shooter signaling-server run-web
+.PHONY: shooter signaling-server run-web windows
 
 shooter:
 	go build ./cmd/shooter
@@ -15,3 +15,6 @@ build-web:
 itch.io: build-web
 	cp shooter.wasm itch.io
 	butler push ./itch.io kazzmir/simple-shooter:html
+
+windows:
+	GOOS=windows go build -o shooter-win.exe ./cmd/shooter
