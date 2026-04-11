@@ -455,6 +455,31 @@ func (beam *BeamGun) DrawIcon(screen *ebiten.Image, imageManager *ImageManager, 
 	drawGunLevel(screen, beam, x, y, textFace)
 }
 
+func drawBlendedLight(screen *ebiten.Image, x float64, y float64, radius float64, col color.Color, shaderManager *ShaderManager) {
+    options := &ebiten.DrawRectShaderOptions{}
+    options.Blend = ebiten.BlendLighter
+    cx := x
+    cy := y
+    options.GeoM.Translate(float64(cx-radius), float64(cy-radius))
+    // options.Blend = AlphaBlender
+    // options.Images[0] = player.pic
+    options.Uniforms = make(map[string]interface{})
+    // radians = math.Pi * 90 / 180
+    // log.Printf("Red: %v", radians)
+    // red := vec4(abs(sin(Red) / 3), 0, 0, 0)
+    options.Uniforms["Center"] = []float32{float32(cx), float32(cy)}
+    options.Uniforms["Radius"] = float32(radius)
+    options.Uniforms["CenterAlpha"] = float32(0.9)
+    options.Uniforms["EdgeAlpha"] = float32(0)
+
+    r, g, b, _ := col.RGBA()
+    base := float32(255)
+
+    options.Uniforms["Color"] = []float32{float32(r >> 8) / base, float32(g >> 8) / base, float32(b >> 8) / base}
+
+    screen.DrawRectShader(int(radius*2), int(radius*2), shaderManager.AlphaCircleShader, options)
+}
+
 func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]*Bullet, error) {
 	if beam.enabled && beam.counter == 0 {
 		beam.counter = int(60.0 / beam.Rate())
@@ -475,9 +500,13 @@ func (beam *BeamGun) Shoot(imageManager *ImageManager, x float64, y float64) ([]
 				health:      3,
 				velocityX:   0,
 				velocityY:   velocityY,
-				animation:   animation,
 				ElementType: beam.ElementType(),
 				Gun:         beam,
+                CustomDraw: func(bullet *Bullet, screen *ebiten.Image, shaderManager *ShaderManager, camera *Camera) {
+                    x, y := camera.Apply(bullet.x, bullet.y)
+                    drawBlendedLight(screen, x, y, 12, color.RGBA{R: 255, A: 255}, shaderManager)
+                    animation.Draw(screen, x, y)
+                },
 				// pic: pic,
 			}
 		}
@@ -752,7 +781,7 @@ func (lightning *LightningGun) Shoot(imageManager *ImageManager, x float64, y fl
 						}
 						return self.RemainingLife > 0
 					},
-					CustomDraw: func(self *Bullet, screen *ebiten.Image, camera *Camera) {
+					CustomDraw: func(self *Bullet, screen *ebiten.Image, shaderManager *ShaderManager, camera *Camera) {
 						// var options ebiten.DrawImageOptions
 						life := self.RemainingLife
 						alpha := uint8(255)

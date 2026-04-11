@@ -362,17 +362,17 @@ type Bullet struct {
 
 	// optional func that returns true if we should keep the bullet, and false if we should remove it
 	Update     func(bullet *Bullet) bool
-	CustomDraw func(bullet *Bullet, screen *ebiten.Image, camera *Camera)
+	CustomDraw func(bullet *Bullet, screen *ebiten.Image, shaderManager *ShaderManager, camera *Camera)
 }
 
 func (bullet *Bullet) Damage(amount int) {
 	bullet.health -= amount
 }
 
-func (bullet *Bullet) Draw(screen *ebiten.Image, camera *Camera) {
+func (bullet *Bullet) Draw(screen *ebiten.Image, shaderManager *ShaderManager, camera *Camera) {
 
 	if bullet.CustomDraw != nil {
-		bullet.CustomDraw(bullet, screen, camera)
+		bullet.CustomDraw(bullet, screen, shaderManager, camera)
 	} else {
 		x, y := camera.Apply(bullet.x, bullet.y)
 		if bullet.animation != nil {
@@ -1969,12 +1969,13 @@ func (game *Game) Update(run *Run) error {
 }
 
 // draw a big orange circle that fades out towards the edge of the circle
-func (game *Game) TestAlphaCircle(screen *ebiten.Image) {
+func (game *Game) TestAlphaCircle(screen *ebiten.Image, x float64, y float64) {
 	{
 		options := &ebiten.DrawRectShaderOptions{}
-		cx := 300
-		cy := 300
-		radius := 100
+        options.Blend = ebiten.BlendLighter
+		cx := x
+		cy := y
+		radius := 100.0
 		options.GeoM.Translate(float64(cx-radius), float64(cy-radius))
 		// options.Blend = AlphaBlender
 		// options.Images[0] = player.pic
@@ -1985,10 +1986,10 @@ func (game *Game) TestAlphaCircle(screen *ebiten.Image) {
 		options.Uniforms["Center"] = []float32{float32(cx), float32(cy)}
 		options.Uniforms["Radius"] = float32(radius)
 		options.Uniforms["CenterAlpha"] = float32(0.9)
-		options.Uniforms["EdgeAlpha"] = float32(0.2)
+		options.Uniforms["EdgeAlpha"] = float32(0)
 		options.Uniforms["Color"] = []float32{1, 0.5, 0}
 
-		screen.DrawRectShader(radius*2, radius*2, game.ShaderManager.AlphaCircleShader, options)
+		screen.DrawRectShader(int(radius*2), int(radius*2), game.ShaderManager.AlphaCircleShader, options)
 	}
 }
 
@@ -2017,6 +2018,8 @@ func (game *Game) Draw(screen *ebiten.Image) {
 		asteroid.Draw(screen, game.ImageManager, game.ShaderManager, game.Camera)
 	}
 
+    // game.TestAlphaCircle(screen, game.Player.x - game.Camera.x, game.Player.y)
+
 	if game.RemotePlayer != nil && game.RemotePlayer.IsAlive() {
 		if game.isMaster() {
 			game.RemotePlayer.DrawWithTint(screen, game.ShaderManager, game.Camera, makeSlaveTint())
@@ -2036,11 +2039,11 @@ func (game *Game) Draw(screen *ebiten.Image) {
 	}
 
 	for _, bullet := range game.Bullets {
-		bullet.Draw(screen, game.Camera)
+		bullet.Draw(screen, game.ShaderManager, game.Camera)
 	}
 
 	for _, bullet := range game.EnemyBullets {
-		bullet.Draw(screen, game.Camera)
+		bullet.Draw(screen, game.ShaderManager, game.Camera)
 	}
 
 	for _, bomb := range game.Bombs {
@@ -2097,6 +2100,7 @@ func (game *Game) Draw(screen *ebiten.Image) {
 
 	// vector.StrokeRect(screen, 0, 0, 100, 100, 3, &color.RGBA{R: 255, G: 0, B: 0, A: 128}, true)
 	// vector.FillRect(screen, 0, 0, 100, 100, &color.RGBA{R: 255, G: 0, B: 0, A: 64}, true)
+
 }
 
 func (game *Game) PreloadAssets() error {
