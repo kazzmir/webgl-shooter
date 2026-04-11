@@ -618,6 +618,12 @@ func (missle *MissleGun) Shoot(imageManager *ImageManager, x float64, y float64)
 			pic:         pic,
 			ElementType: missle.ElementType(),
 			Gun:         missle,
+            CustomDraw:  func(bullet *Bullet, screen *ebiten.Image, shaderManager *ShaderManager, camera *Camera) {
+                x, y := camera.Apply(bullet.x, bullet.y)
+                drawBlendedLight(screen, x, y + float64(pic.Bounds().Dy()) / 2, 12, color.NRGBA{R: 255, G: 255, B: 128, A: 210}, shaderManager)
+                drawBlendedLight(screen, x, y + float64(pic.Bounds().Dy()) / 2 + 10, 8, color.NRGBA{R: 255, G: 255, B: 0, A: 180}, shaderManager)
+                drawCenteredImage(screen, pic, x, y)
+            },
 		}
 
 		return []*Bullet{&bullet}, nil
