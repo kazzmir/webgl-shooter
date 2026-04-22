@@ -358,6 +358,10 @@ type Bullet struct {
 	Owner                string
 	GunKind              string
 	RemainingLife        int
+	LightningSeed        int64
+	LightningOriginX     float64
+	LightningOriginY     float64
+	LightningLevel       int
 	Gun                  Gun
 
 	// optional func that returns true if we should keep the bullet, and false if we should remove it
@@ -1972,7 +1976,7 @@ func (game *Game) Update(run *Run) error {
 func (game *Game) TestAlphaCircle(screen *ebiten.Image, x float64, y float64) {
 	{
 		options := &ebiten.DrawRectShaderOptions{}
-        options.Blend = ebiten.BlendLighter
+		options.Blend = ebiten.BlendLighter
 		cx := x
 		cy := y
 		radius := 100.0
@@ -2018,7 +2022,7 @@ func (game *Game) Draw(screen *ebiten.Image) {
 		asteroid.Draw(screen, game.ImageManager, game.ShaderManager, game.Camera)
 	}
 
-    // game.TestAlphaCircle(screen, game.Player.x - game.Camera.x, game.Player.y)
+	// game.TestAlphaCircle(screen, game.Player.x - game.Camera.x, game.Player.y)
 
 	if game.RemotePlayer != nil && game.RemotePlayer.IsAlive() {
 		if game.isMaster() {

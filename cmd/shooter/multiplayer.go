@@ -40,6 +40,7 @@ type multiplayerEnvelope struct {
 	PlayerState      *playerState             `json:"player_state,omitempty"`
 	LatencyPing      *latencyPingMessage      `json:"latency_ping,omitempty"`
 	BulletMade       *bulletMadeMessage       `json:"bullet_made,omitempty"`
+	LightningShot    *lightningShotMessage    `json:"lightning_shot,omitempty"`
 	PowerupCollected *powerupCollectedMessage `json:"powerup_collected,omitempty"`
 	Spawn            *spawnMessage            `json:"spawn,omitempty"`
 	Snapshot         *snapshotMessage         `json:"snapshot,omitempty"`
@@ -60,6 +61,15 @@ type latencyPingMessage struct {
 type bulletMadeMessage struct {
 	CreatedAt uint64      `json:"created_at"`
 	Bullet    bulletState `json:"bullet"`
+}
+
+type lightningShotMessage struct {
+	CreatedAt uint64  `json:"created_at"`
+	Seed      int64   `json:"seed"`
+	X         float64 `json:"x"`
+	Y         float64 `json:"y"`
+	Level     int     `json:"level"`
+	Owner     string  `json:"owner"`
 }
 
 type powerupCollectedMessage struct {
@@ -124,17 +134,21 @@ type gunState struct {
 }
 
 type bulletState struct {
-	X             float64     `json:"x"`
-	Y             float64     `json:"y"`
-	Strength      float64     `json:"strength"`
-	VelocityX     float64     `json:"velocity_x"`
-	VelocityY     float64     `json:"velocity_y"`
-	Health        int         `json:"health"`
-	Kind          string      `json:"kind"`
-	ElementType   ElementType `json:"element_type"`
-	Owner         string      `json:"owner"`
-	GunKind       string      `json:"gun_kind"`
-	RemainingLife int         `json:"remaining_life"`
+	X              float64     `json:"x"`
+	Y              float64     `json:"y"`
+	Strength       float64     `json:"strength"`
+	VelocityX      float64     `json:"velocity_x"`
+	VelocityY      float64     `json:"velocity_y"`
+	Health         int         `json:"health"`
+	Kind           string      `json:"kind"`
+	ElementType    ElementType `json:"element_type"`
+	Owner          string      `json:"owner"`
+	GunKind        string      `json:"gun_kind"`
+	RemainingLife  int         `json:"remaining_life"`
+	LightningSeed  int64       `json:"lightning_seed"`
+	LightningX     float64     `json:"lightning_x"`
+	LightningY     float64     `json:"lightning_y"`
+	LightningLevel int         `json:"lightning_level"`
 }
 
 type asteroidState struct {
@@ -466,6 +480,14 @@ func (game *Game) processNetworkMessages(run *Run, messages [][]byte) error {
 			if game.isMaster() && envelope.BulletMade != nil {
 				game.Bullets = append(game.Bullets, game.makeBulletFromState(envelope.BulletMade.Bullet))
 			}
+		case "lightning_shot":
+			if envelope.LightningShot != nil {
+				bullets, err := game.makeLightningShotBullets(*envelope.LightningShot)
+				if err != nil {
+					return err
+				}
+				game.Bullets = append(game.Bullets, bullets...)
+			}
 		case "powerup_collected":
 			if game.isMaster() && envelope.PowerupCollected != nil {
 				game.removeCollectedPowerup(envelope.PowerupCollected.Powerup)
@@ -557,12 +579,21 @@ func (game *Game) AddPlayerBullets(bullets ...*Bullet) {
 		}
 	}
 	game.Bullets = append(game.Bullets, bullets...)
-	if game.isMaster() {
-		for _, bullet := range bullets {
-			game.sendSpawn("bullet", game.Counter, serializeBullet(bullet))
+	for i := 0; i < len(bullets); i++ {
+		bullet := bullets[i]
+		if bullet == nil {
+			continue
 		}
-	} else if game.isSlave() {
-		for _, bullet := range bullets {
+		if bullet.Kind == "lightning" {
+			game.sendLightningShot(game.Counter, bullet)
+			for i+1 < len(bullets) && bullets[i+1] != nil && bullets[i+1].Kind == "lightning" && bullets[i+1].LightningSeed == bullet.LightningSeed {
+				i += 1
+			}
+			continue
+		}
+		if game.isMaster() {
+			game.sendSpawn("bullet", game.Counter, serializeBullet(bullet))
+		} else if game.isSlave() {
 			game.sendBulletMade(game.Counter, bullet)
 		}
 	}
@@ -766,6 +797,53 @@ func (game *Game) sendBulletMade(createdAt uint64, bullet *Bullet) {
 	}
 }
 
+func (game *Game) sendLightningShot(createdAt uint64, bullet *Bullet) {
+	if game.Multiplayer == nil || game.Multiplayer.Peer == nil || bullet == nil {
+		return
+	}
+
+	if err := game.Multiplayer.Peer.SendGameMessage(multiplayerEnvelope{
+		Kind: "lightning_shot",
+		LightningShot: &lightningShotMessage{
+			CreatedAt: createdAt,
+			Seed:      bullet.LightningSeed,
+			X:         bullet.LightningOriginX,
+			Y:         bullet.LightningOriginY,
+			Level:     bullet.LightningLevel,
+			Owner:     bullet.Owner,
+		},
+	}); err != nil && game.Counter%120 == 0 {
+		log.Printf("Unable to send lightning_shot: %v", err)
+	}
+}
+
+func (game *Game) makeLightningShotBullets(message lightningShotMessage) ([]*Bullet, error) {
+	gun := &LightningGun{
+		enabled:     true,
+		level:       message.Level,
+		elementType: ElementLightning,
+	}
+
+	bullets, err := gun.ShootWithSeed(game.ImageManager, message.X, message.Y, message.Seed)
+	if err != nil {
+		return nil, err
+	}
+
+	ownerPlayer := game.bulletOwnerPlayer(&Bullet{Owner: message.Owner})
+	ownerGun := findPlayerGunByKind(ownerPlayer, "lightning")
+	if ownerGun == nil {
+		ownerGun = gun
+	}
+
+	for _, bullet := range bullets {
+		bullet.Owner = message.Owner
+		bullet.GunKind = "lightning"
+		bullet.Gun = ownerGun
+	}
+
+	return bullets, nil
+}
+
 func (game *Game) noteCollectedPowerup(powerup Powerup) {
 	state := serializePowerup(powerup)
 	if state.Kind == "" {
@@ -922,17 +1000,21 @@ func makeGunsFromState(states []gunState) []Gun {
 
 func serializeBullet(bullet *Bullet) bulletState {
 	return bulletState{
-		X:             bullet.x,
-		Y:             bullet.y,
-		Strength:      bullet.Strength,
-		VelocityX:     bullet.velocityX,
-		VelocityY:     bullet.velocityY,
-		Health:        bullet.health,
-		Kind:          bulletKind(bullet),
-		ElementType:   bullet.ElementType,
-		Owner:         bullet.Owner,
-		GunKind:       bullet.GunKind,
-		RemainingLife: bullet.RemainingLife,
+		X:              bullet.x,
+		Y:              bullet.y,
+		Strength:       bullet.Strength,
+		VelocityX:      bullet.velocityX,
+		VelocityY:      bullet.velocityY,
+		Health:         bullet.health,
+		Kind:           bulletKind(bullet),
+		ElementType:    bullet.ElementType,
+		Owner:          bullet.Owner,
+		GunKind:        bullet.GunKind,
+		RemainingLife:  bullet.RemainingLife,
+		LightningSeed:  bullet.LightningSeed,
+		LightningX:     bullet.LightningOriginX,
+		LightningY:     bullet.LightningOriginY,
+		LightningLevel: bullet.LightningLevel,
 	}
 }
 
@@ -999,17 +1081,21 @@ func findPlayerGunByKind(player *Player, kind string) Gun {
 
 func (game *Game) makeBulletFromState(state bulletState) *Bullet {
 	bullet := &Bullet{
-		x:             state.X,
-		y:             state.Y,
-		Strength:      state.Strength,
-		velocityX:     state.VelocityX,
-		velocityY:     state.VelocityY,
-		health:        state.Health,
-		Kind:          state.Kind,
-		ElementType:   state.ElementType,
-		Owner:         state.Owner,
-		GunKind:       state.GunKind,
-		RemainingLife: state.RemainingLife,
+		x:                state.X,
+		y:                state.Y,
+		Strength:         state.Strength,
+		velocityX:        state.VelocityX,
+		velocityY:        state.VelocityY,
+		health:           state.Health,
+		Kind:             state.Kind,
+		ElementType:      state.ElementType,
+		Owner:            state.Owner,
+		GunKind:          state.GunKind,
+		RemainingLife:    state.RemainingLife,
+		LightningSeed:    state.LightningSeed,
+		LightningOriginX: state.LightningX,
+		LightningOriginY: state.LightningY,
+		LightningLevel:   state.LightningLevel,
 	}
 
 	ownerPlayer := game.bulletOwnerPlayer(bullet)
