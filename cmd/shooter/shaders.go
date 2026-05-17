@@ -20,6 +20,9 @@ var ExplosionShaderData []byte
 //go:embed shaders/alpha-circle.kage
 var AlphaCircleShaderData []byte
 
+//go:embed shaders/galaxy.kage
+var GalaxyShaderData []byte
+
 func LoadRedShader() (*ebiten.Shader, error) {
     return ebiten.NewShader(RedShaderData)
 }
@@ -38,4 +41,8 @@ func LoadExplosionShader() (*ebiten.Shader, error) {
 
 func LoadAlphaCircleShader() (*ebiten.Shader, error) {
     return ebiten.NewShader(AlphaCircleShaderData)
+}
+
+func LoadGalaxyShader() (*ebiten.Shader, error) {
+    return ebiten.NewShader(GalaxyShaderData)
 }
