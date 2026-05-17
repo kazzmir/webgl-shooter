@@ -587,7 +587,7 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialMusicVo
 	var menu *Menu
 
 	startNewGame := func(run *Run) error {
-		return run.StartGame("", false)
+		return run.StartGame("", false, "")
 	}
 
 	options = append(options, &MenuOption{
@@ -698,7 +698,7 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialMusicVo
 					run.Player = player
 				}
 
-				game, err := MakeGame(soundManager, run, 1)
+				game, err := MakeGame(soundManager, run, 1, "")
 				if err != nil {
 					return err
 				}
@@ -755,7 +755,7 @@ func createMenu(quit context.Context, soundManager *SoundManager, initialMusicVo
 	multiplayerStartOption = &MenuOption{
 		Text: "Start game",
 		Action: func(self *MenuOption, run *Run, key ebiten.Key) error {
-			return run.StartGame(multiplayerRoleMaster, true)
+			return run.StartGame(multiplayerRoleMaster, true, "")
 		},
 		Respond: []ebiten.Key{ebiten.KeyEnter},
 	}

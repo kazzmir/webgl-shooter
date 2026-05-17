@@ -433,6 +433,8 @@ type PlanetPosition struct {
 }
 
 type Background struct {
+	Backdrop     *ebiten.Image
+	BackdropName gameImages.Image
 	Galaxy       *ebiten.Image
 	GalaxyShader *ebiten.Shader
 	Galaxies     []*GalaxyPosition
@@ -443,6 +445,15 @@ type Background struct {
 	// Star *ebiten.Image
 	// Star2 *ebiten.Image
 	Stars []*StarPosition
+}
+
+func randomBackdropName() gameImages.Image {
+	backdrops := [...]gameImages.Image{
+		gameImages.ImageGalaxy,
+		gameImages.ImagePillars,
+	}
+
+	return backdrops[rand.N(len(backdrops))]
 }
 
 func randomFloat(min float64, max float64) float64 {
@@ -474,7 +485,16 @@ func makePlanetPosition(assets []*PlanetAsset) *PlanetPosition {
 	}
 }
 
-func MakeBackground() (*Background, error) {
+func MakeBackground(backdropName gameImages.Image) (*Background, error) {
+	if backdropName == "" {
+		backdropName = randomBackdropName()
+	}
+
+	backdropImage, err := gameImages.LoadImage(backdropName)
+	if err != nil {
+		return nil, err
+	}
+
 	galaxyImage, err := gameImages.LoadImage(gameImages.ImageGalaxy)
 	if err != nil {
 		return nil, err
@@ -577,6 +597,8 @@ func MakeBackground() (*Background, error) {
 	}
 
 	return &Background{
+		Backdrop:     ebiten.NewImageFromImage(backdropImage),
+		BackdropName: backdropName,
 		Galaxy:       ebiten.NewImageFromImage(galaxyImage),
 		GalaxyShader: galaxyShader,
 		Galaxies:     galaxies,
@@ -617,10 +639,10 @@ func (background *Background) Update() {
 
 func (background *Background) Draw(screen *ebiten.Image, camera *Camera, counter uint64) {
 	options := &ebiten.DrawImageOptions{}
-	bounds := background.Galaxy.Bounds()
+	bounds := background.Backdrop.Bounds()
 	options.GeoM.Scale(float64(screen.Bounds().Dx())/float64(bounds.Dx()), float64(screen.Bounds().Dy())/float64(bounds.Dy()))
 	options.ColorScale.ScaleAlpha(0.3)
-	screen.DrawImage(background.Galaxy, options)
+	screen.DrawImage(background.Backdrop, options)
 
 	useTime := float32(counter) / 60.0
 	for _, galaxy := range background.Galaxies {
@@ -2372,7 +2394,7 @@ func (run *Run) Update() error {
 		err := run.Game.Update(run)
 		if errors.Is(err, LevelEnd) {
 			notifyPeer := run.Game != nil && run.Game.isMaster()
-			return run.StartNextLevel(run.Game.Difficulty*1.5, notifyPeer)
+			return run.StartNextLevel(run.Game.Difficulty*1.5, notifyPeer, "")
 		} else {
 			return err
 		}
@@ -2405,7 +2427,7 @@ func (run *Run) Draw(screen *ebiten.Image) {
 	*/
 }
 
-func MakeGame(soundManager *SoundManager, run *Run, difficulty float64) (*Game, error) {
+func MakeGame(soundManager *SoundManager, run *Run, difficulty float64, backdropName gameImages.Image) (*Game, error) {
 	if run.Player == nil {
 		return nil, fmt.Errorf("game: no player created")
 	}
@@ -2420,7 +2442,7 @@ func MakeGame(soundManager *SoundManager, run *Run, difficulty float64) (*Game, 
 	   }
 	*/
 
-	background, err := MakeBackground()
+	background, err := MakeBackground(backdropName)
 	if err != nil {
 		return nil, err
 	}

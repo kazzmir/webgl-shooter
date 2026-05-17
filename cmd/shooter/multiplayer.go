@@ -47,11 +47,13 @@ type multiplayerEnvelope struct {
 }
 
 type startGameMessage struct {
-	Difficulty float64 `json:"difficulty"`
+	Difficulty float64          `json:"difficulty"`
+	Background gameImages.Image `json:"background,omitempty"`
 }
 
 type levelStartMessage struct {
-	Difficulty float64 `json:"difficulty"`
+	Difficulty float64          `json:"difficulty"`
+	Background gameImages.Image `json:"background,omitempty"`
 }
 
 type latencyPingMessage struct {
@@ -301,7 +303,7 @@ func (player *Player) ApplyInput(game *Game, run *Run, input playerInputState, a
 	return nil
 }
 
-func (run *Run) StartGame(role string, notifyPeer bool) error {
+func (run *Run) StartGame(role string, notifyPeer bool, backdropName gameImages.Image) error {
 	run.Mode = RunGame
 
 	if run.Game != nil {
@@ -314,7 +316,7 @@ func (run *Run) StartGame(role string, notifyPeer bool) error {
 	}
 	run.Player = player
 
-	game, err := MakeGame(run.SoundManager, run, 1)
+	game, err := MakeGame(run.SoundManager, run, 1, backdropName)
 	if err != nil {
 		return err
 	}
@@ -351,7 +353,7 @@ func (run *Run) StartGame(role string, notifyPeer bool) error {
 		if notifyPeer && role == multiplayerRoleMaster && run.PeerConnector != nil {
 			if err := run.PeerConnector.SendGameMessage(multiplayerEnvelope{
 				Kind:      "start_game",
-				StartGame: &startGameMessage{Difficulty: game.Difficulty},
+				StartGame: &startGameMessage{Difficulty: game.Difficulty, Background: game.Background.BackdropName},
 			}); err != nil {
 				log.Printf("Unable to send start game message: %v", err)
 			}
@@ -363,8 +365,8 @@ func (run *Run) StartGame(role string, notifyPeer bool) error {
 	return nil
 }
 
-func (run *Run) setupNextLevel(difficulty float64, role string, remotePlayer *Player) (*Game, error) {
-	game, err := MakeGame(run.SoundManager, run, difficulty)
+func (run *Run) setupNextLevel(difficulty float64, role string, remotePlayer *Player, backdropName gameImages.Image) (*Game, error) {
+	game, err := MakeGame(run.SoundManager, run, difficulty, backdropName)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +407,7 @@ func (run *Run) setupNextLevel(difficulty float64, role string, remotePlayer *Pl
 	return game, nil
 }
 
-func (run *Run) StartNextLevel(difficulty float64, notifyPeer bool) error {
+func (run *Run) StartNextLevel(difficulty float64, notifyPeer bool, backdropName gameImages.Image) error {
 	role := ""
 	var remotePlayer *Player
 	if run.Game != nil && run.Game.Multiplayer != nil {
@@ -413,7 +415,7 @@ func (run *Run) StartNextLevel(difficulty float64, notifyPeer bool) error {
 		remotePlayer = run.Game.RemotePlayer
 	}
 
-	game, err := run.setupNextLevel(difficulty, role, remotePlayer)
+	game, err := run.setupNextLevel(difficulty, role, remotePlayer, backdropName)
 	if err != nil {
 		return err
 	}
@@ -427,7 +429,7 @@ func (run *Run) StartNextLevel(difficulty float64, notifyPeer bool) error {
 	if notifyPeer && game.isMaster() && game.Multiplayer != nil && game.Multiplayer.Peer != nil {
 		if err := game.Multiplayer.Peer.SendGameMessage(multiplayerEnvelope{
 			Kind:       "level_start",
-			LevelStart: &levelStartMessage{Difficulty: difficulty},
+			LevelStart: &levelStartMessage{Difficulty: difficulty, Background: game.Background.BackdropName},
 		}); err != nil {
 			log.Printf("Unable to send level start message: %v", err)
 		}
@@ -445,7 +447,7 @@ func (run *Run) handleMenuMultiplayerMessages(messages [][]byte) error {
 			continue
 		}
 		if envelope.Kind == "start_game" && run.PeerConnector != nil && run.PeerConnector.IsSlave() {
-			return run.StartGame(multiplayerRoleSlave, false)
+			return run.StartGame(multiplayerRoleSlave, false, envelope.StartGame.Background)
 		}
 	}
 	return nil
@@ -506,7 +508,7 @@ func (game *Game) processNetworkMessages(run *Run, messages [][]byte) error {
 			}
 		case "level_start":
 			if game.isSlave() && envelope.LevelStart != nil {
-				return run.StartNextLevel(envelope.LevelStart.Difficulty, false)
+				return run.StartNextLevel(envelope.LevelStart.Difficulty, false, envelope.LevelStart.Background)
 			}
 		}
 	}

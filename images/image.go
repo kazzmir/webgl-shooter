@@ -16,6 +16,7 @@ const ImageStar1 = Image("star1")
 const ImageStar2 = Image("star2")
 const ImagePlanet = Image("planet")
 const ImageGalaxy = Image("galaxy")
+const ImagePillars = Image("pillars")
 const ImageEarth = Image("earth")
 const ImageMars = Image("mars")
 const ImageAlienWorld = Image("alien-world")
@@ -73,6 +74,9 @@ var planetImage []byte
 
 //go:embed background/galaxy3.jpg
 var galaxyImage []byte
+
+//go:embed background/pillars.jpg
+var pillarsImage []byte
 
 //go:embed background/earth.jpg
 var earthImage []byte
@@ -202,6 +206,8 @@ func LoadImage(name Image) (image.Image, error) {
 		return loadEmbeddedImage(planetImage)
 	case ImageGalaxy:
 		return loadEmbeddedImage(galaxyImage)
+	case ImagePillars:
+		return loadEmbeddedImage(pillarsImage)
 	case ImageEarth:
 		return loadEmbeddedImage(earthImage)
 	case ImageMars:
