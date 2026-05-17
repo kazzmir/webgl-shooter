@@ -49,6 +49,9 @@ const CameraEdgeFadeAlpha = 0.85
 const OffscreenEnemyIndicatorSize = 24
 const OffscreenEnemyIndicatorMaxAlpha = 128.0 / 255.0
 const OffscreenEnemyIndicatorPulseSpeed = 0.12
+const GalaxyParallaxFactor = 0.48
+const PlanetParallaxFactor = 0.64
+const StarParallaxFactor = 0.85
 
 var triangleFillImage = func() *ebiten.Image {
 	img := ebiten.NewImage(1, 1)
@@ -92,6 +95,10 @@ func (camera *Camera) WorldGeoM() ebiten.GeoM {
 
 func (camera *Camera) Apply(x float64, y float64) (float64, float64) {
 	return x - camera.x, y - camera.y
+}
+
+func (camera *Camera) ApplyParallax(x float64, y float64, factor float64) (float64, float64) {
+	return x - camera.x*factor, y - camera.y*factor
 }
 
 func toFloatArray(color color.Color) []float32 {
@@ -617,16 +624,16 @@ func (background *Background) Draw(screen *ebiten.Image, camera *Camera, counter
 
 	useTime := float32(counter) / 60.0
 	for _, galaxy := range background.Galaxies {
-		x, y := camera.Apply(galaxy.x, galaxy.y)
+		x, y := camera.ApplyParallax(galaxy.x, galaxy.y, GalaxyParallaxFactor)
 		DrawGalaxy(screen, background.GalaxyShader, background.Galaxy, useTime, float32(galaxy.tilt), float32(x), float32(y), float32(galaxy.scale))
 	}
 
-	planetX, planetY := camera.Apply(background.Planet.x, background.Planet.y)
+	planetX, planetY := camera.ApplyParallax(background.Planet.x, background.Planet.y, PlanetParallaxFactor)
 	planetTime := float64(counter) / background.Planet.rotationSpeed
 	DrawPlanet(screen, planetX, planetY, background.Planet.scale, background.Planet.axis, background.Planet.asset.Image, background.Planet.asset.Cloud, planetTime, background.PlanetShader)
 
 	for _, star := range background.Stars {
-		x, y := camera.Apply(star.x, star.y)
+		x, y := camera.ApplyParallax(star.x, star.y, StarParallaxFactor)
 		options := &ebiten.DrawImageOptions{}
 		options.ColorScale.ScaleAlpha(0.5)
 		options.GeoM.Translate(x, y)
