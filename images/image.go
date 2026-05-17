@@ -16,6 +16,11 @@ const ImageStar1 = Image("star1")
 const ImageStar2 = Image("star2")
 const ImagePlanet = Image("planet")
 const ImageGalaxy = Image("galaxy")
+const ImageEarth = Image("earth")
+const ImageMars = Image("mars")
+const ImageAlienWorld = Image("alien-world")
+const ImageCloud1 = Image("cloud1")
+const ImageCloudA = Image("cloud-a")
 const ImageBullet = Image("bullet")
 const ImageEnemy1 = Image("enemy1")
 const ImageEnemy2 = Image("enemy2")
@@ -68,6 +73,21 @@ var planetImage []byte
 
 //go:embed background/galaxy3.jpg
 var galaxyImage []byte
+
+//go:embed background/earth.jpg
+var earthImage []byte
+
+//go:embed background/mars.jpg
+var marsImage []byte
+
+//go:embed background/alien-world.jpg
+var alienWorldImage []byte
+
+//go:embed background/cloud1.png
+var cloud1Image []byte
+
+//go:embed background/cloud-a.png
+var cloudAImage []byte
 
 //go:embed bullet/small-blue.png
 var bulletSmallBlueImage []byte
@@ -182,6 +202,16 @@ func LoadImage(name Image) (image.Image, error) {
 		return loadEmbeddedImage(planetImage)
 	case ImageGalaxy:
 		return loadEmbeddedImage(galaxyImage)
+	case ImageEarth:
+		return loadEmbeddedImage(earthImage)
+	case ImageMars:
+		return loadEmbeddedImage(marsImage)
+	case ImageAlienWorld:
+		return loadEmbeddedImage(alienWorldImage)
+	case ImageCloud1:
+		return loadEmbeddedImage(cloud1Image)
+	case ImageCloudA:
+		return loadEmbeddedImage(cloudAImage)
 	case ImageBullet:
 		return loadEmbeddedImage(bulletImage)
 	case ImageEnemy1:

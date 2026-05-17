@@ -1,75 +1,63 @@
 package main
 
 import (
-    _ "fmt"
-    "image"
-    "math/rand/v2"
-    _ "image/png"
-    _ "image/jpeg"
-    "github.com/hajimehoshi/ebiten/v2"
-    "github.com/hajimehoshi/ebiten/v2/ebitenutil"
-    // "github.com/hajimehoshi/ebiten/v2/vector"
+	"image"
+	"math/rand/v2"
+
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 type Vector3 struct {
-    X float32
-    Y float32
-    Z float32
+	X float32
+	Y float32
+	Z float32
 }
 
 func DrawPlanet(screen *ebiten.Image, x float64, y float64, scale float64, axis Vector3, planetImage *ebiten.Image, cloudImage *ebiten.Image, timeSeconds float64, shader *ebiten.Shader) {
-    bounds := planetImage.Bounds()
-    w, h := bounds.Dx(), bounds.Dy()
+	bounds := planetImage.Bounds()
+	w, h := bounds.Dx(), bounds.Dy()
 
-    opts := &ebiten.DrawRectShaderOptions{}
-    opts.GeoM.Translate(-float64(w) * 0.5, -float64(h) * 0.5)
-    opts.GeoM.Scale(scale, scale)
-    opts.GeoM.Translate(x, y)
+	opts := &ebiten.DrawRectShaderOptions{}
+	opts.GeoM.Translate(-float64(w)*0.5, -float64(h)*0.5)
+	opts.GeoM.Scale(scale, scale)
+	opts.GeoM.Translate(x, y)
 
-    // fmt.Printf("Resolution: %v x %v\n", w, h)
+	// fmt.Printf("Resolution: %v x %v\n", w, h)
 
-    rotationSpeed := timeSeconds / 600.0
+	rotationSpeed := timeSeconds / 600.0
 
-    opts.Uniforms = map[string]interface{}{
-        "Rotation":       float32(rotationSpeed),
-        "Axis": []float32{axis.X, axis.Y, axis.Z},
-    }
-    opts.Images[0] = planetImage
+	opts.Uniforms = map[string]interface{}{
+		"Rotation": float32(rotationSpeed),
+		"Axis":     []float32{axis.X, axis.Y, axis.Z},
+	}
+	opts.Images[0] = planetImage
 
-    screen.DrawRectShader(w, h, shader, opts)
+	screen.DrawRectShader(w, h, shader, opts)
 
-    if cloudImage != nil {
-        opts.Blend = ebiten.BlendLighter
-        opts.Images[0] = cloudImage
-        opts.ColorScale.ScaleAlpha(0.2)
-        opts.Uniforms["Rotation"] = float32(rotationSpeed * 0.7)
-        screen.DrawRectShader(w, h, shader, opts)
-    }
+	if cloudImage != nil {
+		opts.Blend = ebiten.BlendLighter
+		opts.Images[0] = cloudImage
+		opts.ColorScale.ScaleAlpha(0.2)
+		opts.Uniforms["Rotation"] = float32(rotationSpeed * 0.7)
+		screen.DrawRectShader(w, h, shader, opts)
+	}
 }
 
-func makeCloudImage(bounds image.Rectangle) *ebiten.Image {
-    w, h := bounds.Dx(), bounds.Dy()
-    img := ebiten.NewImage(w, h)
-    // img.Fill(color.RGBA{B: 255, A: 255})
+func makeCloudImage(bounds image.Rectangle, clouds ...*ebiten.Image) *ebiten.Image {
+	w, h := bounds.Dx(), bounds.Dy()
+	img := ebiten.NewImage(w, h)
 
-    clouds := []string{"cloud1.png", "cloud-a.png"}
+	for _, cloud := range clouds {
+		cloudBounds := cloud.Bounds()
 
-    for _, cloudFile := range clouds {
-        cloud, _, err := ebitenutil.NewImageFromFile(cloudFile)
-        if err != nil {
-            panic(err)
-        }
+		for range 10 {
+			var opts ebiten.DrawImageOptions
+			opts.GeoM.Translate(float64(w-cloudBounds.Dx())*rand.Float64(), float64(h-cloudBounds.Dy())*rand.Float64())
+			img.DrawImage(cloud, &opts)
+		}
+	}
 
-        cloudBounds := cloud.Bounds()
-
-        for range 10 {
-            var opts ebiten.DrawImageOptions
-            opts.GeoM.Translate(float64(w - cloudBounds.Dx()) * rand.Float64(), float64(h - cloudBounds.Dy()) * rand.Float64())
-            img.DrawImage(cloud, &opts)
-        }
-    }
-
-    return img
+	return img
 }
 
 /*

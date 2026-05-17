@@ -1,8 +1,8 @@
 package main
 
 import (
-    _ "embed"
-    "github.com/hajimehoshi/ebiten/v2"
+	_ "embed"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 //go:embed shaders/red.kage
@@ -23,26 +23,33 @@ var AlphaCircleShaderData []byte
 //go:embed shaders/galaxy.kage
 var GalaxyShaderData []byte
 
+//go:embed shaders/planet.kage
+var PlanetShaderData []byte
+
 func LoadRedShader() (*ebiten.Shader, error) {
-    return ebiten.NewShader(RedShaderData)
+	return ebiten.NewShader(RedShaderData)
 }
 
 func LoadEdgeShader() (*ebiten.Shader, error) {
-    return ebiten.NewShader(EdgeShaderData)
+	return ebiten.NewShader(EdgeShaderData)
 }
 
 func LoadShadowShader() (*ebiten.Shader, error) {
-    return ebiten.NewShader(ShadowShaderData)
+	return ebiten.NewShader(ShadowShaderData)
 }
 
 func LoadExplosionShader() (*ebiten.Shader, error) {
-    return ebiten.NewShader(ExplosionShaderData)
+	return ebiten.NewShader(ExplosionShaderData)
 }
 
 func LoadAlphaCircleShader() (*ebiten.Shader, error) {
-    return ebiten.NewShader(AlphaCircleShaderData)
+	return ebiten.NewShader(AlphaCircleShaderData)
 }
 
 func LoadGalaxyShader() (*ebiten.Shader, error) {
-    return ebiten.NewShader(GalaxyShaderData)
+	return ebiten.NewShader(GalaxyShaderData)
+}
+
+func LoadPlanetShader() (*ebiten.Shader, error) {
+	return ebiten.NewShader(PlanetShaderData)
 }

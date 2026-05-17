@@ -412,10 +412,25 @@ type GalaxyPosition struct {
 	scale float64
 }
 
+type PlanetAsset struct {
+	Image *ebiten.Image
+	Cloud *ebiten.Image
+}
+
+type PlanetPosition struct {
+	x, y  float64
+	scale float64
+	axis  Vector3
+	asset *PlanetAsset
+}
+
 type Background struct {
 	Galaxy       *ebiten.Image
 	GalaxyShader *ebiten.Shader
 	Galaxies     []*GalaxyPosition
+	PlanetShader *ebiten.Shader
+	PlanetAssets []*PlanetAsset
+	Planet       *PlanetPosition
 
 	// Star *ebiten.Image
 	// Star2 *ebiten.Image
@@ -426,6 +441,30 @@ func randomFloat(min float64, max float64) float64 {
 	return min + rand.Float64()*(max-min)
 }
 
+func randomPlanetAxis() Vector3 {
+	axis := Vector3{
+		X: float32(randomFloat(-0.5, 0.5)),
+		Y: float32(randomFloat(-0.5, 0.5)),
+		Z: float32(randomFloat(-0.5, 0.5)),
+	}
+
+	if axis.X == 0 && axis.Y == 0 && axis.Z == 0 {
+		axis.Z = 1
+	}
+
+	return axis
+}
+
+func makePlanetPosition(assets []*PlanetAsset) *PlanetPosition {
+	return &PlanetPosition{
+		x:     randomFloat(0, float64(LogicalWidth)),
+		y:     randomFloat(-float64(ScreenHeight), float64(ScreenHeight)),
+		scale: randomFloat(0.3, 0.8),
+		axis:  randomPlanetAxis(),
+		asset: assets[rand.N(len(assets))],
+	}
+}
+
 func MakeBackground() (*Background, error) {
 	galaxyImage, err := gameImages.LoadImage(gameImages.ImageGalaxy)
 	if err != nil {
@@ -433,6 +472,36 @@ func MakeBackground() (*Background, error) {
 	}
 
 	galaxyShader, err := LoadGalaxyShader()
+	if err != nil {
+		return nil, err
+	}
+
+	planetShader, err := LoadPlanetShader()
+	if err != nil {
+		return nil, err
+	}
+
+	earthImage, err := gameImages.LoadImage(gameImages.ImageEarth)
+	if err != nil {
+		return nil, err
+	}
+
+	marsImage, err := gameImages.LoadImage(gameImages.ImageMars)
+	if err != nil {
+		return nil, err
+	}
+
+	alienWorldImage, err := gameImages.LoadImage(gameImages.ImageAlienWorld)
+	if err != nil {
+		return nil, err
+	}
+
+	cloud1Image, err := gameImages.LoadImage(gameImages.ImageCloud1)
+	if err != nil {
+		return nil, err
+	}
+
+	cloudAImage, err := gameImages.LoadImage(gameImages.ImageCloudA)
 	if err != nil {
 		return nil, err
 	}
@@ -482,16 +551,42 @@ func MakeBackground() (*Background, error) {
 		})
 	}
 
+	earth := ebiten.NewImageFromImage(earthImage)
+	cloud1 := ebiten.NewImageFromImage(cloud1Image)
+	cloudA := ebiten.NewImageFromImage(cloudAImage)
+	planetAssets := []*PlanetAsset{
+		{
+			Image: earth,
+			Cloud: makeCloudImage(earth.Bounds(), cloud1, cloudA),
+		},
+		{
+			Image: ebiten.NewImageFromImage(marsImage),
+		},
+		{
+			Image: ebiten.NewImageFromImage(alienWorldImage),
+		},
+	}
+
 	return &Background{
 		Galaxy:       ebiten.NewImageFromImage(galaxyImage),
 		GalaxyShader: galaxyShader,
 		Galaxies:     galaxies,
+		PlanetShader: planetShader,
+		PlanetAssets: planetAssets,
+		Planet:       makePlanetPosition(planetAssets),
 		// Star: ebiten.NewImageFromImage(starImage),
 		Stars: stars,
 	}, nil
 }
 
 func (background *Background) Update() {
+	background.Planet.y += 0.38
+	if background.Planet.y > ScreenHeight+250 {
+		background.Planet = makePlanetPosition(background.PlanetAssets)
+		background.Planet.y = randomFloat(-float64(ScreenHeight)-250, -250)
+        background.Planet.scale = randomFloat(0.3, 0.8)
+	}
+
 	for _, galaxy := range background.Galaxies {
 		galaxy.y += 0.22
 		if galaxy.y > ScreenHeight+200 {
@@ -518,6 +613,9 @@ func (background *Background) Draw(screen *ebiten.Image, camera *Camera, counter
 		x, y := camera.Apply(galaxy.x, galaxy.y)
 		DrawGalaxy(screen, background.GalaxyShader, background.Galaxy, useTime, float32(galaxy.tilt), float32(x), float32(y), float32(galaxy.scale))
 	}
+
+	planetX, planetY := camera.Apply(background.Planet.x, background.Planet.y)
+	DrawPlanet(screen, planetX, planetY, background.Planet.scale, background.Planet.axis, background.Planet.asset.Image, background.Planet.asset.Cloud, float64(counter)/2.0, background.PlanetShader)
 
 	for _, star := range background.Stars {
 		x, y := camera.Apply(star.x, star.y)
@@ -872,7 +970,7 @@ func (player *Player) DrawHud(screen *ebiten.Image, imageManager *ImageManager, 
 
 			options.GeoM.Translate(5, energyY+float64(energy.Bounds().Dy())-float64(useHeight))
 
-			vector.FillRect(screen, 5, float32(energyY + 1), float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 180}), false)
+			vector.FillRect(screen, 5, float32(energyY+1), float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 180}), false)
 
 			sub := energy.SubImage(image.Rect(0, energy.Bounds().Dy()-int(useHeight), energy.Bounds().Dx(), energy.Bounds().Dy())).(*ebiten.Image)
 			screen.DrawImage(sub, options)
