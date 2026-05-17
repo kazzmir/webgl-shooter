@@ -583,7 +583,7 @@ func MakeBackground() (*Background, error) {
 
 func (background *Background) Update() {
 	background.Planet.y += 0.38
-	if background.Planet.y > ScreenHeight+250 {
+	if background.Planet.y > ScreenHeight+float64(background.PlanetAssets[0].Image.Bounds().Dy())*background.Planet.scale {
 		background.Planet = makePlanetPosition(background.PlanetAssets)
 		background.Planet.y = randomFloat(-float64(ScreenHeight)-250, -250)
 		background.Planet.scale = randomFloat(0.3, 0.8)
@@ -628,6 +628,7 @@ func (background *Background) Draw(screen *ebiten.Image, camera *Camera, counter
 	for _, star := range background.Stars {
 		x, y := camera.Apply(star.x, star.y)
 		options := &ebiten.DrawImageOptions{}
+		options.ColorScale.ScaleAlpha(0.5)
 		options.GeoM.Translate(x, y)
 		screen.DrawImage(star.Image, options)
 	}
