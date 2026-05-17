@@ -418,10 +418,11 @@ type PlanetAsset struct {
 }
 
 type PlanetPosition struct {
-	x, y  float64
-	scale float64
-	axis  Vector3
-	asset *PlanetAsset
+	x, y          float64
+	scale         float64
+	rotationSpeed float64
+	axis          Vector3
+	asset         *PlanetAsset
 }
 
 type Background struct {
@@ -457,11 +458,12 @@ func randomPlanetAxis() Vector3 {
 
 func makePlanetPosition(assets []*PlanetAsset) *PlanetPosition {
 	return &PlanetPosition{
-		x:     randomFloat(0, float64(LogicalWidth)),
-		y:     randomFloat(-float64(ScreenHeight), float64(ScreenHeight)),
-		scale: randomFloat(0.3, 0.8),
-		axis:  randomPlanetAxis(),
-		asset: assets[rand.N(len(assets))],
+		x:             randomFloat(0, float64(LogicalWidth)),
+		y:             randomFloat(-float64(ScreenHeight), float64(ScreenHeight)),
+		scale:         randomFloat(0.3, 0.8),
+		rotationSpeed: randomFloat(1, 4),
+		axis:          randomPlanetAxis(),
+		asset:         assets[rand.N(len(assets))],
 	}
 }
 
@@ -584,7 +586,8 @@ func (background *Background) Update() {
 	if background.Planet.y > ScreenHeight+250 {
 		background.Planet = makePlanetPosition(background.PlanetAssets)
 		background.Planet.y = randomFloat(-float64(ScreenHeight)-250, -250)
-        background.Planet.scale = randomFloat(0.3, 0.8)
+		background.Planet.scale = randomFloat(0.3, 0.8)
+		background.Planet.rotationSpeed = randomFloat(1, 4)
 	}
 
 	for _, galaxy := range background.Galaxies {
@@ -606,7 +609,11 @@ func (background *Background) Update() {
 }
 
 func (background *Background) Draw(screen *ebiten.Image, camera *Camera, counter uint64) {
-	// screen.Fill(color.RGBA{0x1b, 0x22, 0x24, 0xff})
+	options := &ebiten.DrawImageOptions{}
+	bounds := background.Galaxy.Bounds()
+	options.GeoM.Scale(float64(screen.Bounds().Dx())/float64(bounds.Dx()), float64(screen.Bounds().Dy())/float64(bounds.Dy()))
+	options.ColorScale.ScaleAlpha(0.3)
+	screen.DrawImage(background.Galaxy, options)
 
 	useTime := float32(counter) / 60.0
 	for _, galaxy := range background.Galaxies {
@@ -615,7 +622,8 @@ func (background *Background) Draw(screen *ebiten.Image, camera *Camera, counter
 	}
 
 	planetX, planetY := camera.Apply(background.Planet.x, background.Planet.y)
-	DrawPlanet(screen, planetX, planetY, background.Planet.scale, background.Planet.axis, background.Planet.asset.Image, background.Planet.asset.Cloud, float64(counter)/2.0, background.PlanetShader)
+	planetTime := float64(counter) / background.Planet.rotationSpeed
+	DrawPlanet(screen, planetX, planetY, background.Planet.scale, background.Planet.axis, background.Planet.asset.Image, background.Planet.asset.Cloud, planetTime, background.PlanetShader)
 
 	for _, star := range background.Stars {
 		x, y := camera.Apply(star.x, star.y)
