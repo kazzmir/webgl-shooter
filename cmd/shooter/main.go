@@ -872,7 +872,7 @@ func (player *Player) DrawHud(screen *ebiten.Image, imageManager *ImageManager, 
 
 			options.GeoM.Translate(5, energyY+float64(energy.Bounds().Dy())-float64(useHeight))
 
-			vector.StrokeRect(screen, 5, float32(energyY), float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), 1, premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 200}), true)
+			vector.FillRect(screen, 5, float32(energyY + 1), float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 180}), false)
 
 			sub := energy.SubImage(image.Rect(0, energy.Bounds().Dy()-int(useHeight), energy.Bounds().Dx(), energy.Bounds().Dy())).(*ebiten.Image)
 			screen.DrawImage(sub, options)
