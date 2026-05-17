@@ -1,0 +1,85 @@
+//kage:unit pixels
+
+package main
+
+// Uniforms passed from Go
+var Rotation float
+var Axis vec3
+
+const PI = 3.141592653589793
+
+// Rodrigues' rotation formula
+// https://www.youtube.com/watch?v=CQSC5W5bPXQ
+func rotateAroundAxis(v vec3, axis vec3, angle float) vec3 {
+	c := cos(angle)
+	s := sin(angle)
+
+	return v*c +
+		cross(axis, v)*s +
+		axis*dot(axis, v)*(1.0 - c)
+}
+
+// Convert direction vector -> spherical UV
+func dirToUV(d vec3) vec2 {
+	u := atan2(d.z, d.x)/(2.0*PI) + 0.5
+	v := asin(d.y)/PI + 0.5
+	return vec2(u, v)
+}
+
+func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
+	// Normalize screen coords to [-1, 1]
+	// uv := (position.xy - imageDstOrigin()) / Resolution
+	// uv := texCoord.xy / Resolution
+
+    resolution := imageSrc0Size()
+
+    uv := (texCoord - imageSrc0Origin()) / resolution
+
+    // convert from [0-1] to [-1, 1]
+	p := uv*2.0 - 1.0
+
+	// Correct aspect ratio
+	p.x *= resolution.x / resolution.y
+
+	// Sphere mask. Get the magnitude of the p vector
+	r2 := dot(p, p)
+    // if the magnitude is larger than the unit circle then this point lies outside
+    // the sphere
+	if r2 > 1.0 {
+		return vec4(0.0, 0.0, 0.0, 0.0)
+	}
+
+	// Reconstruct sphere normal
+	z := sqrt(1.0 - r2)
+	n := normalize(vec3(p.x, p.y, z))
+
+    axis := normalize(Axis)
+
+	// Animate rotation
+	rotated := rotateAroundAxis(n, axis, Rotation)
+
+	// Convert to UV for texture lookup
+    // UV coordinates are back in [0-1] range
+	sphereUV := dirToUV(rotated)
+
+    sphereUV.x = fract(sphereUV.x)
+    sphereUV.y = clamp(sphereUV.y, 0.0, 1.0)
+
+    // convert back to UV coordinates
+    pos := sphereUV.xy * resolution.xy
+
+	// Sample texture. Add offset as well to account for ebiten atlas
+	col := imageSrc0At(pos + imageSrc0Origin())
+
+	// Simple lighting (fake sun from top-right)
+    // TODO: make lighting vector an input
+	lightDir := normalize(vec3(0.5, 0.5, 1.0))
+	diff := clamp(dot(rotated, lightDir), 0.0, 1.0)
+
+	// Add a bit of ambient
+	lighting := diff*0.8 + 0.8
+    // lighting := vec3(1)
+    // lighting = clamp(lighting, 0, 1)
+
+	return vec4(col.rgb * lighting, 1.0)
+}
