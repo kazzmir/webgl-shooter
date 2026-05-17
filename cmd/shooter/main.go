@@ -406,7 +406,33 @@ type StarPosition struct {
 	Image  *ebiten.Image
 }
 
+type GalaxyPosition struct {
+	x, y  float64
+	tilt  float64
+	scale float64
+}
+
+type PlanetAsset struct {
+	Image *ebiten.Image
+	Cloud *ebiten.Image
+}
+
+type PlanetPosition struct {
+	x, y          float64
+	scale         float64
+	rotationSpeed float64
+	axis          Vector3
+	asset         *PlanetAsset
+}
+
 type Background struct {
+	Galaxy       *ebiten.Image
+	GalaxyShader *ebiten.Shader
+	Galaxies     []*GalaxyPosition
+	PlanetShader *ebiten.Shader
+	PlanetAssets []*PlanetAsset
+	Planet       *PlanetPosition
+
 	// Star *ebiten.Image
 	// Star2 *ebiten.Image
 	Stars []*StarPosition
@@ -416,7 +442,72 @@ func randomFloat(min float64, max float64) float64 {
 	return min + rand.Float64()*(max-min)
 }
 
+func randomPlanetAxis() Vector3 {
+	axis := Vector3{
+		X: float32(randomFloat(-0.5, 0.5)),
+		Y: float32(randomFloat(-0.5, 0.5)),
+		Z: float32(randomFloat(-0.5, 0.5)),
+	}
+
+	if axis.X == 0 && axis.Y == 0 && axis.Z == 0 {
+		axis.Z = 1
+	}
+
+	return axis
+}
+
+func makePlanetPosition(assets []*PlanetAsset) *PlanetPosition {
+	return &PlanetPosition{
+		x:             randomFloat(0, float64(LogicalWidth)),
+		y:             randomFloat(-float64(ScreenHeight), float64(ScreenHeight)),
+		scale:         randomFloat(0.3, 0.8),
+		rotationSpeed: randomFloat(1, 4),
+		axis:          randomPlanetAxis(),
+		asset:         assets[rand.N(len(assets))],
+	}
+}
+
 func MakeBackground() (*Background, error) {
+	galaxyImage, err := gameImages.LoadImage(gameImages.ImageGalaxy)
+	if err != nil {
+		return nil, err
+	}
+
+	galaxyShader, err := LoadGalaxyShader()
+	if err != nil {
+		return nil, err
+	}
+
+	planetShader, err := LoadPlanetShader()
+	if err != nil {
+		return nil, err
+	}
+
+	earthImage, err := gameImages.LoadImage(gameImages.ImageEarth)
+	if err != nil {
+		return nil, err
+	}
+
+	marsImage, err := gameImages.LoadImage(gameImages.ImageMars)
+	if err != nil {
+		return nil, err
+	}
+
+	alienWorldImage, err := gameImages.LoadImage(gameImages.ImageAlienWorld)
+	if err != nil {
+		return nil, err
+	}
+
+	cloud1Image, err := gameImages.LoadImage(gameImages.ImageCloud1)
+	if err != nil {
+		return nil, err
+	}
+
+	cloudAImage, err := gameImages.LoadImage(gameImages.ImageCloudA)
+	if err != nil {
+		return nil, err
+	}
+
 	starImage, err := gameImages.LoadImage(gameImages.ImageStar1)
 	if err != nil {
 		return nil, err
@@ -450,13 +541,65 @@ func MakeBackground() (*Background, error) {
 		stars = append(stars, &StarPosition{x: x, y: y, dx: dx, dy: dy, Image: image})
 	}
 
+	numGalaxies := 1
+
+	var galaxies []*GalaxyPosition
+	for range numGalaxies {
+		galaxies = append(galaxies, &GalaxyPosition{
+			x:     randomFloat(0, float64(LogicalWidth)),
+			y:     randomFloat(0-float64(ScreenHeight), float64(ScreenHeight)),
+			tilt:  randomFloat(0.2, 0.8),
+			scale: randomFloat(0.2, 0.8),
+		})
+	}
+
+	earth := ebiten.NewImageFromImage(earthImage)
+	cloud1 := ebiten.NewImageFromImage(cloud1Image)
+	cloudA := ebiten.NewImageFromImage(cloudAImage)
+	planetAssets := []*PlanetAsset{
+		{
+			Image: earth,
+			Cloud: makeCloudImage(earth.Bounds(), cloud1, cloudA),
+		},
+		{
+			Image: ebiten.NewImageFromImage(marsImage),
+		},
+		{
+			Image: ebiten.NewImageFromImage(alienWorldImage),
+		},
+	}
+
 	return &Background{
+		Galaxy:       ebiten.NewImageFromImage(galaxyImage),
+		GalaxyShader: galaxyShader,
+		Galaxies:     galaxies,
+		PlanetShader: planetShader,
+		PlanetAssets: planetAssets,
+		Planet:       makePlanetPosition(planetAssets),
 		// Star: ebiten.NewImageFromImage(starImage),
 		Stars: stars,
 	}, nil
 }
 
 func (background *Background) Update() {
+	background.Planet.y += 0.38
+	if background.Planet.y > ScreenHeight+float64(background.PlanetAssets[0].Image.Bounds().Dy())*background.Planet.scale {
+		background.Planet = makePlanetPosition(background.PlanetAssets)
+		background.Planet.y = randomFloat(-float64(ScreenHeight)-250, -250)
+		background.Planet.scale = randomFloat(0.3, 0.8)
+		background.Planet.rotationSpeed = randomFloat(1, 4)
+	}
+
+	for _, galaxy := range background.Galaxies {
+		galaxy.y += 0.22
+		if galaxy.y > ScreenHeight+200 {
+			galaxy.x = randomFloat(0, float64(LogicalWidth))
+			galaxy.y = randomFloat(-float64(ScreenHeight)-200, -200)
+			galaxy.tilt = randomFloat(0.2, 0.8)
+			galaxy.scale = randomFloat(0.2, 0.8)
+		}
+	}
+
 	for _, star := range background.Stars {
 		star.y += star.dy
 		if star.y > ScreenHeight+50 {
@@ -465,12 +608,27 @@ func (background *Background) Update() {
 	}
 }
 
-func (background *Background) Draw(screen *ebiten.Image, camera *Camera) {
-	screen.Fill(color.RGBA{0x1b, 0x22, 0x24, 0xff})
+func (background *Background) Draw(screen *ebiten.Image, camera *Camera, counter uint64) {
+	options := &ebiten.DrawImageOptions{}
+	bounds := background.Galaxy.Bounds()
+	options.GeoM.Scale(float64(screen.Bounds().Dx())/float64(bounds.Dx()), float64(screen.Bounds().Dy())/float64(bounds.Dy()))
+	options.ColorScale.ScaleAlpha(0.3)
+	screen.DrawImage(background.Galaxy, options)
+
+	useTime := float32(counter) / 60.0
+	for _, galaxy := range background.Galaxies {
+		x, y := camera.Apply(galaxy.x, galaxy.y)
+		DrawGalaxy(screen, background.GalaxyShader, background.Galaxy, useTime, float32(galaxy.tilt), float32(x), float32(y), float32(galaxy.scale))
+	}
+
+	planetX, planetY := camera.Apply(background.Planet.x, background.Planet.y)
+	planetTime := float64(counter) / background.Planet.rotationSpeed
+	DrawPlanet(screen, planetX, planetY, background.Planet.scale, background.Planet.axis, background.Planet.asset.Image, background.Planet.asset.Cloud, planetTime, background.PlanetShader)
 
 	for _, star := range background.Stars {
 		x, y := camera.Apply(star.x, star.y)
 		options := &ebiten.DrawImageOptions{}
+		options.ColorScale.ScaleAlpha(0.5)
 		options.GeoM.Translate(x, y)
 		screen.DrawImage(star.Image, options)
 	}
@@ -821,7 +979,7 @@ func (player *Player) DrawHud(screen *ebiten.Image, imageManager *ImageManager, 
 
 			options.GeoM.Translate(5, energyY+float64(energy.Bounds().Dy())-float64(useHeight))
 
-			vector.StrokeRect(screen, 5, float32(energyY), float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), 1, premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 200}), true)
+			vector.FillRect(screen, 5, float32(energyY+1), float32(energy.Bounds().Dx()), float32(energy.Bounds().Dy()), premultiplyAlpha(color.RGBA{R: 0xaa, G: 0xe9, B: 0xfb, A: 180}), false)
 
 			sub := energy.SubImage(image.Rect(0, energy.Bounds().Dy()-int(useHeight), energy.Bounds().Dx(), energy.Bounds().Dy())).(*ebiten.Image)
 			screen.DrawImage(sub, options)
@@ -1998,7 +2156,7 @@ func (game *Game) TestAlphaCircle(screen *ebiten.Image, x float64, y float64) {
 }
 
 func (game *Game) Draw(screen *ebiten.Image) {
-	game.Background.Draw(screen, game.Camera)
+	game.Background.Draw(screen, game.Camera, game.Counter)
 
 	makeSlaveTint := func() *colorm.ColorM {
 		var tint colorm.ColorM

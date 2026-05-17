@@ -1,0 +1,142 @@
+//kage:unit pixels
+
+package main
+
+var GalaxyCenter vec2
+var GalaxyScale float
+var Time float
+var Tilt float
+
+// sampleNoise0 and sampleNoise1 treat the source images as tiling noise textures.
+func sampleNoise0(uv vec2) vec4 {
+	origin := imageSrc0Origin()
+	size := imageSrc0Size()
+	return imageSrc0UnsafeAt(origin + mod(uv*size, size))
+}
+
+func sampleNoise1(uv vec2) vec4 {
+	origin := imageSrc1Origin()
+	size := imageSrc1Size()
+	return imageSrc1UnsafeAt(origin + mod(uv*size, size))
+}
+
+func getNoiseValue(uv vec2) float {
+	n := sampleNoise0(uv).r
+	// Fold the noise around the midpoint so bright and dark regions both contribute.
+	return 1.0 - abs(2.0*n-1.0)
+}
+
+func tiltedPlaneUV(uv vec2) vec2 {
+	tiltAngle := 1.6 * Tilt
+	cameraDistance := 2.2
+	cosTilt := cos(tiltAngle)
+	tanTilt := sin(tiltAngle) / cosTilt
+
+	// Intersect the screen ray with a plane that has been rotated around the X axis.
+	// This adds foreshortening and depth instead of only flattening the galaxy vertically.
+	perspective := cameraDistance / (cameraDistance + uv.y*tanTilt)
+	return vec2(
+		uv.x*perspective,
+		uv.y*perspective/cosTilt,
+	)
+}
+
+func turbulentNoise(uv vec2) float {
+	dustStrength := 3.0
+	rotationSpeed := 0.1
+
+	value := 0.0
+	angle := -rotationSpeed * Time
+	rotationMatrix := mat2(
+		vec2(cos(angle), -sin(angle)),
+		vec2(sin(angle), cos(angle)),
+	)
+
+	// Build fractal turbulence by repeatedly rotating and doubling the sample frequency.
+	scale := 1.0
+	for i := 0; i < 7; i++ {
+		uv = rotationMatrix * uv
+		noiseValue := getNoiseValue(uv * scale)
+		value += (1.0 / scale) * pow(noiseValue, dustStrength)
+		scale *= 2.0
+	}
+
+	return value / 2.0
+}
+
+func Fragment(dstPos vec4) vec4 {
+	dustColor := vec3(0.4, 0.34, 0.43)
+	armCount := 5.0
+	armCompression := 0.1
+	coreRadius := 0.25
+	coreColor := vec3(0.48, 0.8, 0.79)
+	galaxyRadius := 0.4
+	rotationSpeed := 0.1
+	skyColor := vec3(0.23, 0.08, 0.14)
+	starSize := 0.537
+
+	// Convert the current pixel into centered normalized space.
+	screenSize := imageDstSize()
+	screenUV := dstPos.xy / screenSize
+	uv := screenUV - GalaxyCenter
+
+	// Correct the x axis so the galaxy stays circular on non-square render targets.
+	aspectRatio := screenSize.x / screenSize.y
+	uv.x *= aspectRatio
+	uv /= max(GalaxyScale, 0.0001)
+	// View the galaxy through a tilted plane so it appears rotated in 3D around the X axis.
+	// Tilt = 0 leaves the galaxy flat, while Tilt = 1 maps to a 1.6 rad near-edge-on view.
+	uv = tiltedPlaneUV(uv)
+
+	// Polar coordinates make it easy to express spiral-arm motion.
+	rho := length(uv)
+	rhoSafe := max(rho, 0.0001)
+	ang := atan2(uv.y, uv.x)
+	// shear is a logarithmic twist amount: points nearer the core get a larger angular
+	// offset than points farther out, which bends straight radial structure into spirals.
+	shear := 2.0 * log(rhoSafe)
+	// shearMatrix is the rotation matrix for that twist. We reuse it later to rotate the
+	// dust-sampling coordinates by the same radius-dependent amount so the turbulence follows
+	// the same spiral flow as the galaxy arms instead of cutting across them.
+	shearMatrix := mat2(
+		vec2(cos(shear), -sin(shear)),
+		vec2(sin(shear), cos(shear)),
+	)
+
+	// Base radial falloff for the disk and the bright central core.
+	diskDensity := exp(-pow(rho/galaxyRadius, 2.0))
+	coreGlow := exp(-pow(rho/coreRadius, 2.0))
+
+	// Subtracting shear from ang measures each pixel in the spiral's twisted frame, which is
+	// what lets a simple sine wave form curved arms instead of concentric rings.
+	// The extra time terms rotate and undulate that frame.
+	phase := armCount*(ang-shear) + rotationSpeed*Time*40
+	armWarpAngle := ang - armCompression*cos(phase) + rotationSpeed*Time
+	warpedUV := rho * vec2(cos(armWarpAngle), sin(armWarpAngle))
+
+	// Increase density inside arms and reduce it between them.
+	armDensity := 1.0 + armCount*armCompression*sin(phase)
+	diskDensity *= 0.7 * armDensity
+
+	// Modulate the disk with rotating turbulence to create dusty structure.
+	dust := turbulentNoise(0.108 * (shearMatrix * warpedUV))
+	dustTransparency := pow(1.0-dust*diskDensity, 2.0)
+
+	// Combine two noise fields to get sparse, punchy background stars.
+	// stars1 := sampleNoise1(starSize*uv + vec2(0.5)).r
+	stars2 := sampleNoise0(starSize*uv + vec2(0.5)).r
+	// stars := pow(1.0-(1.0-stars1)*(1.0-stars2), 5.0)
+    stars := pow(stars2, 5.0)
+
+	// Blend sky, dusty disk, stars, and then the core glow.
+	finalColor := mix(
+		skyColor,
+		dustTransparency*(1.7*dustColor)+vec3(1.2*stars),
+		vec3(diskDensity),
+	)
+	finalColor = mix(finalColor, 1.2*coreColor, vec3(coreGlow))
+
+	// Fade the outer edge so the galaxy blends out instead of ending abruptly.
+	alpha := 1.0 - pow(rho/galaxyRadius, 3.0)
+	return vec4(finalColor, 1) * alpha
+}
