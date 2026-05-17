@@ -407,8 +407,9 @@ type StarPosition struct {
 }
 
 type GalaxyPosition struct {
-	x, y float64
-	tilt float64
+	x, y  float64
+	tilt  float64
+	scale float64
 }
 
 type Background struct {
@@ -469,14 +470,15 @@ func MakeBackground() (*Background, error) {
 		stars = append(stars, &StarPosition{x: x, y: y, dx: dx, dy: dy, Image: image})
 	}
 
-    numGalaxies := 1
+	numGalaxies := 1
 
 	var galaxies []*GalaxyPosition
 	for range numGalaxies {
 		galaxies = append(galaxies, &GalaxyPosition{
-			x:    randomFloat(0, float64(LogicalWidth)),
-			y:    randomFloat(0-float64(ScreenHeight), float64(ScreenHeight)),
-			tilt: randomFloat(0.2, 0.8),
+			x:     randomFloat(0, float64(LogicalWidth)),
+			y:     randomFloat(0-float64(ScreenHeight), float64(ScreenHeight)),
+			tilt:  randomFloat(0.2, 0.8),
+			scale: randomFloat(0.2, 0.8),
 		})
 	}
 
@@ -496,6 +498,7 @@ func (background *Background) Update() {
 			galaxy.x = randomFloat(0, float64(LogicalWidth))
 			galaxy.y = randomFloat(-float64(ScreenHeight)-200, -200)
 			galaxy.tilt = randomFloat(0.2, 0.8)
+			galaxy.scale = randomFloat(0.2, 0.8)
 		}
 	}
 
@@ -513,7 +516,7 @@ func (background *Background) Draw(screen *ebiten.Image, camera *Camera, counter
 	useTime := float32(counter) / 60.0
 	for _, galaxy := range background.Galaxies {
 		x, y := camera.Apply(galaxy.x, galaxy.y)
-		DrawGalaxy(screen, background.GalaxyShader, background.Galaxy, useTime, float32(galaxy.tilt), float32(x), float32(y), 0.45)
+		DrawGalaxy(screen, background.GalaxyShader, background.Galaxy, useTime, float32(galaxy.tilt), float32(x), float32(y), float32(galaxy.scale))
 	}
 
 	for _, star := range background.Stars {
