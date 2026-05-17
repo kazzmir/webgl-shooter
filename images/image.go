@@ -1,11 +1,12 @@
 package image
 
 import (
-    _ "embed"
-    "image"
-    "bytes"
-    "fmt"
-    _ "image/png"
+	"bytes"
+	_ "embed"
+	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 )
 
 type Image string
@@ -14,6 +15,7 @@ const ImagePlayer = Image("player")
 const ImageStar1 = Image("star1")
 const ImageStar2 = Image("star2")
 const ImagePlanet = Image("planet")
+const ImageGalaxy = Image("galaxy")
 const ImageBullet = Image("bullet")
 const ImageEnemy1 = Image("enemy1")
 const ImageEnemy2 = Image("enemy2")
@@ -63,6 +65,9 @@ var star2Image []byte
 
 //go:embed background/planet1.png
 var planetImage []byte
+
+//go:embed background/galaxy3.jpg
+var galaxyImage []byte
 
 //go:embed bullet/small-blue.png
 var bulletSmallBlueImage []byte
@@ -157,53 +162,91 @@ var rotate1Image []byte
 //go:embed player/bolt1.png
 var lightningImage []byte
 
-func loadPng(data []byte) (image.Image, error) {
-    img, _, err := image.Decode(bytes.NewReader(data))
-    if err != nil {
-        return nil, err
-    }
-    return img, nil
+func loadEmbeddedImage(data []byte) (image.Image, error) {
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	return img, nil
 }
 
 func LoadImage(name Image) (image.Image, error) {
-    switch name {
-        case ImagePlayer: return loadPng(playerImage)
-        case ImageStar1: return loadPng(star1Image)
-        case ImageStar2: return loadPng(star2Image)
-        case ImagePlanet: return loadPng(planetImage)
-        case ImageBullet: return loadPng(bulletImage)
-        case ImageEnemy1: return loadPng(enemy1Image)
-        case ImageEnemy2: return loadPng(enemy2Image)
-        case ImageEnemy3: return loadPng(enemy3Image)
-        case ImageEnemy4: return loadPng(enemy4Image)
-        case ImageEnemy5: return loadPng(enemy5Image)
-        case ImageEnemy6: return loadPng(enemy6Image)
-        case ImageEnemy7: return loadPng(enemy7Image)
-        case ImageEnemy8: return loadPng(enemy8Image)
-        case ImageEnemy9: return loadPng(enemy9Image)
-        case ImageBoss1: return loadPng(boss1Image)
-        case ImageExplosion1: return loadPng(explosion1Image)
-        case ImageExplosion2: return loadPng(explosion2Animation)
-        case ImageExplosion3: return loadPng(explosion3Animation)
-        case ImageHit: return loadPng(hitImage)
-        case ImageBeam1: return loadPng(beam1Image)
-        case ImageWave1: return loadPng(wave1Image)
-        case ImageRotate1: return loadPng(rotate1Image)
-        case ImageHit2: return loadPng(hit2Image)
-        case ImageMissle1: return loadPng(missle1Image)
-        case ImageBulletSmallBlue: return loadPng(bulletSmallBlueImage)
-        case ImagePowerup1: return loadPng(powerup1Image)
-        case ImagePowerup2: return loadPng(powerup2Image)
-        case ImagePowerup3: return loadPng(powerup3Image)
-        case ImagePowerup4: return loadPng(powerup4Image)
-        case ImagePowerup5: return loadPng(powerup5Image)
-        case ImageAsteroid1: return loadPng(asteroid1Image)
-        case ImageAsteroid2: return loadPng(asteroid2Image)
-        case ImageFire1: return loadPng(fire1Animation)
-        case ImageBomb: return loadPng(bombImage)
-        case ImagePowerupBomb: return loadPng(powerupBombImage)
-        case ImageLightningIcon: return loadPng(lightningImage)
-    }
+	switch name {
+	case ImagePlayer:
+		return loadEmbeddedImage(playerImage)
+	case ImageStar1:
+		return loadEmbeddedImage(star1Image)
+	case ImageStar2:
+		return loadEmbeddedImage(star2Image)
+	case ImagePlanet:
+		return loadEmbeddedImage(planetImage)
+	case ImageGalaxy:
+		return loadEmbeddedImage(galaxyImage)
+	case ImageBullet:
+		return loadEmbeddedImage(bulletImage)
+	case ImageEnemy1:
+		return loadEmbeddedImage(enemy1Image)
+	case ImageEnemy2:
+		return loadEmbeddedImage(enemy2Image)
+	case ImageEnemy3:
+		return loadEmbeddedImage(enemy3Image)
+	case ImageEnemy4:
+		return loadEmbeddedImage(enemy4Image)
+	case ImageEnemy5:
+		return loadEmbeddedImage(enemy5Image)
+	case ImageEnemy6:
+		return loadEmbeddedImage(enemy6Image)
+	case ImageEnemy7:
+		return loadEmbeddedImage(enemy7Image)
+	case ImageEnemy8:
+		return loadEmbeddedImage(enemy8Image)
+	case ImageEnemy9:
+		return loadEmbeddedImage(enemy9Image)
+	case ImageBoss1:
+		return loadEmbeddedImage(boss1Image)
+	case ImageExplosion1:
+		return loadEmbeddedImage(explosion1Image)
+	case ImageExplosion2:
+		return loadEmbeddedImage(explosion2Animation)
+	case ImageExplosion3:
+		return loadEmbeddedImage(explosion3Animation)
+	case ImageHit:
+		return loadEmbeddedImage(hitImage)
+	case ImageBeam1:
+		return loadEmbeddedImage(beam1Image)
+	case ImageWave1:
+		return loadEmbeddedImage(wave1Image)
+	case ImageRotate1:
+		return loadEmbeddedImage(rotate1Image)
+	case ImageHit2:
+		return loadEmbeddedImage(hit2Image)
+	case ImageMissle1:
+		return loadEmbeddedImage(missle1Image)
+	case ImageBulletSmallBlue:
+		return loadEmbeddedImage(bulletSmallBlueImage)
+	case ImagePowerup1:
+		return loadEmbeddedImage(powerup1Image)
+	case ImagePowerup2:
+		return loadEmbeddedImage(powerup2Image)
+	case ImagePowerup3:
+		return loadEmbeddedImage(powerup3Image)
+	case ImagePowerup4:
+		return loadEmbeddedImage(powerup4Image)
+	case ImagePowerup5:
+		return loadEmbeddedImage(powerup5Image)
+	case ImageAsteroid1:
+		return loadEmbeddedImage(asteroid1Image)
+	case ImageAsteroid2:
+		return loadEmbeddedImage(asteroid2Image)
+	case ImageFire1:
+		return loadEmbeddedImage(fire1Animation)
+	case ImageBomb:
+		return loadEmbeddedImage(bombImage)
+	case ImagePowerupBomb:
+		return loadEmbeddedImage(powerupBombImage)
+	case ImageLightningIcon:
+		return loadEmbeddedImage(lightningImage)
+	}
 
-    return nil, fmt.Errorf("no such image: %s", name)
+	return nil, fmt.Errorf("no such image: %s", name)
 }

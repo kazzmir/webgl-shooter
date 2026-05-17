@@ -406,7 +406,16 @@ type StarPosition struct {
 	Image  *ebiten.Image
 }
 
+type GalaxyPosition struct {
+	x, y float64
+	tilt float64
+}
+
 type Background struct {
+	Galaxy       *ebiten.Image
+	GalaxyShader *ebiten.Shader
+	Galaxies     []*GalaxyPosition
+
 	// Star *ebiten.Image
 	// Star2 *ebiten.Image
 	Stars []*StarPosition
@@ -417,6 +426,16 @@ func randomFloat(min float64, max float64) float64 {
 }
 
 func MakeBackground() (*Background, error) {
+	galaxyImage, err := gameImages.LoadImage(gameImages.ImageGalaxy)
+	if err != nil {
+		return nil, err
+	}
+
+	galaxyShader, err := LoadGalaxyShader()
+	if err != nil {
+		return nil, err
+	}
+
 	starImage, err := gameImages.LoadImage(gameImages.ImageStar1)
 	if err != nil {
 		return nil, err
@@ -450,13 +469,36 @@ func MakeBackground() (*Background, error) {
 		stars = append(stars, &StarPosition{x: x, y: y, dx: dx, dy: dy, Image: image})
 	}
 
+    numGalaxies := 1
+
+	var galaxies []*GalaxyPosition
+	for range numGalaxies {
+		galaxies = append(galaxies, &GalaxyPosition{
+			x:    randomFloat(0, float64(LogicalWidth)),
+			y:    randomFloat(0-float64(ScreenHeight), float64(ScreenHeight)),
+			tilt: randomFloat(0.2, 0.8),
+		})
+	}
+
 	return &Background{
+		Galaxy:       ebiten.NewImageFromImage(galaxyImage),
+		GalaxyShader: galaxyShader,
+		Galaxies:     galaxies,
 		// Star: ebiten.NewImageFromImage(starImage),
 		Stars: stars,
 	}, nil
 }
 
 func (background *Background) Update() {
+	for _, galaxy := range background.Galaxies {
+		galaxy.y += 0.22
+		if galaxy.y > ScreenHeight+200 {
+			galaxy.x = randomFloat(0, float64(LogicalWidth))
+			galaxy.y = randomFloat(-float64(ScreenHeight)-200, -200)
+			galaxy.tilt = randomFloat(0.2, 0.8)
+		}
+	}
+
 	for _, star := range background.Stars {
 		star.y += star.dy
 		if star.y > ScreenHeight+50 {
@@ -465,8 +507,14 @@ func (background *Background) Update() {
 	}
 }
 
-func (background *Background) Draw(screen *ebiten.Image, camera *Camera) {
-	screen.Fill(color.RGBA{0x1b, 0x22, 0x24, 0xff})
+func (background *Background) Draw(screen *ebiten.Image, camera *Camera, counter uint64) {
+	// screen.Fill(color.RGBA{0x1b, 0x22, 0x24, 0xff})
+
+	useTime := float32(counter) / 60.0
+	for _, galaxy := range background.Galaxies {
+		x, y := camera.Apply(galaxy.x, galaxy.y)
+		DrawGalaxy(screen, background.GalaxyShader, background.Galaxy, useTime, float32(galaxy.tilt), float32(x), float32(y), 0.45)
+	}
 
 	for _, star := range background.Stars {
 		x, y := camera.Apply(star.x, star.y)
@@ -1998,7 +2046,7 @@ func (game *Game) TestAlphaCircle(screen *ebiten.Image, x float64, y float64) {
 }
 
 func (game *Game) Draw(screen *ebiten.Image) {
-	game.Background.Draw(screen, game.Camera)
+	game.Background.Draw(screen, game.Camera, game.Counter)
 
 	makeSlaveTint := func() *colorm.ColorM {
 		var tint colorm.ColorM
